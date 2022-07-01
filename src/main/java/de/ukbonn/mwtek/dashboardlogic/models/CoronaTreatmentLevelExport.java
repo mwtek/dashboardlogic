@@ -15,30 +15,48 @@
  * OF THE POSSIBILITY OF SUCH DAMAGES. You should have received a copy of the GPL 3 license with *
  * this file. If not, visit http://www.gnu.de/documents/gpl-3.0.en.html
  */
+package de.ukbonn.mwtek.dashboardlogic.models;
 
-package de.ukbonn.mwtek.dashboardlogic.enums;
+import java.util.List;
 
 /**
- * Enum class that contains the different possible treatmentlevel states
- * 
- * @author <a href="mailto:david.meyers@ukbonn.de">David Meyers</a>
- *
+ * Export model for file generation that reports case/encounter ids of active cases separated by
+ * treatment level
  */
-public enum TreatmentLevel {
+public record CoronaTreatmentLevelExport(List<String> listNormalWard, List<String> listIcu,
+                                         List<String> listIcuVent, List<String> listEcmo) {
 
-  AMBULANT ("ambulant"),
-  NORMALSTATION ("Normalstation"),
-  ICU ("ICU"),
-  ICUWITHVENTILATION ("ICU_mit_Beatmung"),
-  ICUWITHECMO ("ICU_mit_ECMO");
+  public String toCsv() {
+    StringBuilder sb = new StringBuilder();
+    sb.append("Normalstation;ICU;ICU_mit_Beatmung;ICU_mit_ECMO\n");
 
-  private TreatmentLevel(String text) {
-    this.text = text;
-  }
+    int maxSize = Math.max(listNormalWard.size(), listIcu.size());
+    for (int i = 0; i < maxSize; i++) {
+      if (listNormalWard.size() > i && listNormalWard.get(i) != null) {
+        sb.append(listNormalWard.get(i)).append(";");
+      } else {
+        sb.append(";");
+      }
+      if (listIcu.size() > i && listIcu.get(i) != null) {
+        sb.append(listIcu.get(i)).append(";");
+      } else {
+        sb.append(";");
+      }
+      if (listIcuVent.size() > i && listIcuVent.get(i) != null) {
+        sb.append(listIcuVent.get(i)).append(";");
+      } else {
+        sb.append(";");
+      }
+      if (listEcmo.size() > i && listEcmo.get(i) != null) {
+        sb.append(listEcmo.get(i));
+      } else {
+        sb.append(";");
+      }
 
-  private String text;
+      sb.append("\n");
+    }
 
-  public String getText() {
-    return text;
+    return sb.toString();
   }
 }
+

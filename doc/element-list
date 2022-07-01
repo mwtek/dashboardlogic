@@ -1,0 +1,13 @@
+de.ukbonn.mwtek.dashboardlogic.enums
+de.ukbonn.mwtek.dashboardlogic.logic
+de.ukbonn.mwtek.dashboardlogic.logic.cumulative
+de.ukbonn.mwtek.dashboardlogic.logic.cumulative.age
+de.ukbonn.mwtek.dashboardlogic.logic.cumulative.gender
+de.ukbonn.mwtek.dashboardlogic.logic.cumulative.lengthofstay
+de.ukbonn.mwtek.dashboardlogic.logic.cumulative.maxtreatmentlevel
+de.ukbonn.mwtek.dashboardlogic.logic.current
+de.ukbonn.mwtek.dashboardlogic.logic.current.age
+de.ukbonn.mwtek.dashboardlogic.logic.timeline
+de.ukbonn.mwtek.dashboardlogic.models
+de.ukbonn.mwtek.dashboardlogic.settings
+de.ukbonn.mwtek.dashboardlogic.tools

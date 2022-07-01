@@ -20,9 +20,8 @@ package de.ukbonn.mwtek.dashboardlogic.enums;
 
 /**
  * Enum class containing the different VitalStatus states
- * 
- * @author <a href="mailto:david.meyers@ukbonn.de">David Meyers</a>
  *
+ * @author <a href="mailto:david.meyers@ukbonn.de">David Meyers</a>
  */
 public enum VitalStatus {
   // VitalStatus

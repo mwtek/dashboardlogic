@@ -21,9 +21,8 @@ package de.ukbonn.mwtek.dashboardlogic.enums;
 /**
  * Class with all numeric, parameterizable constants that can have an influence on the dashboard
  * logic
- * 
- * @author <a href="mailto:david.meyers@ukbonn.de">David Meyers</a>
  *
+ * @author <a href="mailto:david.meyers@ukbonn.de">David Meyers</a>
  */
 public class CoronaDashboardConstants {
 

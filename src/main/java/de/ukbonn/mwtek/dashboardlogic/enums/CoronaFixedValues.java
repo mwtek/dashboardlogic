@@ -18,140 +18,124 @@
 
 package de.ukbonn.mwtek.dashboardlogic.enums;
 
-import org.hl7.fhir.r4.model.Coding;
-import org.hl7.fhir.r4.model.Encounter;
 import com.google.common.collect.ImmutableList;
 import de.ukbonn.mwtek.utilities.fhir.misc.StaticValueProvider;
 
 /**
  * Class with all textual fixed values necessary for the creation of the Json class and data
  * processing (e.g. DataItems designations, formatting, flags).
- * 
+ *
  * @author <a href="mailto:david.meyers@ukbonn.de">David Meyers</a>
  * @author <a href="mailto:berke_enes.dincel@ukbonn.de">Berke Enes Dincel</a>
  */
 public enum CoronaFixedValues {
   // COVID-States
-  POSITIVE_RESULT (StaticValueProvider.system + "/covidResultPositive"),
-  NEGATIVE_RESULT (StaticValueProvider.system + "/covidResultNegative"),
-  BORDERLINE_RESULT (StaticValueProvider.system + "/covidResultBorderLine"),
-  TWELVE_DAYS_LOGIC ("12 Days Timespan"),
+  POSITIVE_RESULT(StaticValueProvider.system + "/covidResultPositive"),
+  NEGATIVE_RESULT(StaticValueProvider.system + "/covidResultNegative"),
+  BORDERLINE_RESULT(StaticValueProvider.system + "/covidResultBorderLine"),
+  TWELVE_DAYS_LOGIC("12 Days Timespan"),
 
   // DateFormat
-  DATEFORMAT ("yyyy-MM-dd"),
+  DATE("date"),
 
   // ICU-CategoryCodes
-  ECMO_CODE ("182744004"),
-  VENT_CODE ("40617009"),
-  VENT_CODE2 ("57485005"),
+  ECMO_CODE("182744004"),
+  VENT_CODE("40617009"),
+  VENT_CODE2("57485005"),
 
   // Positive/Negative state
-  POSITIVE_CODE ("10828004"),
-  NEGATIVE_CODE ("260385009"),
-  BORDERLINE_CODE ("419984006"),
+  POSITIVE_CODE("10828004"),
+  NEGATIVE_CODE("260385009"),
+  BORDERLINE_CODE("419984006"),
 
   // Entry in specific data items
-  POSITIVE ("positiv"),
-  NEGATIVE ("negativ"),
-  BORDERLINE ("grenzwertig_Verdacht"),
-  MALE_SPECIFICATION ("maennlich"),
-  FEMALE_SPECIFICATION ("weiblich"),
-  DIVERSE_SPECIFICATION ("divers"),
+  POSITIVE("Positive"),
+  NEGATIVE("Negative"),
+  BORDERLINE("Borderline_suspected"),
+  MALE_SPECIFICATION("Male"),
+  FEMALE_SPECIFICATION("Female"),
+  DIVERSE_SPECIFICATION("Diverse"),
 
-  ICU ("ICU"),
-  ICU_VENTILATION ("ICU_mit_Beatmung"),
-  ICU_ECMO ("ICU_mit_ECMO"),
-  NORMALSTATION ("Normalstation"),
-  STATIONARY_ITEM ("stationär"),
-  AFTERSTATIONARY_ITEM ("nachstationär"),
-  PARTSTATIONARY_ITEM ("teilstationär"),
-  PRESTATIONARY_ITEM ("vorstationär"),
-  AMBULANT_ITEM ("ambulant"),
+  ICU("ICU"),
+  ICU_VENTILATION("ICU_with_ventilation"),
+  ICU_ECMO("ICU_with_ecmo"),
+  NORMAL_WARD("Normal_ward"),
+
+  // Internal usages for list management
+  STATIONARY_ITEM("Stationary"),
+  OUTPATIENT_ITEM("Outpatient"),
 
   // Gender [FHIR Value Set]
-  MALE ("male"),
-  FEMALE ("female"),
-  DIVERSE ("diverse"),
-  UNKNOWN ("unknown"), // just for debugging issues
+  GENDER_MALE("male"),
+  GENDER_FEMALE("female"),
+  GENDER_DIVERSE("diverse"),
+  GENDER_UNKNOWN("unknown"),
 
   // Administrative data patient
-  COUNTRY_CODE ("D"),
-  CITY_BONN ("Bonn"),
+  /*
+   ISO 3166 country code
+   */
+  COUNTRY_CODE("DE"),
+  CITY_BONN("Bonn"),
 
   // dischargeCoding [FHIR Value Set]
-  DEATH_CODE ("07"),
+  DISCHARGE_DISPOSITION_EXT_URL("http://fhir.de/StructureDefinition/Entlassungsgrund"),
+  DISCHARGE_DISPOSITION_FIRST_AND_SECOND_POS_EXT_URL("ErsteUndZweiteStelle"),
+  DISCHARGE_DISPOSITION_FIRST_AND_SECOND_POS_SYSTEM(
+      "http://fhir.de/CodeSystem/dkgev/EntlassungsgrundErsteUndZweiteStelle"),
+  DEATH_CODE("07"),
 
   // VitalStatus
-  ALIVE ("alive"),
-  DEAD ("dead"),
+  ALIVE("alive"),
+  DEAD("dead"),
 
   // Encounter.case.class (new fhir profile ->
   // https://simplifier.net/packages/de.basisprofil.r4/1.0.0/files/397957)
-  CASECLASS_INPATIENT ("IMP"),
-  CASECLASS_OUTPATIENT ("AMB"),
+  CASECLASS_INPATIENT("IMP"),
+  CASECLASS_OUTPATIENT("AMB"),
 
   // Encounter.case.type.kontaktart (new fhir profile ->
   // https://simplifier.net/packages/de.basisprofil.r4/1.0.0/files/397801)
-  CASETYPE_PRESTATIONARY ("vorstationaer"),
-  CASETYPE_POSTSTATIONARY ("nachstationaer"),
-  CASETYPE_PARTSTATIONARY ("teilstationaer"),
-  CASETYPE_NORMALSTATIONARY ("normalstationaer"),
-  CASETYPE_INTENSIVESTATIONARY ("intensivstationaer"),
-  CASETYPE_KONTAKTART_SYSTEM ("http://fhir.de/CodeSystem/kontaktart-de"),
+  CASETYPE_PRESTATIONARY("vorstationaer"),
+  CASETYPE_POSTSTATIONARY("nachstationaer"),
+  CASETYPE_PARTSTATIONARY("teilstationaer"),
+  CASETYPE_NORMALSTATIONARY("normalstationaer"),
+  CASETYPE_INTENSIVESTATIONARY("intensivstationaer"),
+  CASETYPE_KONTAKTART_SYSTEM("http://fhir.de/CodeSystem/kontaktart-de"),
 
   // CaseStatus
-  ALL ("all"),
-  INPATIENT ("inpatient"),
-  OUTPATIENT ("outpatient"),
+  CASESTATUS_ALL("all"),
+  CASESTATUS_INPATIENT("inpatient"),
+  CASESTATUS_OUTPATIENT("outpatient"),
 
   // PhysicalType(s)
-  WARD ("wa"),
+  WARD("wa"),
 
   // DiagnosticCodes
-  PRIMAERCODE ("http://fhir.de/StructureDefinition/icd-10-gm-primaercode"),
-  ICD ("http://fhir.de/StructureDefinition/icd-10-gm-ausrufezeichen"),
-  ICD_SYSTEM ("http://fhir.de/CodeSystem/dimdi/icd-10-gm"),
-  ICD_SECURITY ("http://fhir.de/StructureDefinition/icd-10-gm-diagnosesicherheit"),
-  ICD_SECURITY_SYSTEM ("https://fhir.kbv.de/CodeSystem/KBV_CS_SFHIR_ICD_DIAGNOSESICHERHEIT"),
-  DIAGNOSECODE_EMPTY ("No Code"),
-  U071 ("U07.1"),
-  U071A ("U07.1A"),
-  U071G ("U07.1G"),
-  U071Z ("U07.1Z"),
-  U071V ("U07.1V"),
-  U072 ("U07.2"),
-  U072A ("U07.2A"),
-  U072G ("U07.2G"),
-  U072V ("U07.2V"),
-  U072Z ("U07.2Z"),;
+  ICD("http://fhir.de/StructureDefinition/icd-10-gm-ausrufezeichen"),
+  ICD_SYSTEM("http://fhir.de/CodeSystem/bfarm/icd-10-gm"),
+  ICD_DIAG_RELIABILITY_EXT_URL("http://fhir.de/StructureDefinition/icd-10-gm-diagnosesicherheit"),
+  ICD_DIAG_RELIABILITY_CODING_SYSTEM(
+      "https://fhir.kbv.de/CodeSystem/KBV_CS_SFHIR_ICD_DIAGNOSESICHERHEIT"),
 
-  /**
-   * ValueSet with all inpatient codes ({@link Coding#getCode() Encounter.class.code}) that fit to
-   * the data specification
-   */
-  public static final ImmutableList<String> STATIONARY_CODES =
-      ImmutableList.of("stationär", "nachstationär", "teilstationär");
+  U071("U07.1"),
+  U072("U07.2"),
 
-  /**
-   * ValueSet with all inpatient codes ({@link Encounter#getType() Encounter.type.kontaktart}) that
-   * fit to the data specification
-   */
-  public static final ImmutableList<String> STATIONARY_CODETYPES =
-      ImmutableList.of("normalstationaer", "nachstationaer", "teilstationaer");
+  // Diagnosis Reliability
+  DIAG_RELIABILITY_MISSING("No Code"),
+  DIAG_RELIABILITY_A("A"),
+  DIAG_RELIABILITY_G("G"),
+  DIAG_RELIABILITY_V("V"),
+  LOINC_SYSTEM("http://loinc.org"),
 
-  /**
-   * ValueSet with all outpatient codes ({@link Coding#getCode() Encounter.class.code}) that fit to
-   * the data specification
-   */
-  public static final ImmutableList<String> AMBU_CODES =
-      ImmutableList.of("ambulant", "vorstationär");
+  // Covid variant related codes
+  VARIANT_ALPHA_CODE("LA31569-9"),
+  VARIANT_BETA_CODE("LA31570-7"),
+  VARIANT_DELTA_CODE("LA32552-4"),
+  VARIANT_GAMMA_CODE("LA32552-4"),
+  VARIANT_OMICRON_CODE("LA33381-7"),
 
-  /**
-   * ValueSet with all codes in ({@link Encounter#getType() Encounter.type.kontaktart}) that should
-   * count as outpatient in the data specification
-   */
-  public static final ImmutableList<String> AMBU_ADDITIONALCODETYPES =
-      ImmutableList.of("vorstationaer");
+  DIAG_RELIABILITY_Z("Z");
 
   /**
    * LOINC codes for SARS-CoV-2 (COVID-19) PCR laboratory results
@@ -160,15 +144,53 @@ public enum CoronaFixedValues {
       ImmutableList.of("94306-8", "96763-8", "94640-0");
 
   /**
+   * LOINC codes for covid variants
+   */
+  public static final ImmutableList<String> COVID_VARIANT_CODES =
+      ImmutableList.of("96741-4", "96895-8");
+
+  // Display forms of the covid variants to check against
+  public static final String VARIANT_ALPHA = "Alpha";
+  public static final String VARIANT_BETA = "Beta";
+  public static final String VARIANT_GAMMA = "Gamma";
+  public static final String VARIANT_DELTA = "Delta";
+  public static final String VARIANT_OMICRON = "Omicron";
+  public static final String VARIANT_OTHER_VOC = "OtherVOC";
+  public static final String VARIANT_NON_VOC = "NonVOC";
+  public static final String VARIANT_UNKNOWN = "Unknown";
+
+  // Codes of the covid variants to check against
+  // For now the display values are checked since its more flexible if new variants appear or to generalize non-voc variants
+  public static final String VARIANT_ALPHA_LOINC = "LA31569-9";
+  public static final String VARIANT_BETA_LOINC = "LA31570-7";
+  public static final String VARIANT_GAMMA_LOINC = "LA31621-8";
+  public static final String VARIANT_DELTA_LOINC = "LA32552-4";
+  public static final String VARIANT_OMICRON_LOINC = "LA33381-7";
+
+  /**
    * ValueSet of diagnostic certainties for outpatient diagnoses for borderline COVID-19 findings
    */
   public static final ImmutableList<String> DIAGNOSIS_SECURITY_BORDERLINE =
-      ImmutableList.of("V", "G", "Z");
+      ImmutableList.of(DIAG_RELIABILITY_V.getValue(), DIAG_RELIABILITY_G.getValue(),
+          DIAG_RELIABILITY_Z.getValue());
+
+  /**
+   * ValueSet of diagnostic certainties for outpatient diagnoses for borderline COVID-19 findings
+   */
+  public static final ImmutableList<CoronaFixedValues> DIAGNOSIS_SECURITY_BORDERLINE_ENUM =
+      ImmutableList.of(DIAG_RELIABILITY_V, DIAG_RELIABILITY_G, DIAG_RELIABILITY_Z);
 
   /**
    * ValueSet of diagnostic certainties for outpatient diagnoses for negative COVID-19 findings
    */
-  public static final ImmutableList<String> DIAGNOSIS_SECURITY_NEGATIVE = ImmutableList.of("A");
+  public static final ImmutableList<String> DIAGNOSIS_SECURITY_NEGATIVE =
+      ImmutableList.of(DIAG_RELIABILITY_A.getValue());
+
+  /**
+   * ValueSet of diagnostic certainties for outpatient diagnoses for negative COVID-19 findings
+   */
+  public static final ImmutableList<CoronaFixedValues> DIAGNOSIS_SECURITY_NEGATIVE_ENUM =
+      ImmutableList.of(DIAG_RELIABILITY_A);
 
   private final String value;
 

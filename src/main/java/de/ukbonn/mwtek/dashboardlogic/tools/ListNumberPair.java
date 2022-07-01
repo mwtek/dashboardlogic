@@ -15,27 +15,25 @@
  * OF THE POSSIBILITY OF SUCH DAMAGES. You should have received a copy of the GPL 3 license with *
  * this file. If not, visit http://www.gnu.de/documents/gpl-3.0.en.html
  */
-
 package de.ukbonn.mwtek.dashboardlogic.tools;
 
+import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import java.util.List;
 
 /**
- * 
  * A map that connects two lists with a derivation of type {@link Number}.
- * 
- * @author <a href="mailto:david.meyers@ukbonn.de">David Meyers</a>
  *
+ * @author <a href="mailto:david.meyers@ukbonn.de">David Meyers</a>
  */
 @Getter
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
 public class ListNumberPair {
+
   private static final long serialVersionUID = -2860214903845265285L;
   private List<? extends Number> date = null;
   private List<? extends Number> value = null;

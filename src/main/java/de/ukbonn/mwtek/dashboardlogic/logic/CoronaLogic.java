@@ -21,6 +21,8 @@ package de.ukbonn.mwtek.dashboardlogic.logic;
 
 import de.ukbonn.mwtek.dashboardlogic.enums.CoronaDashboardConstants;
 import de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues;
+import de.ukbonn.mwtek.dashboardlogic.enums.QualitativeLabResultCodes;
+import de.ukbonn.mwtek.dashboardlogic.settings.InputCodeSettings;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbCondition;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbObservation;
@@ -57,15 +59,18 @@ public class CoronaLogic {
    * corresponding observation and condition resources.
    *
    * @param listEncounters        List of all {@linkplain UkbEncounter} resources that could be
-   *                              flagged
+   *                              flagged.
    * @param listConditions        List of all {@linkplain UkbCondition} resources with U07.* ICD
-   *                              codes
-   * @param listLaborObservations List of all observation resources with a SARS-CoV-2 PCR code
-   * @return The origin encounter list, with flags about the corona status in the extension
+   *                              codes.
+   * @param listLaborObservations List of all observation resources with a SARS-CoV-2 PCR code.
+   * @param inputCodeSettings     The configuration of the parameterizable codes such as the
+   *                              observation codes or procedure codes.
+   * @return The origin encounter list, with flags about the corona status in the extension.
    */
   public static List<UkbEncounter> flagCases(List<UkbEncounter> listEncounters,
-      List<UkbCondition> listConditions, List<UkbObservation> listLaborObservations) {
-    Set<String> labSet = getCaseIdsWithPositiveLabObs(listLaborObservations);
+      List<UkbCondition> listConditions, List<UkbObservation> listLaborObservations,
+      InputCodeSettings inputCodeSettings) {
+    Set<String> labSet = getCaseIdsWithPositiveLabObs(listLaborObservations, inputCodeSettings);
     // create maps <DiagnoseCodes, Set<CaseId>>
     HashMap<String, Set<String>> u071CaseId =
         getCaseIdsByDiagReliability(listConditions, CoronaFixedValues.U071.getValue());
@@ -411,18 +416,23 @@ public class CoronaLogic {
   }
 
   /**
-   * Creation of a set of caseIds that have a SARS-CoV-2 positive lab result
+   * Creation of a set of caseIds that have a SARS-CoV-2 positive lab result.
    *
-   * @param listLabObservations list with {@link UkbObservation observation resoures}
+   * @param listLabObservations list with {@link UkbObservation observation resources}.
+   * @param inputCodeSettings   The configuration of the parameterizable codes such as the
+   *                            observation codes or procedure codes.
    * @return set of case ids that have a SARS-CoV-2 positive lab result
    */
-  public static Set<String> getCaseIdsWithPositiveLabObs(List<UkbObservation> listLabObservations) {
+  public static Set<String> getCaseIdsWithPositiveLabObs(List<UkbObservation> listLabObservations,
+      InputCodeSettings inputCodeSettings) {
     Set<String> labSet = new HashSet<>();
+    List<String> observationPcrLoincCodes = inputCodeSettings.getObservationPcrLoincCodes();
     for (UkbObservation labObs : listLabObservations) {
-      if (CoronaFixedValues.COVID_LOINC_CODES.contains(
+      if (observationPcrLoincCodes.contains(
           labObs.getCode().getCoding().get(0).getCode())) {
-        if (((CodeableConcept) labObs.getValue()).getCoding().get(0).getCode()
-            .equals(CoronaFixedValues.POSITIVE_CODE.getValue())) {
+        if (QualitativeLabResultCodes.getPositiveCodes()
+            .contains(((CodeableConcept) labObs.getValue()).getCoding().get(0).getCode()
+            )) {
           labSet.add(labObs.getCaseId());
         }
       }

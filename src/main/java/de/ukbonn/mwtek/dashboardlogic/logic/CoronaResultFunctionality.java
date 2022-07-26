@@ -18,8 +18,10 @@
 package de.ukbonn.mwtek.dashboardlogic.logic;
 
 import de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues;
+import de.ukbonn.mwtek.dashboardlogic.enums.QualitativeLabResultCodes;
 import de.ukbonn.mwtek.dashboardlogic.models.CoronaResults;
 import de.ukbonn.mwtek.dashboardlogic.models.CoronaTreatmentLevelExport;
+import de.ukbonn.mwtek.dashboardlogic.settings.InputCodeSettings;
 import de.ukbonn.mwtek.dashboardlogic.tools.LocationFilter;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbCondition;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
@@ -73,16 +75,18 @@ public class CoronaResultFunctionality {
    * Create a map sorting the encounters according to their icu treatmentlevel, only for the current
    * logic
    *
-   * @param listEncounters    A list with {@linkplain UkbEncounter} resources
+   * @param listEncounters    A list with {@linkplain UkbEncounter} resources.
    * @param listLocations     A list with {@linkplain UkbLocation} resources, to figure out which
-   *                          location is an icu location
+   *                          location is an icu location.
    * @param listIcuProcedures The {@link UkbProcedure} resources, which include information about
-   *                          ECMO / artificial ventilation periods
+   *                          ECMO / artificial ventilation periods.
+   * @param inputCodeSettings The configuration of the parameterizable codes such as the observation
+   *                          codes or procedure codes.
    * @return Map Containing encounter which are currently in icu
    */
   public static Map<String, List<UkbEncounter>> createCurrentIcuMap(
       List<UkbEncounter> listEncounters, List<UkbLocation> listLocations,
-      List<UkbProcedure> listIcuProcedures) {
+      List<UkbProcedure> listIcuProcedures, InputCodeSettings inputCodeSettings) {
     log.debug("started createCurrentIcuMap");
     Instant startTimer = TimerTools.startTimer();
 
@@ -118,7 +122,7 @@ public class CoronaResultFunctionality {
               // if encounter is icu_vent or icu_Ecmo
               if (icu.getStatus().equals(ProcedureStatus.INPROGRESS)) {
                 String categoryCode = icu.getCategory().getCoding().get(0).getCode();
-                sortIcuToMap(categoryCode, resultMap, encounter);
+                sortIcuToMap(categoryCode, resultMap, encounter, inputCodeSettings);
               }
               // check if the current location of the encounter is icu
               else {
@@ -155,15 +159,18 @@ public class CoronaResultFunctionality {
   /**
    * same procedure as createCurrentIcuMap, just for everything besides the current logic
    *
-   * @param listEncounters    A list with {@linkplain UkbEncounter} resources
+   * @param listEncounters    A list with {@linkplain UkbEncounter} resources.
    * @param listLocations     A list with {@linkplain UkbLocation} resources, to figure out which
-   *                          location is an icu location
+   *                          location is an icu location.
    * @param listIcuProcedures The {@link UkbProcedure} resources, which include information about
-   *                          ECMO / artificial ventilation periods
+   *                          ECMO / artificial ventilation periods.
+   * @param inputCodeSettings The configuration of the parameterizable codes such as the observation
+   *                          codes or procedure codes.
    * @return Map on which ICU cases are separated according to ICU, ventilation and Ecmo
    */
   public static Map<String, List<UkbEncounter>> createIcuMap(List<UkbEncounter> listEncounters,
-      List<UkbLocation> listLocations, List<UkbProcedure> listIcuProcedures) {
+      List<UkbLocation> listLocations, List<UkbProcedure> listIcuProcedures,
+      InputCodeSettings inputCodeSettings) {
     log.debug("started createIcuMap");
 
     // List of stationary Cases
@@ -206,7 +213,7 @@ public class CoronaResultFunctionality {
           for (UkbProcedure icu : listIcuByEncounter) {
             String categoryCode = icu.getCategory().getCoding().get(0).getCode();
             if (categoryCode != null) {
-              sortIcuToMap(categoryCode, resultMap, encounter);
+              sortIcuToMap(categoryCode, resultMap, encounter, inputCodeSettings);
             }
           }
           // check if encounter is only lying in icu without any procedure
@@ -295,23 +302,23 @@ public class CoronaResultFunctionality {
   /**
    * Sorting the icu cases whether they have an ecmo or a ventilation procedure
    *
-   * @param categoryCode The value of an ICU category code (see {@link CoronaFixedValues#ECMO_CODE
-   *                     })
-   * @param resultMap    Map that links the maxtreatmentlevel with {@link UkbEncounter}
-   * @param encounter    The encounter that is going to be checked
+   * @param categoryCode      The value of an icu category code.
+   * @param resultMap         Map that links the maxtreatmentlevel with {@link UkbEncounter}.
+   * @param encounter         The encounter that is going to be checked.
+   * @param inputCodeSettings The configuration of the parameterizable codes such as the observation
+   *                          codes or procedure codes.
    */
   private static void sortIcuToMap(String categoryCode, Map<String, List<UkbEncounter>> resultMap,
-      UkbEncounter encounter) {
+      UkbEncounter encounter, InputCodeSettings inputCodeSettings) {
     // check if it is an ecmo case
-    if (categoryCode.equals(CoronaFixedValues.ECMO_CODE.getValue())) {
+    if (inputCodeSettings.getProcedureEcmoCodes().contains(categoryCode)) {
       if (!resultMap.get(CoronaFixedValues.ICU_ECMO.getValue()).contains(encounter)) {
         addIcuEncounter(resultMap, encounter, CoronaFixedValues.ICU_ECMO.getValue());
       }
     }
 
     // check if it is a ventilation case
-    else if (categoryCode.equals(CoronaFixedValues.VENT_CODE.getValue()) || categoryCode.equals(
-        CoronaFixedValues.VENT_CODE2.getValue())) {
+    else if (inputCodeSettings.getProcedureVentilationCodes().contains(categoryCode)) {
       if (!resultMap.get(CoronaFixedValues.ICU_VENTILATION.getValue()).contains(encounter)) {
         addIcuEncounter(resultMap, encounter, CoronaFixedValues.ICU_VENTILATION.getValue());
       }
@@ -353,7 +360,7 @@ public class CoronaResultFunctionality {
     Instant startTimer = TimerTools.startTimer();
 
     encounterMap.put(CoronaFixedValues.OUTPATIENT_ITEM.getValue(), new ArrayList<>());
-    encounterMap.put(CoronaFixedValues.STATIONARY_ITEM.getValue(), new ArrayList<>());
+    encounterMap.put(CoronaFixedValues.INPATIENT_ITEM.getValue(), new ArrayList<>());
     // Iterate through each encounter,
     // check if they have positive flag
     // and if they are ambulant or stationary cases
@@ -364,7 +371,7 @@ public class CoronaResultFunctionality {
       if (e.hasExtension(CoronaFixedValues.POSITIVE_RESULT.getValue())) {
         // check if encounter is stationary (without the prestationary ones!)
         if (CoronaResultFunctionality.isCaseClassInpatient(e)) {
-          encounterMap.get(CoronaFixedValues.STATIONARY_ITEM.getValue()).add(e);
+          encounterMap.get(CoronaFixedValues.INPATIENT_ITEM.getValue()).add(e);
         }
         // check if encounter is ambulant
         else if (CoronaResultFunctionality.isCaseClassOutpatient(e)) {
@@ -429,7 +436,7 @@ public class CoronaResultFunctionality {
         if (mapIsBonnPatient.containsKey(encounter.getPatientId())) {
           boolean isBonn = mapIsBonnPatient.get(encounter.getPatientId());
           switch (key) {
-            case STATIONARY_ITEM:
+            case INPATIENT_ITEM:
               if (isBonn) {
                 listOnlyBonn.add(encounter.getId());
               } else {
@@ -481,31 +488,38 @@ public class CoronaResultFunctionality {
    *
    * @param listLabObservations A list with c19 {@link UkbObservation} resources
    * @param labResult           The laboratory result to be filtered for (e.g. {@link
-   *                            CoronaFixedValues#POSITIVE} )
+   *                            CoronaFixedValues#POSITIVE} ).
+   * @param inputCodeSettings   The configuration of the parameterizable codes such as the
+   *                            observation codes or procedure codes.
    * @return Get tests of all patients for whom an outpatient, pre-stationary, post-stationary,
    * partial hospitalisation or full hospitalisation case related to the test exists.
    */
   public static Set<UkbObservation> getObservationsByResult(
-      List<UkbObservation> listLabObservations, CoronaFixedValues labResult) {
+      List<UkbObservation> listLabObservations, CoronaFixedValues labResult,
+      InputCodeSettings inputCodeSettings) {
     Set<UkbObservation> listObs = new HashSet<>();
+    List<String> observationPcrLoincCodes = inputCodeSettings.getObservationPcrLoincCodes();
     switch (labResult) {
       case POSITIVE -> listObs = listLabObservations.stream()
-          .filter(x -> CoronaFixedValues.COVID_LOINC_CODES.contains(
+          .filter(x -> observationPcrLoincCodes.contains(
               x.getCode().getCoding().get(0)
-                  .getCode()) && ((CodeableConcept) x.getValue()).getCoding().get(0)
-              .getCode().equals(CoronaFixedValues.POSITIVE_CODE.getValue()))
+                  .getCode()) && QualitativeLabResultCodes.getPositiveCodes()
+              .contains(((CodeableConcept) x.getValue()).getCoding().get(0)
+                  .getCode()))
           .collect(Collectors.toSet()); // case
       case BORDERLINE -> listObs = listLabObservations.stream()
-          .filter(x -> CoronaFixedValues.COVID_LOINC_CODES.contains(
+          .filter(x -> observationPcrLoincCodes.contains(
               x.getCode().getCoding().get(0)
-                  .getCode()) && ((CodeableConcept) x.getValue()).getCoding().get(0)
-              .getCode().equals(CoronaFixedValues.BORDERLINE_CODE.getValue()))
+                  .getCode()) && QualitativeLabResultCodes.getBorderlineCodes()
+              .contains(((CodeableConcept) x.getValue()).getCoding().get(0)
+                  .getCode()))
           .collect(Collectors.toSet()); // case
       case NEGATIVE -> listObs = listLabObservations.stream()
-          .filter(x -> CoronaFixedValues.COVID_LOINC_CODES.contains(
+          .filter(x -> observationPcrLoincCodes.contains(
               x.getCode().getCoding().get(0)
-                  .getCode()) && ((CodeableConcept) x.getValue()).getCoding().get(0)
-              .getCode().equals(CoronaFixedValues.NEGATIVE_CODE.getValue()))
+                  .getCode()) && QualitativeLabResultCodes.getNegativeCodes()
+              .contains(((CodeableConcept) x.getValue()).getCoding().get(0)
+                  .getCode()))
           .collect(Collectors.toSet()); // case
       default -> {
       }
@@ -514,11 +528,11 @@ public class CoronaResultFunctionality {
   }
 
   /**
-   * Calculates the age of the patient at the time of the admission date of a case
+   * Calculates the age of the patient at the time of the admission date of a case.
    *
-   * @param birthDate     The birthdate of the patient
-   * @param admissionDate Date when the patient was hospitalised
-   * @return Age at the time of the admission
+   * @param birthDate     The birthdate of the patient.
+   * @param admissionDate Date when the patient was hospitalised.
+   * @return Age at the time of the admission.
    */
   public static Integer calculateAge(Date birthDate, Date admissionDate) {
     if (birthDate != null && admissionDate != null) {
@@ -535,13 +549,13 @@ public class CoronaResultFunctionality {
   }
 
   /**
-   * Filling the given maxtreatmentlevel casenrs map for debug purposes
+   * Filling the given maxtreatmentlevel casenrs map for debug purposes.
    *
    * @param listCumulativeEncounter   Sublist with encounters that have already been used in the
-   *                                  "cumulative.treatmentlevel" data item
+   *                                  "cumulative.treatmentlevel" data item.
    * @param treatmentLevel            TreatmentLevel (e.g. {@link CoronaFixedValues#OUTPATIENT_ITEM}
-   *                                  )
-   * @param resultMaxTreatmentCaseNrs Map with the output
+   *                                  ).
+   * @param resultMaxTreatmentCaseNrs Map with the output.
    */
   public static void createCumulativeMaxDebug(List<UkbEncounter> listCumulativeEncounter,
       String treatmentLevel,
@@ -559,12 +573,12 @@ public class CoronaResultFunctionality {
   }
 
   /**
-   * Finds the first recorded encounter Resource the patient had, and saves it together with the
-   * Patient Reousrce
+   * Finds the first recorded encounter resource the patient had, and saves it together with the
+   * patient resource.
    *
-   * @param encounter       Case Resource
-   * @param pidAdmissionMap Map containing patient ids and the first encounter Resource attached to
-   *                        it
+   * @param encounter       The {@link UkbEncounter} to be checked.
+   * @param pidAdmissionMap Map containing patient ids and the first encounter resource attached to
+   *                        it.
    */
   public static void sortingFirstAdmissionDateToPid(UkbEncounter encounter,
       Map<String, UkbEncounter> pidAdmissionMap) {
@@ -588,10 +602,10 @@ public class CoronaResultFunctionality {
   }
 
   /**
-   * Sort age to the corresponding age group
+   * Sort age to the corresponding age group.
    *
-   * @param age - age for checking
-   * @return lowest value of the age group
+   * @param age Age for checking
+   * @return Lowest value of the age group.
    */
   public static int checkAgeGroup(int age) {
     if (age <= 19) {
@@ -622,10 +636,10 @@ public class CoronaResultFunctionality {
 
 
   /**
-   * Retrieval of the value that is part of a slice in {@link Encounter#getType() Encounter.type}
+   * Retrieval of the value that is part of a slice in {@link Encounter#getType() Encounter.type}.
    *
-   * @param listType List of {@link Encounter#getType() Encounter.types}
-   * @return The contact-type of a german value set (e.g. "vorstationär")
+   * @param listType List of {@link Encounter#getType() Encounter.types}.
+   * @return The contact-type of a german value set (e.g. "vorstationär").
    */
   private static String getContactType(List<CodeableConcept> listType) {
 
@@ -640,10 +654,10 @@ public class CoronaResultFunctionality {
   }
 
   /**
-   * A simple check if the given contact type got the value "prestationary"
+   * A simple check if the given contact type got the value "prestationary".
    *
-   * @param listType A list of {@link Encounter#getType() Encounter.types}
-   * @return true if the case type equals "prestationary"
+   * @param listType A list of {@link Encounter#getType() Encounter.types}.
+   * @return <code>True</code> if the case type equals "prestationary".
    */
   public static boolean isCaseTypePrestationary(List<CodeableConcept> listType) {
     String contactType = getContactType(listType);
@@ -655,28 +669,30 @@ public class CoronaResultFunctionality {
    * is the case class counted as "inpatient" regarding the json data specification (without
    * pre-stationary cases)
    *
-   * @param encounter An instance of an {@link UkbEncounter} object
-   * @return True, if the case class of the encounter is "inpatient"
+   * @param encounter An instance of an {@link UkbEncounter} object.
+   * @return <code>True</code>, if the case class of the encounter is "inpatient"
    */
   public static boolean isCaseClassInpatient(UkbEncounter encounter) {
     return encounter.getClass_()
-        .getCode() != null && (CoronaFixedValues.CASECLASS_INPATIENT.getValue()
-        .equals(encounter.getClass_().getCode()) && !isCaseTypePrestationary(
-        encounter.getType()));
+        .getCode() != null && (
+        CoronaFixedValues.ENCOUNTER_CLASS_INPATIENT_CODES.contains(encounter.getClass_().getCode())
+            && !isCaseTypePrestationary(
+            encounter.getType()));
   }
 
   /**
    * is the case class counted as "outpatient" regarding the json data specification (plus
    * pre-stationary cases that are counted as "outpatient" logic-wise in the workflow aswell)
    *
-   * @param encounter An instance of an {@link UkbEncounter} object
-   * @return True, if the case class of the encounter is "outpatient"
+   * @param encounter An instance of an {@link UkbEncounter} object.
+   * @return <code>True</code>, if the case class of the encounter is "outpatient".
    */
   public static boolean isCaseClassOutpatient(UkbEncounter encounter) {
     return encounter.getClass_()
-        .getCode() != null && (CoronaFixedValues.CASECLASS_OUTPATIENT.getValue()
-        .equals(encounter.getClass_().getCode()) || isCaseTypePrestationary(
-        encounter.getType()));
+        .getCode() != null && (
+        CoronaFixedValues.ENCOUNTER_CLASS_OUTPATIENT_CODES.contains(encounter.getClass_().getCode())
+            || isCaseTypePrestationary(
+            encounter.getType()));
   }
 
   /**
@@ -695,15 +711,16 @@ public class CoronaResultFunctionality {
 
   /**
    * Export of a csv file that displays a list of case/encounter numbers of active cases separated
-   * by treatment level when run through
+   * by treatment level when run through.
    *
    * @param mapCurrentTreatmentlevelCasenrs {@link CoronaResults#getMapCurrentTreatmentlevelCasenrs()
    *                                        Map} with the current case/encounter ids by treatment
-   *                                        level
-   * @param exportDirectory                 The directory to export to (e.g.: "C:\currentTreatmentlevelExport")
+   *                                        level.
+   * @param exportDirectory                 The directory to export to (e.g.: "C:\currentTreatmentlevelExport").
    * @param fileBaseName                    The base file name of the generated file (e.g.:
-   *                                        "Caseids_inpatient_covid19_patients")
+   *                                        "Caseids_inpatient_covid19_patients").
    */
+  @SuppressWarnings("unused")
   public static void generateCurrentTreatmentLevelList(
       HashMap<String, List<String>> mapCurrentTreatmentlevelCasenrs, String exportDirectory,
       String fileBaseName) {
@@ -730,18 +747,20 @@ public class CoronaResultFunctionality {
    * Determination of all patient Ids that have at least one case with a positive SARS-CoV-2 PCR
    * laboratory result and/or SARS-CoV-2 diagnosis (U07.1 and U07.2).
    *
-   * @param listUkbObservations List with the {@link UkbObservation SARS-CoV-2 lab findings}
-   * @param listUkbConditions   List with the {@link UkbCondition SARS-CoV-2 conditions}
+   * @param listUkbObservations List with the {@link UkbObservation SARS-CoV-2 lab findings}.
+   * @param listUkbConditions   List with the {@link UkbCondition SARS-CoV-2 conditions}.
+   * @param inputCodeSettings   The configuration of the parameterizable codes such as the
+   *                            observation codes or procedure codes.
    * @return {@link HashSet} with patient Ids that have at least one case with a positive SARS-CoV-2
-   * PCR laboratory result and/or SARS-CoV-2 diagnosis
+   * PCR laboratory result and/or SARS-CoV-2 diagnosis.
    */
   public static Set<String> getPidsPosFinding(List<UkbObservation> listUkbObservations,
-      List<UkbCondition> listUkbConditions) {
+      List<UkbCondition> listUkbConditions, InputCodeSettings inputCodeSettings) {
     Set<String> listPidsPosFinding = new HashSet<>();
     // Get all patient ids where the patient got at least one positive SARS-CoV-2 lab finding
-    listPidsPosFinding.addAll(getPidsWithPosCovidLabResult(listUkbObservations));
+    listPidsPosFinding.addAll(getPidsWithPosCovidLabResult(listUkbObservations, inputCodeSettings));
     // Get all patient ids where the patient got at least one SARS-CoV-2 related condition
-    listPidsPosFinding.addAll(getPidsWithCovidDiagnosis(listUkbConditions));
+    listPidsPosFinding.addAll(getPidsWithCovidDiagnosis(listUkbConditions, inputCodeSettings));
 
     return listPidsPosFinding;
   }
@@ -749,35 +768,38 @@ public class CoronaResultFunctionality {
   /**
    * Identification of all patients who have at least one case with a positive SARS-CoV-2 pcr test.
    *
-   * @param listUkbObservations List with the {@link UkbObservation SARS-CoV-2 lab findings}
+   * @param listUkbObservations List with the {@link UkbObservation SARS-CoV-2 lab findings}.
+   * @param inputCodeSettings   The configuration of the parameterizable codes such as the
+   *                            observation codes or procedure codes.
    * @return List with the patients ids of all patients who have at least one case with a positive
    * SARS-CoV-2 pcr tests
    */
   public static Collection<String> getPidsWithPosCovidLabResult(
-      List<UkbObservation> listUkbObservations) {
+      List<UkbObservation> listUkbObservations, InputCodeSettings inputCodeSettings) {
+    List<String> observationPcrLoincCodes = inputCodeSettings.getObservationPcrLoincCodes();
     return listUkbObservations.parallelStream()
-        .filter(x -> CoronaFixedValues.COVID_LOINC_CODES.contains(
+        .filter(x -> observationPcrLoincCodes.contains(
             x.getCode().getCoding().get(0).getCode()))
-        .filter(x -> x.getValueCodeableConcept().getCoding().get(0).getCode()
-            .equals(CoronaFixedValues.POSITIVE_CODE.getValue()))
+        .filter(x -> QualitativeLabResultCodes.getPositiveCodes()
+            .contains(x.getValueCodeableConcept().getCoding().get(0).getCode()))
         .map(UkbObservation::getPatientId).collect(Collectors.toSet());
   }
 
   /**
    * Identification of all patients who have at least one case with a U07.1 or U07.2 diagnosis.
    *
-   * @param listUkbConditions List with the {@link UkbCondition SARS-CoV-2 icd conditions}
+   * @param listUkbConditions List with the {@link UkbCondition SARS-CoV-2 icd conditions}.
+   * @param inputCodeSettings The configuration of the parameterizable codes such as the observation
+   *                          codes or procedure codes.
    * @return List with the patients ids of all patients who have at least one case with a U07.1 or
    * U07.2 diagnosis
    */
-  public static Set<String> getPidsWithCovidDiagnosis(List<UkbCondition> listUkbConditions) {
+  public static Set<String> getPidsWithCovidDiagnosis(List<UkbCondition> listUkbConditions,
+      InputCodeSettings inputCodeSettings) {
     Set<String> pidsWithCovidDiag = new HashSet<>();
     listUkbConditions.forEach(condition -> {
-      if (condition.hasCode() && condition.getCode()
-          .hasCoding(CoronaFixedValues.ICD_SYSTEM.getValue(),
-              CoronaFixedValues.U071.getValue()) || condition.getCode()
-          .hasCoding(CoronaFixedValues.ICD_SYSTEM.getValue(),
-              CoronaFixedValues.U072.getValue())) {
+      if (condition.hasCode() && isCodingValid(condition.getCode(),
+          CoronaFixedValues.ICD_SYSTEM.getValue(), inputCodeSettings.getConditionIcdCodes())) {
         pidsWithCovidDiag.add(condition.getPatientId());
       }
     });
@@ -785,12 +807,13 @@ public class CoronaResultFunctionality {
   }
 
   /**
-   * Check whether the Coding has the needed
+   * Checking if the given {@link CodeableConcept#getCoding() coding} of a
+   * <code>CodeableConcept</code> got a code that is part of the given value set.
    *
    * @param codeableConcept The codings that need to be checked (e.g. {@link UkbObservation#getCode()}).
-   * @param system          The system that should be checked
-   * @param validCodes      The codes that should be checked
-   * @return True if the system and a valid code is part of the coding
+   * @param system          The system that should be checked.
+   * @param validCodes      The codes that should be checked.
+   * @return <code>True</code> if the system and a valid code is part of the coding.
    */
   public static boolean isCodingValid(CodeableConcept codeableConcept, String system,
       List<String> validCodes) {

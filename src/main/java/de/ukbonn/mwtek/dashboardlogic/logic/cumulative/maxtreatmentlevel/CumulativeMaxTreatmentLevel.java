@@ -5,20 +5,27 @@ import de.ukbonn.mwtek.dashboardlogic.logic.CoronaResultFunctionality;
 import de.ukbonn.mwtek.dashboardlogic.models.CoronaDataItem;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
 import de.ukbonn.mwtek.utilities.generic.time.TimerTools;
-import lombok.extern.slf4j.Slf4j;
-
 import java.time.Instant;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import lombok.extern.slf4j.Slf4j;
 
 
 /**
- * This class is used for generating the data item {@link CoronaDataItem cumulative.maxtreatmentlevel}
+ * This class is used for generating the data item {@link CoronaDataItem
+ * cumulative.maxtreatmentlevel}
  *
  * @author <a href="mailto:david.meyers@ukbonn.de">David Meyers</a>
  * @author <a href="mailto:berke_enes.dincel@ukbonn.de">Berke Enes Dincel</a>
  */
 
-@Slf4j public class CumulativeMaxTreatmentLevel {
+@Slf4j
+public class CumulativeMaxTreatmentLevel {
 
   public List<UkbEncounter> listEncounters;
 
@@ -30,14 +37,17 @@ import java.util.*;
    * Returns a list containing encounter which have or had ambulant or stationary as their highest
    * treatmentlevel
    *
-   * @param mapIcu                      Map that assigns a list of case numbers to an ICU treatment level class
-   * @param treatmentLevel              Treatmentlevel (e.g. {@link CoronaFixedValues#ICU_ECMO}) as separation criterion
+   * @param mapIcu                      Map that assigns a list of case numbers to an ICU treatment
+   *                                    level class
+   * @param treatmentLevel              Treatmentlevel (e.g. {@link CoronaFixedValues#ICU_ECMO}) as
+   *                                    separation criterion
    * @param mapPositiveEncounterByClass Map with all positive encounters, grouped by case class
    * @return List with all encounters that have the given MaxTreatmentLevel
    */
-  @SuppressWarnings("incomplete-switch") public List<UkbEncounter> getCumulativeByClass(
-          Map<String, List<UkbEncounter>> mapIcu, CoronaFixedValues treatmentLevel,
-          HashMap<String, List<UkbEncounter>> mapPositiveEncounterByClass) {
+  @SuppressWarnings("incomplete-switch")
+  public List<UkbEncounter> getCumulativeByClass(
+      Map<String, List<UkbEncounter>> mapIcu, CoronaFixedValues treatmentLevel,
+      HashMap<String, List<UkbEncounter>> mapPositiveEncounterByClass) {
     Set<String> ambulantPidSet = new HashSet<>();
     Set<String> stationaryPidSet = new HashSet<>();
     List<UkbEncounter> listResult = new ArrayList<>();
@@ -50,19 +60,19 @@ import java.util.*;
         case OUTPATIENT_ITEM: // check which case is ambulant and does not have the twelve Days Logic
           for (UkbEncounter encounter : value) {
             if (CoronaResultFunctionality.isCaseClassOutpatient(
-                    encounter) && !encounter.hasExtension(
-                    CoronaFixedValues.TWELVE_DAYS_LOGIC.getValue())) {
+                encounter) && !encounter.hasExtension(
+                CoronaFixedValues.TWELVE_DAYS_LOGIC.getValue())) {
               ambulantPidSet.add(encounter.getPatientId());
             }
           }
           break;
-        case STATIONARY_ITEM: // check if stationary and is not any kind of ICU
+        case INPATIENT_ITEM: // check if stationary and is not any kind of ICU
           for (UkbEncounter e : value) {
             if (CoronaResultFunctionality.isCaseClassInpatient(e)) {
               // check if icu
               if (!mapIcu.get(CoronaFixedValues.ICU_ECMO.getValue()).contains(e) && !mapIcu.get(
-                      CoronaFixedValues.ICU_VENTILATION.getValue()).contains(e) && !mapIcu.get(
-                      CoronaFixedValues.ICU.getValue()).contains(e)) {
+                  CoronaFixedValues.ICU_VENTILATION.getValue()).contains(e) && !mapIcu.get(
+                  CoronaFixedValues.ICU.getValue()).contains(e)) {
                 stationaryPidSet.add(e.getPatientId());
               }
             }
@@ -74,10 +84,10 @@ import java.util.*;
     // treatmentlevel
     if (treatmentLevel.equals(CoronaFixedValues.OUTPATIENT_ITEM)) {
       listResult = youngestCaseLogic(treatmentLevel.getValue(), mapPositiveEncounterByClass,
-              ambulantPidSet);
-    } else if (treatmentLevel.equals(CoronaFixedValues.STATIONARY_ITEM)) {
+          ambulantPidSet);
+    } else if (treatmentLevel.equals(CoronaFixedValues.INPATIENT_ITEM)) {
       listResult = youngestCaseLogic(treatmentLevel.getValue(), mapPositiveEncounterByClass,
-              stationaryPidSet);
+          stationaryPidSet);
     }
 
     TimerTools.stopTimerAndLog(startTime, "finished getCumulativeByClass");
@@ -87,14 +97,15 @@ import java.util.*;
   /**
    * Creates a list of encounters who are the youngest created encounter for the patient
    *
-   * @param treatmentLevel              Treatmentlevel (e.g. {@link CoronaFixedValues#ICU_ECMO}) as separation criterion
+   * @param treatmentLevel              Treatmentlevel (e.g. {@link CoronaFixedValues#ICU_ECMO}) as
+   *                                    separation criterion
    * @param mapPositiveEncounterByClass Map with all positive encounters, grouped by case class
    * @param setInpatientPids            Set with all the pids of inpatient patients
    * @return List of encounters that all have different pids
    */
   private List<UkbEncounter> youngestCaseLogic(String treatmentLevel,
-          HashMap<String, List<UkbEncounter>> mapPositiveEncounterByClass,
-          Set<String> setInpatientPids) {
+      HashMap<String, List<UkbEncounter>> mapPositiveEncounterByClass,
+      Set<String> setInpatientPids) {
     Map<String, List<UkbEncounter>> pidEncounterMap = new HashMap<>();
     try {
       for (UkbEncounter encounter : mapPositiveEncounterByClass.get(treatmentLevel)) {
@@ -103,7 +114,7 @@ import java.util.*;
           if (pidEncounterMap.containsKey(encounter.getPatientId())) {
 
             List<UkbEncounter> tempEncounterList =
-                    new ArrayList<>(pidEncounterMap.get(encounter.getPatientId()));
+                new ArrayList<>(pidEncounterMap.get(encounter.getPatientId()));
 
             UkbEncounter youngestCase = encounter;
             if (!tempEncounterList.isEmpty()) {
@@ -147,10 +158,11 @@ import java.util.*;
         UkbEncounter newestCase = entry.getValue().get(0);
         for (UkbEncounter encounter : entry.getValue()) {
           if (!newestCase.equals(encounter)) {
-            if (encounter.isPeriodStartExistent() && newestCase.isPeriodStartExistent())
+            if (encounter.isPeriodStartExistent() && newestCase.isPeriodStartExistent()) {
               if (newestCase.getPeriod().getStart().before(encounter.getPeriod().getStart())) {
                 newestCase = encounter;
               }
+            }
           }
         }
         listEndResult.add(newestCase);
@@ -170,8 +182,9 @@ import java.util.*;
    * @param treatmentLevel TreatmentLevel as separation criterion
    * @return List of all encounter that have the given treatment level as maximum treatment level
    */
-  @SuppressWarnings("incomplete-switch") public List<UkbEncounter> getCumulativeByIcuLevel(
-          Map<String, List<UkbEncounter>> mapIcu, CoronaFixedValues treatmentLevel) {
+  @SuppressWarnings("incomplete-switch")
+  public List<UkbEncounter> getCumulativeByIcuLevel(
+      Map<String, List<UkbEncounter>> mapIcu, CoronaFixedValues treatmentLevel) {
     List<UkbEncounter> resultList = new ArrayList<>();
     HashMap<String, List<UkbEncounter>> mapPidAndCase = new HashMap<>();
     log.debug("started getCumulativeByIcuLevel [" + treatmentLevel + "]");
@@ -193,7 +206,7 @@ import java.util.*;
         // checks if the encounter has a higher treatmentlevel
         for (UkbEncounter encounter : listIcuEncounter) {
           if (!listEcmoEncounter.contains(encounter) && !listVentilationEncounter.contains(
-                  encounter)) {
+              encounter)) {
             // Sort cases by pids; example: Map<Pid,Cases> Pid[123456,7891234]
             addPidToMap(mapPidAndCase, encounter);
             setIcuPids.add(encounter.getPatientId());
@@ -284,16 +297,16 @@ import java.util.*;
   }
 
   /**
-   * Returns the case from an encounter list with the lowest admission date
-   * ({@link UkbEncounter#getPeriod()})
+   * Returns the case from an encounter list with the lowest admission date ({@link
+   * UkbEncounter#getPeriod()})
    *
    * @param mapEncounterByPid Map of all encounters per pid
    * @return The oldest positive C19 case of a patient
    */
   private UkbEncounter getFirstCovidPositiveCase(
-          Map.Entry<String, List<UkbEncounter>> mapEncounterByPid) {
+      Map.Entry<String, List<UkbEncounter>> mapEncounterByPid) {
     return mapEncounterByPid.getValue().stream().filter(UkbEncounter::isPeriodStartExistent)
-            .min(Comparator.comparing(x -> x.getPeriod().getStart())).orElse(null);
+        .min(Comparator.comparing(x -> x.getPeriod().getStart())).orElse(null);
   }
 
   /**
@@ -303,7 +316,7 @@ import java.util.*;
    * @param encounter     the encounter that has to be added
    */
   private void addPidToMap(HashMap<String, List<UkbEncounter>> mapPidAndCase,
-          UkbEncounter encounter) {
+      UkbEncounter encounter) {
     if (mapPidAndCase.containsKey(encounter.getPatientId())) {
       mapPidAndCase.get(encounter.getPatientId()).add(encounter);
     } else {

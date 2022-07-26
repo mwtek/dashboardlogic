@@ -38,7 +38,7 @@ import org.hl7.fhir.r4.model.Coding;
 
 /**
  * This class is used for generating the data items {@link CoronaDataItem cumulative.age} including
- * the sub items (*.alive, *.dead)
+ * the sub items (*.alive, *.dead).
  *
  * @author <a href="mailto:david.meyers@ukbonn.de">David Meyers</a>
  * @author <a href="mailto:berke_enes.dincel@ukbonn.de">Berke Enes Dincel</a>

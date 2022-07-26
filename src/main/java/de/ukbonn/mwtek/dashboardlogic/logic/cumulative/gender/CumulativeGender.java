@@ -32,7 +32,7 @@ import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * This class is used for generating the data item {@link CoronaDataItem cumulative.gender}
+ * This class is used for generating the data item {@link CoronaDataItem cumulative.gender}.
  *
  * @author <a href="mailto:david.meyers@ukbonn.de">David Meyers</a>
  * @author <a href="mailto:berke_enes.dincel@ukbonn.de">Berke Enes Dincel</a>

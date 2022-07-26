@@ -20,6 +20,7 @@ package de.ukbonn.mwtek.dashboardlogic.enums;
 
 import com.google.common.collect.ImmutableList;
 import de.ukbonn.mwtek.utilities.fhir.misc.StaticValueProvider;
+import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
 
 /**
  * Class with all textual fixed values necessary for the creation of the Json class and data
@@ -38,16 +39,6 @@ public enum CoronaFixedValues {
   // DateFormat
   DATE("date"),
 
-  // ICU-CategoryCodes
-  ECMO_CODE("182744004"),
-  VENT_CODE("40617009"),
-  VENT_CODE2("57485005"),
-
-  // Positive/Negative state
-  POSITIVE_CODE("10828004"),
-  NEGATIVE_CODE("260385009"),
-  BORDERLINE_CODE("419984006"),
-
   // Entry in specific data items
   POSITIVE("Positive"),
   NEGATIVE("Negative"),
@@ -62,7 +53,7 @@ public enum CoronaFixedValues {
   NORMAL_WARD("Normal_ward"),
 
   // Internal usages for list management
-  STATIONARY_ITEM("Stationary"),
+  INPATIENT_ITEM("Stationary"),
   OUTPATIENT_ITEM("Outpatient"),
 
   // Gender [FHIR Value Set]
@@ -89,11 +80,6 @@ public enum CoronaFixedValues {
   ALIVE("alive"),
   DEAD("dead"),
 
-  // Encounter.case.class (new fhir profile ->
-  // https://simplifier.net/packages/de.basisprofil.r4/1.0.0/files/397957)
-  CASECLASS_INPATIENT("IMP"),
-  CASECLASS_OUTPATIENT("AMB"),
-
   // Encounter.case.type.kontaktart (new fhir profile ->
   // https://simplifier.net/packages/de.basisprofil.r4/1.0.0/files/397801)
   CASETYPE_PRESTATIONARY("vorstationaer"),
@@ -118,6 +104,7 @@ public enum CoronaFixedValues {
   ICD_DIAG_RELIABILITY_CODING_SYSTEM(
       "https://fhir.kbv.de/CodeSystem/KBV_CS_SFHIR_ICD_DIAGNOSESICHERHEIT"),
 
+  // ICD code without exclamation mark, as it is used in an "observation contains" logic to make further processing more robust.
   U071("U07.1"),
   U072("U07.2"),
 
@@ -136,18 +123,6 @@ public enum CoronaFixedValues {
   VARIANT_OMICRON_CODE("LA33381-7"),
 
   DIAG_RELIABILITY_Z("Z");
-
-  /**
-   * LOINC codes for SARS-CoV-2 (COVID-19) PCR laboratory results
-   */
-  public static final ImmutableList<String> COVID_LOINC_CODES =
-      ImmutableList.of("94306-8", "96763-8", "94640-0");
-
-  /**
-   * LOINC codes for covid variants
-   */
-  public static final ImmutableList<String> COVID_VARIANT_CODES =
-      ImmutableList.of("96741-4", "96895-8");
 
   // Display forms of the covid variants to check against
   public static final String VARIANT_ALPHA = "Alpha";
@@ -191,6 +166,24 @@ public enum CoronaFixedValues {
    */
   public static final ImmutableList<CoronaFixedValues> DIAGNOSIS_SECURITY_NEGATIVE_ENUM =
       ImmutableList.of(DIAG_RELIABILITY_A);
+
+  /**
+   * List of valid {@link UkbEncounter#getClass_() encounter.class.code} codes for inpatient
+   * encounters. Both the value set from the case module version 1.0 and 2.0 are checked. <a
+   * href="https://simplifier.net/packages/de.basisprofil.r4/1.0.0/files/397957">The value set of
+   * version 2.0 can be found here.</a>.
+   */
+  public static final ImmutableList<String> ENCOUNTER_CLASS_INPATIENT_CODES =
+      ImmutableList.of("IMP", "stationaer");
+
+  /**
+   * List of valid {@link UkbEncounter#getClass_() encounter.class.code} codes for outpatient
+   * encounters. Both the value set from the case module version 1.0 and 2.0 are checked. <a
+   * href="https://simplifier.net/packages/de.basisprofil.r4/1.0.0/files/397957">The value set of
+   * version 2.0 can be found here.</a>.
+   */
+  public static final ImmutableList<String> ENCOUNTER_CLASS_OUTPATIENT_CODES =
+      ImmutableList.of("AMB", "ambulant");
 
   private final String value;
 

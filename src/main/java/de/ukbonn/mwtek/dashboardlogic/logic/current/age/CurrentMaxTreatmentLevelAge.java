@@ -31,7 +31,7 @@ import org.hl7.fhir.r4.model.Patient;
 
 /**
  * This class is used for generating the data item {@link CoronaDataItem
- * current.maxtreatmentlevel.age.* subitems like *.normal_ward and *.age.icu}
+ * current.maxtreatmentlevel.age.* with subitems like *.normal_ward and *.age.icu}.
  *
  * @author <a href="mailto:david.meyers@ukbonn.de">David Meyers</a>
  * @author <a href="mailto:berke_enes.dincel@ukbonn.de">Berke Enes Dincel</a>
@@ -57,26 +57,6 @@ public record CurrentMaxTreatmentLevelAge(List<UkbPatient> listPatients,
       }
     }
     calculateAndCheckAgeGroup(currentMaxPidAdmissionMap, resultList, listPatients);
-    Collections.sort(resultList);
-    return resultList;
-  }
-
-  public List<Long> createCurrentMaxTotalAgeMap(List<Long> currentMaxStationaryAgeList,
-      List<Long> currentMaxIcuAgeList, List<Long> currentMaxIcuVentAgeList,
-      List<Long> currentMaxIcuEcmoAgeList) {
-    List<Long> resultList = new ArrayList<>();
-    if (!currentMaxStationaryAgeList.isEmpty()) {
-      resultList.addAll(currentMaxStationaryAgeList);
-    }
-    if (!currentMaxIcuAgeList.isEmpty()) {
-      resultList.addAll(currentMaxIcuAgeList);
-    }
-    if (!currentMaxIcuVentAgeList.isEmpty()) {
-      resultList.addAll(currentMaxIcuVentAgeList);
-    }
-    if (!currentMaxIcuEcmoAgeList.isEmpty()) {
-      resultList.addAll(currentMaxIcuEcmoAgeList);
-    }
     Collections.sort(resultList);
     return resultList;
   }

@@ -15,51 +15,52 @@
  * OF THE POSSIBILITY OF SUCH DAMAGES. You should have received a copy of the GPL 3 license with *
  * this file. If not, visit http://www.gnu.de/documents/gpl-3.0.en.html
  */
-package de.ukbonn.mwtek.dashboardlogic.logic.timeline;
+package de.ukbonn.mwtek.dashboardlogic.settings;
 
-import java.util.ArrayList;
-import java.util.Collections;
+import com.google.common.collect.ImmutableList;
 import java.util.List;
-import java.util.Map;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
 
 /**
- * This class contains some auxiliary functions that are used in the logic of the timelines.
+ * Configuration class to dynamically respond to emerging covid variants.
  *
  * @author <a href="mailto:david.meyers@ukbonn.de">David Meyers</a>
- * @author <a href="mailto:berke_enes.dincel@ukbonn.de">Berke Enes Dincel</a>
  */
-public class TimelineFunctionalities {
+@Data
+@EqualsAndHashCode(callSuper = false)
+public class InputCodeSettings {
 
-  /**
-   * Splits the resource part from the id in a fhir reference (e.g. {@literal Location/123 -> 123)}
-   *
-   * @param fhirResourceReference A string with a FHIR resource reference (e.g. {@literal
-   *                              Location/123})
-   * @return The plain id of the resource
-   */
-  public static String splitReference(String fhirResourceReference, String fhirId) {
-    String[] parts = fhirResourceReference.split("/");
-    return parts[parts.length - 1];
-  }
+  // Initialization with default values
 
-  /**
-   * Purpose of this auxiliary function is to divide the content of a map into two different lists
-   *
-   * @param tempMap   Map that maps a frequency value to a date (unixtime)
-   * @param dateList  Output list with the date entries
-   * @param valueList Output list with the values (frequencies per day)
-   */
-  public static void divideMapValuesToLists(Map<Long, Long> tempMap, List<Long> dateList,
-      List<Long> valueList) {
+  @Getter
+  private List<String> observationPcrLoincCodes = ImmutableList.of("94306-8", "96763-8",
+      "94640-0");
 
-    // get a list with the keys in ascending order (output requirement)
-    List<Long> listKeys = new ArrayList<>(tempMap.keySet());
-    Collections.sort(listKeys);
+  @Getter
+  private List<String> observationVariantLoincCodes = ImmutableList.of("96741-4", "96895-8");
 
-    listKeys.forEach(key -> {
-      Long value = tempMap.get(key);
-      dateList.add(key);
-      valueList.add(value);
-    });
+
+  @Getter
+  private List<String> conditionIcdCodes = ImmutableList.of("U07.1", "U07.2");
+
+
+  @Getter
+  private List<String> procedureVentilationCodes = ImmutableList.of("40617009",
+      "57485005");
+
+  @Getter
+  private List<String> procedureEcmoCodes = ImmutableList.of("182744004");
+
+  public InputCodeSettings(List<String> observationPcrLoincCodes,
+      List<String> observationVariantLoincCodes,
+      List<String> conditionIcdCodes,
+      List<String> procedureVentilationCodes, List<String> procedureEcmoCodes) {
+    this.observationPcrLoincCodes = observationPcrLoincCodes;
+    this.observationVariantLoincCodes = observationVariantLoincCodes;
+    this.conditionIcdCodes = conditionIcdCodes;
+    this.procedureVentilationCodes = procedureVentilationCodes;
+    this.procedureEcmoCodes = procedureEcmoCodes;
   }
 }

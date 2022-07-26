@@ -20,8 +20,9 @@
 package de.ukbonn.mwtek.dashboardlogic.logic.timeline;
 
 import de.ukbonn.mwtek.dashboardlogic.enums.CoronaDashboardConstants;
-import de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues;
+import de.ukbonn.mwtek.dashboardlogic.enums.QualitativeLabResultCodes;
 import de.ukbonn.mwtek.dashboardlogic.models.CoronaDataItem;
+import de.ukbonn.mwtek.dashboardlogic.settings.InputCodeSettings;
 import de.ukbonn.mwtek.dashboardlogic.tools.ListNumberPair;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbObservation;
 import de.ukbonn.mwtek.utilities.generic.time.DateTools;
@@ -35,12 +36,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.hl7.fhir.r4.model.CodeableConcept;
 
 /**
- * This class is used for generating the data item {@link CoronaDataItem timeline.tests}
+ * This class is used for generating the data item {@link CoronaDataItem timeline.tests}.
  *
  * @author <a href="mailto:david.meyers@ukbonn.de">David Meyers</a>
  * @author <a href="mailto:berke_enes.dincel@ukbonn.de">Berke Enes Dincel</a>
  */
-
 @Slf4j
 public class TimelineTests extends TimelineFunctionalities {
 
@@ -106,13 +106,14 @@ public class TimelineTests extends TimelineFunctionalities {
    *
    * @return ListNumberPair with all positive labor results up until today
    */
-  public ListNumberPair createTimelineTestPositiveMap() {
+  public ListNumberPair createTimelineTestPositiveMap(InputCodeSettings inputCodeSettings) {
     log.debug("started createTimelineTestPositiveMap");
     Instant startTimer = TimerTools.startTimer();
     Map<Long, Long> tempMap = new ConcurrentHashMap<>();
     ArrayList<Long> dateList = new ArrayList<>();
     ArrayList<Long> valueList = new ArrayList<>();
     long currentUnixTime = DateTools.getCurrentUnixTime();
+    List<String> observationPcrLoincCodes = inputCodeSettings.getObservationPcrLoincCodes();
 
     // initialization of the map with the date entries to keep the order ascending
     long startDate = CoronaDashboardConstants.qualifyingDate;
@@ -125,10 +126,11 @@ public class TimelineTests extends TimelineFunctionalities {
     // Creation of a sublist with all positive covid observations
     // and reduce it to the effective dates of the funding's to make the data retrieval more efficient
     List<Long> labEffectiveDatesPositiveFundings = listLabObservations.parallelStream()
-        .filter(x -> (CoronaFixedValues.COVID_LOINC_CODES.contains(
+        .filter(x -> (observationPcrLoincCodes.contains(
             x.getCode().getCoding().get(0).getCode())))
-        .filter(x -> ((CodeableConcept) x.getValue()).getCoding().get(0).getCode()
-            .equals(CoronaFixedValues.POSITIVE_CODE.getValue()))
+        .filter(x -> QualitativeLabResultCodes.getPositiveCodes()
+            .contains(((CodeableConcept) x.getValue()).getCoding().get(0).getCode())
+        )
         .map(UkbObservation::getEffectiveDateTimeType)
         .map(x -> DateTools.dateToUnixTime(x.getValue())).toList();
 

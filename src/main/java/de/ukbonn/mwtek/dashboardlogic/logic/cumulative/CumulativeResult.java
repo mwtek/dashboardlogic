@@ -18,7 +18,9 @@
 package de.ukbonn.mwtek.dashboardlogic.logic.cumulative;
 
 import de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues;
+import de.ukbonn.mwtek.dashboardlogic.enums.QualitativeLabResultCodes;
 import de.ukbonn.mwtek.dashboardlogic.models.CoronaDataItem;
+import de.ukbonn.mwtek.dashboardlogic.settings.InputCodeSettings;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbObservation;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -30,7 +32,7 @@ import java.util.stream.Collectors;
 import org.hl7.fhir.r4.model.CodeableConcept;
 
 /**
- * This class is used for generating the data item {@link CoronaDataItem cumulative.result}
+ * This class is used for generating the data item {@link CoronaDataItem cumulative.result}.
  *
  * @author <a href="mailto:david.meyers@ukbonn.de">David Meyers</a>
  * @author <a href="mailto:berke_enes.dincel@ukbonn.de">Berke Enes Dincel</a>
@@ -49,36 +51,43 @@ public class CumulativeResult {
    * pre-hospital, posthospital, day-care or full inpatient case in connection with the test
    * depending on the laboratory result.
    *
-   * @param labResult The laboratory result to be filtered for (e.g. {@link
-   *                  CoronaFixedValues#POSITIVE})
+   * @param labResult         The laboratory result to be filtered for (e.g. {@link
+   *                          CoronaFixedValues#POSITIVE}).
+   * @param inputCodeSettings The configuration of the parameterizable codes such as the observation
+   *                          codes or procedure codes.
    * @return Get tests of all patients for whom an outpatient, pre-hospital, posthospital, partial
    * hospitalisation or full hospitalisation case related to the test exists.
    */
-  public Set<UkbObservation> getObservationsByResult(CoronaFixedValues labResult) {
+  public Set<UkbObservation> getObservationsByResult(CoronaFixedValues labResult,
+      InputCodeSettings inputCodeSettings) {
     Set<UkbObservation> listObs = new HashSet<>();
+    List<String> observationPcrLoincCodes = inputCodeSettings.getObservationPcrLoincCodes();
     switch (labResult) {
       case POSITIVE -> {
         listObs = listObservations.stream()
-            .filter(x -> CoronaFixedValues.COVID_LOINC_CODES.contains(
+            .filter(x -> observationPcrLoincCodes.contains(
                 x.getCode().getCoding().get(0)
-                    .getCode()) && ((CodeableConcept) x.getValue()).getCoding().get(0)
-                .getCode().equals(CoronaFixedValues.POSITIVE_CODE.getValue()))
+                    .getCode()) && QualitativeLabResultCodes.getPositiveCodes()
+                .contains(((CodeableConcept) x.getValue()).getCoding().get(0)
+                    .getCode()))
             .collect(Collectors.toSet());
       } // case
       case BORDERLINE -> {
         listObs = listObservations.stream()
-            .filter(x -> CoronaFixedValues.COVID_LOINC_CODES.contains(
+            .filter(x -> observationPcrLoincCodes.contains(
                 x.getCode().getCoding().get(0)
-                    .getCode()) && ((CodeableConcept) x.getValue()).getCoding().get(0)
-                .getCode().equals(CoronaFixedValues.BORDERLINE_CODE.getValue()))
+                    .getCode()) && QualitativeLabResultCodes.getBorderlineCodes()
+                .contains(((CodeableConcept) x.getValue()).getCoding().get(0)
+                    .getCode()))
             .collect(Collectors.toSet());
       } // case
       case NEGATIVE -> {
         listObs = listObservations.stream()
-            .filter(x -> CoronaFixedValues.COVID_LOINC_CODES.contains(
+            .filter(x -> observationPcrLoincCodes.contains(
                 x.getCode().getCoding().get(0)
-                    .getCode()) && ((CodeableConcept) x.getValue()).getCoding().get(0)
-                .getCode().equals(CoronaFixedValues.NEGATIVE_CODE.getValue()))
+                    .getCode()) && QualitativeLabResultCodes.getNegativeCodes()
+                .contains(((CodeableConcept) x.getValue()).getCoding().get(0)
+                    .getCode()))
             .collect(Collectors.toSet());
       } // case
       default -> {

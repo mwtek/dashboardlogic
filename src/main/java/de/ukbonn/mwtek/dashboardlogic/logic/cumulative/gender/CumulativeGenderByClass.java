@@ -25,15 +25,13 @@ import de.ukbonn.mwtek.utilities.fhir.resources.UkbPatient;
 import de.ukbonn.mwtek.utilities.generic.time.TimerTools;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 
 /**
  * This class is used for generating the data items {@link CoronaDataItem
- * cumulative.inpatient.gender and cumulative.outpatient.gender}
+ * cumulative.inpatient.gender and cumulative.outpatient.gender}.
  *
  * @author <a href="mailto:david.meyers@ukbonn.de">David Meyers</a>
  * @author <a href="mailto:berke_enes.dincel@ukbonn.de">Berke Enes Dincel</a>
@@ -67,8 +65,8 @@ public class CumulativeGenderByClass extends CumulativeGender {
     List<UkbEncounter> filteredEncounterList = new ArrayList<>();
     List<UkbEncounter> listEncounterByClass = new ArrayList<>();
 
-    boolean isAmbulant = caseClass.equals(CoronaFixedValues.CASECLASS_OUTPATIENT.getValue());
-    boolean isStationary = caseClass.equals(CoronaFixedValues.CASECLASS_INPATIENT.getValue());
+    boolean isAmbulant = caseClass.equals(CoronaFixedValues.OUTPATIENT_ITEM.getValue());
+    boolean isStationary = caseClass.equals(CoronaFixedValues.INPATIENT_ITEM.getValue());
 
     if (isAmbulant) {
       listEncounterByClass = listEncounters.parallelStream()
@@ -91,16 +89,4 @@ public class CumulativeGenderByClass extends CumulativeGender {
     return getGenderCount(filteredEncounterList, listPatients, gender);
   }
 
-  public Map<String, Number> createResultMap(String caseClass) {
-    Map<String, Number> resultMap = new HashMap<>();
-    resultMap.put(CoronaFixedValues.MALE_SPECIFICATION.getValue(),
-        getGenderCountByCaseClass(CoronaFixedValues.GENDER_MALE.getValue(), caseClass));
-    resultMap.put(CoronaFixedValues.FEMALE_SPECIFICATION.getValue(),
-        getGenderCountByCaseClass(CoronaFixedValues.GENDER_FEMALE.getValue(), caseClass));
-    resultMap.put(CoronaFixedValues.DIVERSE_SPECIFICATION.getValue(),
-        getGenderCountByCaseClass(CoronaFixedValues.GENDER_DIVERSE.getValue(), caseClass));
-
-    return resultMap;
-
-  }
 }

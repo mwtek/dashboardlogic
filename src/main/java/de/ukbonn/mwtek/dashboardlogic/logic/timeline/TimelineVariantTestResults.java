@@ -22,6 +22,8 @@ import static de.ukbonn.mwtek.dashboardlogic.tools.StringHelper.isAnyMatchSetWit
 
 import de.ukbonn.mwtek.dashboardlogic.enums.CoronaDashboardConstants;
 import de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues;
+import de.ukbonn.mwtek.dashboardlogic.models.CoronaDataItem;
+import de.ukbonn.mwtek.dashboardlogic.settings.InputCodeSettings;
 import de.ukbonn.mwtek.dashboardlogic.settings.VariantSettings;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbObservation;
 import de.ukbonn.mwtek.utilities.generic.time.DateTools;
@@ -33,6 +35,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.hl7.fhir.r4.model.Coding;
 import org.hl7.fhir.r4.model.Observation;
 
+/**
+ * This class is used for generating the data item {@link CoronaDataItem
+ * timeline.varianttestresults}.
+ *
+ * @author <a href="mailto:david.meyers@ukbonn.de">David Meyers</a>
+ * @author <a href="mailto:berke_enes.dincel@ukbonn.de">Berke Enes Dincel</a>
+ */
 @Slf4j
 public class TimelineVariantTestResults {
 
@@ -42,8 +51,10 @@ public class TimelineVariantTestResults {
     this.listObservation = listObservation;
   }
 
-  public Map<String, List<Integer>> createTimeLineVariantsTests(VariantSettings variantSettings) {
+  public Map<String, List<Integer>> createTimeLineVariantsTests(VariantSettings variantSettings,
+      InputCodeSettings inputCodeSettings) {
     Map<String, List<Integer>> variantMap = new LinkedHashMap<>();
+    List<String> observationVariantLoincCodes = inputCodeSettings.getObservationVariantLoincCodes();
     // Initialization of a map with counts for each variant for each 24-h-period
     variantMap.put(CoronaFixedValues.DATE.getValue(), new ArrayList<>());
     variantMap.put(CoronaFixedValues.VARIANT_ALPHA, new ArrayList<>());
@@ -57,7 +68,7 @@ public class TimelineVariantTestResults {
 
     List<UkbObservation> listVariantObservation = listObservation.stream()
         .filter(x -> isCodingValid(x.getCode(), CoronaFixedValues.LOINC_SYSTEM.getValue(),
-            CoronaFixedValues.COVID_VARIANT_CODES))
+            observationVariantLoincCodes))
         .filter(Observation::hasValueCodeableConcept).toList();
 
     long currentUnixTime = DateTools.getCurrentUnixTime();

@@ -20,16 +20,18 @@ package de.ukbonn.mwtek.dashboardlogic.logic.current;
 import de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues;
 import de.ukbonn.mwtek.dashboardlogic.logic.CoronaResultFunctionality;
 import de.ukbonn.mwtek.dashboardlogic.models.CoronaDataItem;
+import de.ukbonn.mwtek.dashboardlogic.settings.InputCodeSettings;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbProcedure;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.hl7.fhir.r4.model.Encounter.EncounterStatus;
 import org.hl7.fhir.r4.model.Procedure;
 
 /**
- * This class is used for generating the data item {@link CoronaDataItem current.treatmentlevel}
+ * This class is used for generating the data item {@link CoronaDataItem current.treatmentlevel}.
  *
  * @author <a href="mailto:david.meyers@ukbonn.de">David Meyers</a>
  * @author <a href="mailto:berke_enes.dincel@ukbonn.de">Berke Enes Dincel</a>
@@ -55,7 +57,7 @@ public class CurrentTreatmentLevel {
    * @return List with ongoing inpatient encounter that are currently on a standard ward
    */
   public List<UkbEncounter> getCurrentStandardWardEncounter(
-      Map<String, List<UkbEncounter>> mapCurrentIcu) {
+      Map<String, List<UkbEncounter>> mapCurrentIcu, InputCodeSettings inputCodeSettings) {
     List<UkbEncounter> resultList = new ArrayList<>();
     List<UkbEncounter> listIcuEncounter = mapCurrentIcu.get(CoronaFixedValues.ICU.getValue());
     List<UkbEncounter> listVentilationEncounter =
@@ -72,8 +74,8 @@ public class CurrentTreatmentLevel {
       listEncounterWithoutOutpatients.forEach(e -> {
 
         AtomicBoolean stationary = new AtomicBoolean(false);
-        // Check if encounter has no end date and has positive flagging
-        if (!e.getPeriod().hasEnd() && e.hasExtension(
+        // Check if encounter is active and has positive covid flagging
+        if (e.hasStatus() && e.getStatus() == EncounterStatus.INPROGRESS && e.hasExtension(
             CoronaFixedValues.POSITIVE_RESULT.getValue())) {
           // Checking if encounter has a higher treatmentlevel
           if (!listIcuEncounter.contains(e)) {
@@ -81,8 +83,8 @@ public class CurrentTreatmentLevel {
               stationary.set(true);
             } else {
               if (!hasActiveIcuProcedure(listIcuProcedures, e,
-                  CoronaFixedValues.VENT_CODE.getValue()) && !hasActiveIcuProcedure(
-                  listIcuProcedures, e, CoronaFixedValues.ECMO_CODE.getValue())) {
+                  inputCodeSettings.getProcedureVentilationCodes()) && !hasActiveIcuProcedure(
+                  listIcuProcedures, e, inputCodeSettings.getProcedureEcmoCodes())) {
                 stationary.set(true);
               }
             }
@@ -110,7 +112,8 @@ public class CurrentTreatmentLevel {
    */
   @SuppressWarnings("incomplete-switch")
   public List<UkbEncounter> getCurrentEncounterByIcuLevel(
-      Map<String, List<UkbEncounter>> mapCurrentIcu, CoronaFixedValues icuTreatmentLevel) {
+      Map<String, List<UkbEncounter>> mapCurrentIcu, CoronaFixedValues icuTreatmentLevel,
+      InputCodeSettings inputCodeSettings) {
     List<UkbEncounter> currentIcuList = new ArrayList<>();
 
     List<UkbEncounter> listICUEncounter = mapCurrentIcu.get(CoronaFixedValues.ICU.getValue());
@@ -147,15 +150,16 @@ public class CurrentTreatmentLevel {
                 if (ventilation.getCaseId().equals(encounter.getId())) {
                   if (!listEcmoEncounter.contains(encounter)) {
                     if (hasActiveIcuProcedure(listIcuProcedures, encounter,
-                        CoronaFixedValues.VENT_CODE.getValue())) {
+                        inputCodeSettings.getProcedureVentilationCodes())) {
                       currentIcuList.add(encounter);
                       break;
                     }
                   } else {
                     // check if higher treatmentlevel is finished and lower is ongoing
                     if (!hasActiveIcuProcedure(listIcuProcedures, encounter,
-                        CoronaFixedValues.ECMO_CODE.getValue()) && hasActiveIcuProcedure(
-                        listIcuProcedures, encounter, CoronaFixedValues.VENT_CODE.getValue())) {
+                        inputCodeSettings.getProcedureEcmoCodes()) && hasActiveIcuProcedure(
+                        listIcuProcedures, encounter,
+                        inputCodeSettings.getProcedureVentilationCodes())) {
                       currentIcuList.add(encounter);
                       break;
                     }
@@ -175,7 +179,7 @@ public class CurrentTreatmentLevel {
               for (UkbProcedure ecmo : listIcuProcedures) {
                 if (ecmo.getCaseId().equals(encounter.getId())) {
                   if (hasActiveIcuProcedure(listIcuProcedures, encounter,
-                      CoronaFixedValues.ECMO_CODE.getValue())) {
+                      inputCodeSettings.getProcedureEcmoCodes())) {
                     currentIcuList.add(encounter);
                     break;
                   }
@@ -194,19 +198,19 @@ public class CurrentTreatmentLevel {
   /**
    * Simple check whether the icu procedure is ongoing or already finished
    *
-   * @param listIcu       The Procedures which contain information on whether they are ventilation
-   *                      or ecmo
-   * @param encounter     The Encounter to be inspected
-   * @param procedureCode The procedure code that is going to be checked (e.g. {@link
-   *                      CoronaFixedValues#ECMO_CODE})
-   * @return true or false whether the Ventilation or Ecmo Procedure is still ongoing or not
+   * @param listIcu        The procedures which contain information on whether they are ventilation
+   *                       or ecmo.
+   * @param encounter      The Encounter to be inspected.
+   * @param procedureCodes The procedure code(s) that is/are going to be checked.
+   * @return true or false whether the ventilation or ecmo procedure is still ongoing or not.
    */
   private static boolean hasActiveIcuProcedure(List<UkbProcedure> listIcu, UkbEncounter encounter,
-      String procedureCode) {
+      List<String> procedureCodes) {
     boolean isActive = false;
     for (UkbProcedure icu : listIcu) {
-      if (icu.getCaseId().equals(encounter.getId()) && icu.getCategory().getCoding().get(0)
-          .getCode().equals(procedureCode)) {
+      if (icu.getCaseId().equals(encounter.getId()) && procedureCodes.contains(
+          icu.getCategory().getCoding().get(0)
+              .getCode())) {
         if (icu.getStatus().equals(Procedure.ProcedureStatus.INPROGRESS)) {
           isActive = true;
         }

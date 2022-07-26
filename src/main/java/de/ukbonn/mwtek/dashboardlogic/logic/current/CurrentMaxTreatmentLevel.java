@@ -31,7 +31,8 @@ import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * This class is used for generating the data item {@link CoronaDataItem current.maxtreatmentlevel}
+ * This class is used for generating the data item {@link CoronaDataItem
+ * current.maxtreatmentlevel}.
  *
  * @author <a href="mailto:david.meyers@ukbonn.de">David Meyers</a>
  * @author <a href="mailto:berke_enes.dincel@ukbonn.de">Berke Enes Dincel</a>
@@ -77,7 +78,7 @@ public class CurrentMaxTreatmentLevel {
     // check whether the current encounters had a higher treatmentlevel before
     try {
       switch (treatmentLevel) {
-        case STATIONARY_ITEM:
+        case INPATIENT_ITEM:
           for (UkbEncounter encounter : listEncountersInpatients) {
             isPositive = encounter.hasExtension(CoronaFixedValues.POSITIVE_RESULT.getValue());
             hasEnd = encounter.getPeriod().hasEnd();

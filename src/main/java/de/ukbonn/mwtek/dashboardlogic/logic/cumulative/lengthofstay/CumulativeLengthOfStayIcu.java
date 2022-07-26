@@ -40,7 +40,7 @@ import org.hl7.fhir.r4.model.Encounter;
 
 /**
  * This class is used for generating the data items {@link CoronaDataItem
- * cumulative.lengthofstay.icu} and the sub items
+ * cumulative.lengthofstay.icu} and the sub items.
  *
  * @author <a href="mailto:david.meyers@ukbonn.de">David Meyers</a>
  * @author <a href="mailto:berke_enes.dincel@ukbonn.de">Berke Enes Dincel</a>

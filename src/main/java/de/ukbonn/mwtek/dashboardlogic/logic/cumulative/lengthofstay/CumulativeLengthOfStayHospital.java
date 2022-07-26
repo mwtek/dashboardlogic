@@ -39,7 +39,7 @@ import lombok.extern.slf4j.Slf4j;
 
 /**
  * This class is used for generating the data items {@link CoronaDataItem
- * cumulative.lengthofstay.hospital} and the sub items
+ * cumulative.lengthofstay.hospital} and the sub items.
  *
  * @author <a href="mailto:david.meyers@ukbonn.de">David Meyers</a>
  * @author <a href="mailto:berke_enes.dincel@ukbonn.de">Berke Enes Dincel</a>

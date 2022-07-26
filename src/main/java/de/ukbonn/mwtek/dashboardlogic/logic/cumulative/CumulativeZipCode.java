@@ -31,12 +31,11 @@ import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * This class is used for generating the data item {@link CoronaDataItem cumulative.zipcode}
+ * This class is used for generating the data item {@link CoronaDataItem cumulative.zipcode}.
  *
  * @author <a href="mailto:david.meyers@ukbonn.de">David Meyers</a>
  * @author <a href="mailto:berke_enes.dincel@ukbonn.de">Berke Enes Dincel</a>
  */
-
 @Slf4j
 public class CumulativeZipCode {
 

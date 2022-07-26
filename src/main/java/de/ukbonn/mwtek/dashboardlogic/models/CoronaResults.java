@@ -21,8 +21,6 @@ package de.ukbonn.mwtek.dashboardlogic.models;
 
 import static de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues.ALIVE;
 import static de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues.BORDERLINE;
-import static de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues.CASECLASS_INPATIENT;
-import static de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues.CASECLASS_OUTPATIENT;
 import static de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues.CASESTATUS_ALL;
 import static de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues.CASESTATUS_INPATIENT;
 import static de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues.CASESTATUS_OUTPATIENT;
@@ -36,13 +34,13 @@ import static de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues.GENDER_MALE
 import static de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues.ICU;
 import static de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues.ICU_ECMO;
 import static de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues.ICU_VENTILATION;
+import static de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues.INPATIENT_ITEM;
 import static de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues.MALE_SPECIFICATION;
 import static de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues.NEGATIVE;
 import static de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues.NORMAL_WARD;
 import static de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues.OUTPATIENT_ITEM;
 import static de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues.POSITIVE;
 import static de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues.POSITIVE_RESULT;
-import static de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues.STATIONARY_ITEM;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItemTypes.ITEMTYPE_AGGREGATED;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItemTypes.ITEMTYPE_DEBUG;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItemTypes.ITEMTYPE_LIST;
@@ -101,6 +99,7 @@ import de.ukbonn.mwtek.dashboardlogic.logic.timeline.TimelineDeath;
 import de.ukbonn.mwtek.dashboardlogic.logic.timeline.TimelineMaxTreatmentLevel;
 import de.ukbonn.mwtek.dashboardlogic.logic.timeline.TimelineTests;
 import de.ukbonn.mwtek.dashboardlogic.logic.timeline.TimelineVariantTestResults;
+import de.ukbonn.mwtek.dashboardlogic.settings.InputCodeSettings;
 import de.ukbonn.mwtek.dashboardlogic.settings.VariantSettings;
 import de.ukbonn.mwtek.dashboardlogic.tools.ListNumberPair;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbCondition;
@@ -173,15 +172,18 @@ public class CoronaResults {
    * Creation of the JSON specification file for the Corona dashboard based on FHIR resources.
    *
    * @param mapExcludeDataItems Map with data items to be excluded from the output (e.g.
-   *                            "current.treatmentlevel")
-   * @param debug               Flag to provide debug information (e.g. casenrs) in the output
+   *                            "current.treatmentlevel").
+   * @param debug               Flag to provide debug information (e.g. casenrs) in the output.
    * @param variantSettings     {@link VariantSettings Configuration} of extended covid variants for
-   *                            the definition of not yet known/captured variants
+   *                            the definition of not yet known/captured variants.
+   * @param inputCodeSettings   The configuration of the parameterizable codes such as the
+   *                            observation codes or procedure codes.
    * @return List with all the {@link CoronaDataItem data items} that are defined in the corona
    * dashboard json specification
    */
+  @SuppressWarnings("unused")
   public ArrayList<CoronaDataItem> getDataItems(Map<String, Boolean> mapExcludeDataItems,
-      Boolean debug, VariantSettings variantSettings) {
+      Boolean debug, VariantSettings variantSettings, InputCodeSettings inputCodeSettings) {
     ArrayList<CoronaDataItem> currentDataList = new ArrayList<>();
     if (mapExcludeDataItems == null) {
       mapExcludeDataItems = new HashMap<>();
@@ -200,11 +202,11 @@ public class CoronaResults {
 
     Map<String, List<UkbEncounter>> mapIcu =
         CoronaResultFunctionality.createIcuMap(listEncounters, listLocations,
-            listIcuProcedures);
+            listIcuProcedures, inputCodeSettings);
     /* used for current logic */
     Map<String, List<UkbEncounter>> mapCurrentIcu =
         CoronaResultFunctionality.createCurrentIcuMap(listEncounters, listLocations,
-            listIcuProcedures);
+            listIcuProcedures, inputCodeSettings);
 
     // CurrentLogic Classes
     CurrentTreatmentLevel currentTreatmentlevel =
@@ -262,7 +264,7 @@ public class CoronaResults {
             mapPositiveEncounterByClass);
 
     List<UkbEncounter> listCumulativeStandardWardEncounter =
-        cumulativeMaxtreatmentLevel.getCumulativeByClass(mapIcu, STATIONARY_ITEM,
+        cumulativeMaxtreatmentLevel.getCumulativeByClass(mapIcu, INPATIENT_ITEM,
             mapPositiveEncounterByClass);
 
     // initialize ICU data
@@ -301,13 +303,16 @@ public class CoronaResults {
       HashMap<String, Number> listCurrent = new LinkedHashMap<>();
 
       listCurrentStandardWardEncounter =
-          currentTreatmentlevel.getCurrentStandardWardEncounter(mapCurrentIcu);
+          currentTreatmentlevel.getCurrentStandardWardEncounter(mapCurrentIcu, inputCodeSettings);
       listCurrentIcuEncounter =
-          currentTreatmentlevel.getCurrentEncounterByIcuLevel(mapCurrentIcu, ICU);
+          currentTreatmentlevel.getCurrentEncounterByIcuLevel(mapCurrentIcu, ICU,
+              inputCodeSettings);
       listCurrentVentEncounter =
-          currentTreatmentlevel.getCurrentEncounterByIcuLevel(mapCurrentIcu, ICU_VENTILATION);
+          currentTreatmentlevel.getCurrentEncounterByIcuLevel(mapCurrentIcu, ICU_VENTILATION,
+              inputCodeSettings);
       listCurrentEcmoEncounter =
-          currentTreatmentlevel.getCurrentEncounterByIcuLevel(mapCurrentIcu, ICU_ECMO);
+          currentTreatmentlevel.getCurrentEncounterByIcuLevel(mapCurrentIcu, ICU_ECMO,
+              inputCodeSettings);
 
       listCurrent.put(NORMAL_WARD.getValue(), listCurrentStandardWardEncounter.size());
       listCurrent.put(ICU.getValue(), listCurrentIcuEncounter.size());
@@ -342,7 +347,7 @@ public class CoronaResults {
       Map<String, Number> mapCurrentMax = new LinkedHashMap<>();
 
       listCurrentMaxStationary =
-          currentMaxTreatmentlevel.getNumberOfCurrentMaxTreatmentLevel(mapIcu, STATIONARY_ITEM);
+          currentMaxTreatmentlevel.getNumberOfCurrentMaxTreatmentLevel(mapIcu, INPATIENT_ITEM);
 
       listCurrentMaxIcu = currentMaxTreatmentlevel.getNumberOfCurrentMaxTreatmentLevel(mapIcu, ICU);
 
@@ -393,7 +398,7 @@ public class CoronaResults {
       if (mapExcludeDataItems.getOrDefault(CURRENT_MAXTREATMENTLEVEL, false)) {
         listCurrentMaxStationary =
             currentMaxTreatmentlevel.getNumberOfCurrentMaxTreatmentLevel(mapIcu,
-                STATIONARY_ITEM);
+                INPATIENT_ITEM);
       }
 
       CurrentMaxTreatmentLevelAge currentMaxtreatmentlevelAge =
@@ -474,11 +479,11 @@ public class CoronaResults {
       cd.setItemtype(ITEMTYPE_AGGREGATED);
 
       Set<UkbObservation> setPositiveObservations =
-          cumulativeResult.getObservationsByResult(POSITIVE);
+          cumulativeResult.getObservationsByResult(POSITIVE, inputCodeSettings);
       Set<UkbObservation> setNegativeObservations =
-          cumulativeResult.getObservationsByResult(NEGATIVE);
+          cumulativeResult.getObservationsByResult(NEGATIVE, inputCodeSettings);
       Set<UkbObservation> setBorderlineLabCaseNrs =
-          cumulativeResult.getObservationsByResult(BORDERLINE);
+          cumulativeResult.getObservationsByResult(BORDERLINE, inputCodeSettings);
       Map<String, Number> cumulativeResultMap = new LinkedHashMap<>();
 
       cumulativeResultMap.put(POSITIVE.getValue(), setPositiveObservations.size());
@@ -496,7 +501,8 @@ public class CoronaResults {
       cd.setItemtype(ITEMTYPE_AGGREGATED);
 
       Map<String, Integer> resultMap =
-          cumulativeVariantTestResults.createVariantTestResultMap(variantSettings);
+          cumulativeVariantTestResults.createVariantTestResultMap(variantSettings,
+              inputCodeSettings);
 
       cd.setData(resultMap);
       currentDataList.add(cd);
@@ -664,7 +670,8 @@ public class CoronaResults {
       cd.setItemname(TIMELINE_TESTS_POSITIVE);
       cd.setItemtype(ITEMTYPE_LIST);
 
-      ListNumberPair testPositivePair = timelineTests.createTimelineTestPositiveMap();
+      ListNumberPair testPositivePair = timelineTests.createTimelineTestPositiveMap(
+          inputCodeSettings);
 
       cd.setData(testPositivePair);
       currentDataList.add(cd);
@@ -679,7 +686,7 @@ public class CoronaResults {
       TimelineVariantTestResults variantTestResult =
           new TimelineVariantTestResults(listObservations);
 
-      cd.setData(variantTestResult.createTimeLineVariantsTests(variantSettings));
+      cd.setData(variantTestResult.createTimeLineVariantsTests(variantSettings, inputCodeSettings));
       currentDataList.add(cd);
     }
     // timeline maxtreatmentlevel
@@ -690,7 +697,8 @@ public class CoronaResults {
       Map<String, Map<Long, Set<Long>>> resultMaxTreatmentTimeline;
       Map<String, List<Long>> mapResultTreatment = new LinkedHashMap<>();
 
-      resultMaxTreatmentTimeline = timelineMaxtreatmentlevel.createMaxTreatmentTimeline();
+      resultMaxTreatmentTimeline = timelineMaxtreatmentlevel.createMaxTreatmentTimeline(
+          inputCodeSettings);
 
       List<Long> listDate =
           new ArrayList<>(resultMaxTreatmentTimeline.get(SUBITEMTYPE_DATE).keySet());
@@ -770,13 +778,13 @@ public class CoronaResults {
           new CumulativeGenderByClass(listCumulativeInpatients, listPatients);
       cumulativeInpatientGenderMap.put(MALE_SPECIFICATION.getValue(),
           cumulativeInPatientGender.getGenderCountByCaseClass(GENDER_MALE.getValue(),
-              CASECLASS_INPATIENT.getValue()));
+              INPATIENT_ITEM.getValue()));
       cumulativeInpatientGenderMap.put(FEMALE_SPECIFICATION.getValue(),
           cumulativeInPatientGender.getGenderCountByCaseClass(GENDER_FEMALE.getValue(),
-              CASECLASS_INPATIENT.getValue()));
+              INPATIENT_ITEM.getValue()));
       cumulativeInpatientGenderMap.put(DIVERSE_SPECIFICATION.getValue(),
           cumulativeInPatientGender.getGenderCountByCaseClass(GENDER_DIVERSE.getValue(),
-              CASECLASS_INPATIENT.getValue()));
+              INPATIENT_ITEM.getValue()));
 
       cd.setData(cumulativeInpatientGenderMap);
       currentDataList.add(cd);
@@ -794,13 +802,13 @@ public class CoronaResults {
 
       cumulativeOutpatientGender.put(MALE_SPECIFICATION.getValue(),
           cumulativeOutPatientGender.getGenderCountByCaseClass(GENDER_MALE.getValue(),
-              CASECLASS_OUTPATIENT.getValue()));
+              OUTPATIENT_ITEM.getValue()));
       cumulativeOutpatientGender.put(FEMALE_SPECIFICATION.getValue(),
           cumulativeOutPatientGender.getGenderCountByCaseClass(GENDER_FEMALE.getValue(),
-              CASECLASS_OUTPATIENT.getValue()));
+              OUTPATIENT_ITEM.getValue()));
       cumulativeOutpatientGender.put(DIVERSE_SPECIFICATION.getValue(),
           cumulativeOutPatientGender.getGenderCountByCaseClass(GENDER_DIVERSE.getValue(),
-              CASECLASS_OUTPATIENT.getValue()));
+              OUTPATIENT_ITEM.getValue()));
 
       cd.setData(cumulativeOutpatientGender);
       currentDataList.add(cd);
@@ -857,7 +865,7 @@ public class CoronaResults {
       aggData.put("value", new ArrayList<>());
       LinkedHashMap<CoronaFixedValues, List<UkbEncounter>> listCrosstabmaxtreatmentlevels =
           new LinkedHashMap<>();
-      listCrosstabmaxtreatmentlevels.put(STATIONARY_ITEM, listCurrentStandardWardEncounter);
+      listCrosstabmaxtreatmentlevels.put(INPATIENT_ITEM, listCurrentStandardWardEncounter);
       listCrosstabmaxtreatmentlevels.put(ICU, listCurrentIcuEncounter);
 
       List<UkbEncounter> listVentEncounter = new ArrayList<>(listCurrentVentEncounter);

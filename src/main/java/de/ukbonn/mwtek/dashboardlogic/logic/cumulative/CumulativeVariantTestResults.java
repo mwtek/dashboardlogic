@@ -23,6 +23,8 @@ import static de.ukbonn.mwtek.dashboardlogic.logic.CoronaResultFunctionality.isC
 import static de.ukbonn.mwtek.dashboardlogic.tools.StringHelper.isAnyMatchSetWithString;
 
 import de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues;
+import de.ukbonn.mwtek.dashboardlogic.models.CoronaDataItem;
+import de.ukbonn.mwtek.dashboardlogic.settings.InputCodeSettings;
 import de.ukbonn.mwtek.dashboardlogic.settings.VariantSettings;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbObservation;
 import java.util.LinkedHashMap;
@@ -33,6 +35,13 @@ import org.hl7.fhir.r4.model.CodeableConcept;
 import org.hl7.fhir.r4.model.Coding;
 import org.hl7.fhir.r4.model.Observation;
 
+/**
+ * This class is used for generating the data item {@link CoronaDataItem
+ * cumulative.varianttestresults}.
+ *
+ * @author <a href="mailto:david.meyers@ukbonn.de">David Meyers</a>
+ * @author <a href="mailto:berke_enes.dincel@ukbonn.de">Berke Enes Dincel</a>
+ */
 @Slf4j
 public class CumulativeVariantTestResults {
 
@@ -49,20 +58,24 @@ public class CumulativeVariantTestResults {
    * Creation of a map that assigns the supported Covid variants the frequency of their occurrence
    * at the site. Currently, only LOINC encodings are supported.
    *
-   * @param variantSettings The local configuration to extend the query logic with additional covid
-   *                        variants that are not yet known at the time of release.
+   * @param variantSettings   The local configuration to extend the query logic with additional
+   *                          covid variants that are not yet known at the time of release.
+   * @param inputCodeSettings The configuration of the parameterizable codes such as the observation
+   *                          codes or procedure codes.
    * @return Map with frequencies per covid variant.
    */
-  public Map<String, Integer> createVariantTestResultMap(VariantSettings variantSettings) {
+  public Map<String, Integer> createVariantTestResultMap(VariantSettings variantSettings,
+      InputCodeSettings inputCodeSettings) {
     this.variantSettings = variantSettings;
     Map<String, Integer> variantMap = new LinkedHashMap<>();
     initializeVariantMap(variantMap);
+    List<String> observationVariantLoincCodes = inputCodeSettings.getObservationVariantLoincCodes();
 
     // Get all the coding-entries that contain loinc information
     try {
       variantCodings = listObservation.parallelStream()
           .filter(x -> isCodingValid(x.getCode(), LOINC_SYSTEM.getValue(),
-              CoronaFixedValues.COVID_VARIANT_CODES))
+              observationVariantLoincCodes))
           .map(Observation::getValueCodeableConcept).filter(CodeableConcept::hasCoding).flatMap(
               x -> x.getCoding().stream().filter(Coding::hasSystem)
                   .filter(y -> y.getSystem().equals(LOINC_SYSTEM.getValue()))).toList();

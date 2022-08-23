@@ -64,7 +64,8 @@ public class CumulativeResult {
     List<String> observationPcrLoincCodes = inputCodeSettings.getObservationPcrLoincCodes();
     switch (labResult) {
       case POSITIVE -> {
-        listObs = listObservations.stream()
+        listObs = listObservations.parallelStream()
+            .filter(x -> x.hasCode() && x.getCode().hasCoding() && x.hasValueCodeableConcept())
             .filter(x -> observationPcrLoincCodes.contains(
                 x.getCode().getCoding().get(0)
                     .getCode()) && QualitativeLabResultCodes.getPositiveCodes()
@@ -73,7 +74,8 @@ public class CumulativeResult {
             .collect(Collectors.toSet());
       } // case
       case BORDERLINE -> {
-        listObs = listObservations.stream()
+        listObs = listObservations.parallelStream()
+            .filter(x -> x.hasCode() && x.getCode().hasCoding() && x.hasValueCodeableConcept())
             .filter(x -> observationPcrLoincCodes.contains(
                 x.getCode().getCoding().get(0)
                     .getCode()) && QualitativeLabResultCodes.getBorderlineCodes()
@@ -82,7 +84,8 @@ public class CumulativeResult {
             .collect(Collectors.toSet());
       } // case
       case NEGATIVE -> {
-        listObs = listObservations.stream()
+        listObs = listObservations.parallelStream()
+            .filter(x -> x.hasCode() && x.getCode().hasCoding() && x.hasValueCodeableConcept())
             .filter(x -> observationPcrLoincCodes.contains(
                 x.getCode().getCoding().get(0)
                     .getCode()) && QualitativeLabResultCodes.getNegativeCodes()

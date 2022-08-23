@@ -51,7 +51,7 @@ public record CurrentMaxTreatmentLevelAge(List<UkbPatient> listPatients,
     for (Map.Entry<String, List<UkbEncounter>> entry : mapPositiveEncounterByClass.entrySet()) {
       for (UkbEncounter encounter : entry.getValue()) {
         if (currentMaxEncounterPidList.contains(encounter.getPatientId())) {
-          CoronaResultFunctionality.sortingFirstAdmissionDateToPid(encounter,
+          CoronaResultFunctionality.assignFirstAdmissionDateToPid(encounter,
               currentMaxPidAdmissionMap);
         }
       }

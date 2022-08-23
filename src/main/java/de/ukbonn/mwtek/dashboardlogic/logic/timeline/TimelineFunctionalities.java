@@ -46,10 +46,9 @@ public class TimelineFunctionalities {
    * Purpose of this auxiliary function is to divide the content of a map into two different lists
    *
    * @param tempMap   Map that maps a frequency value to a date (unixtime)
-   * @param dateList  Output list with the date entries
    * @param valueList Output list with the values (frequencies per day)
    */
-  public static void divideMapValuesToLists(Map<Long, Long> tempMap, List<Long> dateList,
+  public static void divideMapValuesToLists(Map<Long, Long> tempMap,
       List<Long> valueList) {
 
     // get a list with the keys in ascending order (output requirement)
@@ -58,7 +57,6 @@ public class TimelineFunctionalities {
 
     listKeys.forEach(key -> {
       Long value = tempMap.get(key);
-      dateList.add(key);
       valueList.add(value);
     });
   }

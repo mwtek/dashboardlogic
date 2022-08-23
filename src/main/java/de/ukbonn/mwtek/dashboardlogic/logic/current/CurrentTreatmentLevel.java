@@ -208,8 +208,9 @@ public class CurrentTreatmentLevel {
       List<String> procedureCodes) {
     boolean isActive = false;
     for (UkbProcedure icu : listIcu) {
-      if (icu.getCaseId().equals(encounter.getId()) && procedureCodes.contains(
-          icu.getCategory().getCoding().get(0)
+      if (icu.getCaseId().equals(encounter.getId()) && icu.hasCode() && icu.getCode().hasCoding()
+          && procedureCodes.contains(
+          icu.getCode().getCoding().get(0)
               .getCode())) {
         if (icu.getStatus().equals(Procedure.ProcedureStatus.INPROGRESS)) {
           isActive = true;

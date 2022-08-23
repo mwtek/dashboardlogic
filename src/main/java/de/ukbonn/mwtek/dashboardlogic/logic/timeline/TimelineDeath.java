@@ -17,8 +17,11 @@
  */
 package de.ukbonn.mwtek.dashboardlogic.logic.timeline;
 
-import de.ukbonn.mwtek.dashboardlogic.enums.CoronaDashboardConstants;
+import static de.ukbonn.mwtek.dashboardlogic.enums.CoronaDashboardConstants.dayInSeconds;
+import static de.ukbonn.mwtek.dashboardlogic.logic.CoronaResultFunctionality.getDatesOutputList;
+
 import de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues;
+import de.ukbonn.mwtek.dashboardlogic.enums.CoronaDashboardConstants;
 import de.ukbonn.mwtek.dashboardlogic.logic.CoronaResultFunctionality;
 import de.ukbonn.mwtek.dashboardlogic.models.CoronaDataItem;
 import de.ukbonn.mwtek.dashboardlogic.tools.ListNumberPair;
@@ -58,11 +61,10 @@ public class TimelineDeath extends TimelineFunctionalities {
    *
    * @return ListNumberPair Containing dates and number of deceased people
    */
-  public ListNumberPair createTimeLineDeathMap() {
-    log.debug("started createTimeLineDeathMap");
+  public ListNumberPair createTimelineDeathMap() {
+    log.debug("started createTimelineDeathMap");
     Instant startTimer = TimerTools.startTimer();
     LinkedHashMap<Long, Long> dateResultMap = new LinkedHashMap<>();
-    List<Long> dateList = new ArrayList<>();
     List<Long> valueList = new ArrayList<>();
     ListNumberPair resultPair = new ListNumberPair();
 
@@ -89,10 +91,10 @@ public class TimelineDeath extends TimelineFunctionalities {
         for (UkbEncounter encounter : listPositiveDeceasedCases) {
           checkDaysDifference(tempDateUnix, dateResultMap, encounter);
         }
-        tempDateUnix += 86400; // add one day
+        tempDateUnix += dayInSeconds; // add one day 
       }
-      divideMapValuesToLists(dateResultMap, dateList, valueList);
-      resultPair = new ListNumberPair(dateList, valueList);
+      divideMapValuesToLists(dateResultMap, valueList);
+      resultPair = new ListNumberPair(getDatesOutputList(), valueList);
     } catch (Exception e) {
       log.debug("Error is calculating the timeline death: " + e.getMessage());
     }

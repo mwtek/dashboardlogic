@@ -51,6 +51,7 @@ import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.CUMULATIVE_AGE;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.CUMULATIVE_AGE_MAXTREATMENTLEVEL_ICU;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.CUMULATIVE_AGE_MAXTREATMENTLEVEL_ICU_WITH_ECMO;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.CUMULATIVE_AGE_MAXTREATMENTLEVEL_ICU_WITH_VENTILATION;
+import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.CUMULATIVE_AGE_MAXTREATMENTLEVEL_OUTPATIENT;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.CUMULATIVE_GENDER;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.CUMULATIVE_INPATIENT_AGE;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.CUMULATIVE_INPATIENT_GENDER;
@@ -76,8 +77,9 @@ import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.CURRENT_TREATMENTLE
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.TIMELINE_DEATHS;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.TIMELINE_MAXTREATMENTLEVEL;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.TIMELINE_TESTS;
-import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.TIMELINE_TESTS_POSITIVE;
+import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.TIMELINE_TEST_POSITIVE;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.TIMELINE_VARIANTTESTRESULTS;
+import static de.ukbonn.mwtek.dashboardlogic.logic.CoronaResultFunctionality.getDatesOutputList;
 
 import de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues;
 import de.ukbonn.mwtek.dashboardlogic.enums.VitalStatus;
@@ -114,7 +116,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -185,13 +186,11 @@ public class CoronaResults {
   public ArrayList<CoronaDataItem> getDataItems(Map<String, Boolean> mapExcludeDataItems,
       Boolean debug, VariantSettings variantSettings, InputCodeSettings inputCodeSettings) {
     ArrayList<CoronaDataItem> currentDataList = new ArrayList<>();
-    if (mapExcludeDataItems == null) {
+    if (mapExcludeDataItems == null)
       mapExcludeDataItems = new HashMap<>();
-    }
 
-    if (debug == null) {
+    if (debug == null)
       debug = false;
-    }
 
     // If there are resources with unfilled mandatory attributes, report them immediately (may give
     // partially reduced result sets)
@@ -322,13 +321,14 @@ public class CoronaResults {
       cd.setData(listCurrent);
       currentDataList.add(cd);
 
-      // storing the casenrs of the current treatmentlevel
+      // Storing the casenrs of the current treatmentlevel. This list will be used in coming item generations.
       HashMap<String, List<String>> mapCurrentTreatmentlevelCaseNrs =
           createMapCurrentTreatmentlevelCasenrs(listCurrentStandardWardEncounter,
               listCurrentIcuEncounter, listCurrentVentEncounter, listCurrentEcmoEncounter);
       this.setMapCurrentTreatmentlevelCasenrs(mapCurrentTreatmentlevelCaseNrs);
 
       if (debug) {
+
         cd = new CoronaDataItem();
         cd.setItemname(addCaseNrsToLabel(CURRENT_TREATMENTLEVEL));
         cd.setItemtype(ITEMTYPE_DEBUG);
@@ -588,6 +588,19 @@ public class CoronaResults {
         currentDataList.add(cd);
       }
     }
+    // cumulative.age.maxtreatmentlevel.outpatient
+    if (!mapExcludeDataItems.getOrDefault(CUMULATIVE_AGE_MAXTREATMENTLEVEL_OUTPATIENT, false)) {
+      cd = new CoronaDataItem();
+      cd.setItemname(CUMULATIVE_AGE_MAXTREATMENTLEVEL_OUTPATIENT);
+      cd.setItemtype(ITEMTYPE_LIST);
+
+      List<Integer> cumulativeMaxtreatmentlevelOutpatientAgeList =
+          cumulativeMaxtreatmentLevelAge.createMaxTreatmentLevelAgeMap(
+              mapPositiveEncounterByClass, mapIcu, OUTPATIENT_ITEM);
+
+      cd.setData(cumulativeMaxtreatmentlevelOutpatientAgeList);
+      currentDataList.add(cd);
+    }
     // cumulative.age.maxtreatmentlevel.normal_ward
     if (!mapExcludeDataItems.getOrDefault(CUMULATE_AGE_MAXTREATMENTLEVEL_NORMAL_WARD, false)) {
       cd = new CoronaDataItem();
@@ -596,7 +609,7 @@ public class CoronaResults {
 
       List<Integer> cumulativeMaxtreatmentlevelStationaryAgeList =
           cumulativeMaxtreatmentLevelAge.createMaxTreatmentLevelAgeMap(
-              mapPositiveEncounterByClass, mapIcu, NORMAL_WARD.getValue());
+              mapPositiveEncounterByClass, mapIcu, NORMAL_WARD);
 
       cd.setData(cumulativeMaxtreatmentlevelStationaryAgeList);
       currentDataList.add(cd);
@@ -609,7 +622,7 @@ public class CoronaResults {
 
       List<Integer> cumulativeMaxtreatmentlevelIcuAgeList =
           cumulativeMaxtreatmentLevelAge.createMaxTreatmentLevelAgeMap(
-              mapPositiveEncounterByClass, mapIcu, ICU.getValue());
+              mapPositiveEncounterByClass, mapIcu, ICU);
 
       cd.setData(cumulativeMaxtreatmentlevelIcuAgeList);
       currentDataList.add(cd);
@@ -623,7 +636,7 @@ public class CoronaResults {
 
       List<Integer> cumulativeMaxtreatmentlevelIcuVentAgeList =
           cumulativeMaxtreatmentLevelAge.createMaxTreatmentLevelAgeMap(
-              mapPositiveEncounterByClass, mapIcu, ICU_VENTILATION.getValue());
+              mapPositiveEncounterByClass, mapIcu, ICU_VENTILATION);
 
       cd.setData(cumulativeMaxtreatmentlevelIcuVentAgeList);
       currentDataList.add(cd);
@@ -636,7 +649,7 @@ public class CoronaResults {
 
       List<Integer> cumulativeMaxtreatmentlevelIcuEcmoAgeList =
           cumulativeMaxtreatmentLevelAge.createMaxTreatmentLevelAgeMap(
-              mapPositiveEncounterByClass, mapIcu, ICU_ECMO.getValue());
+              mapPositiveEncounterByClass, mapIcu, ICU_ECMO);
 
       cd.setData(cumulativeMaxtreatmentlevelIcuEcmoAgeList);
       currentDataList.add(cd);
@@ -664,10 +677,10 @@ public class CoronaResults {
       currentDataList.add(cd);
     }
 
-    // timeline.tests.positive
-    if (!mapExcludeDataItems.getOrDefault(TIMELINE_TESTS_POSITIVE, false)) {
+    // timeline.test.positive
+    if (!mapExcludeDataItems.getOrDefault(TIMELINE_TEST_POSITIVE, false)) {
       cd = new CoronaDataItem();
-      cd.setItemname(TIMELINE_TESTS_POSITIVE);
+      cd.setItemname(TIMELINE_TEST_POSITIVE);
       cd.setItemtype(ITEMTYPE_LIST);
 
       ListNumberPair testPositivePair = timelineTests.createTimelineTestPositiveMap(
@@ -686,25 +699,25 @@ public class CoronaResults {
       TimelineVariantTestResults variantTestResult =
           new TimelineVariantTestResults(listObservations);
 
-      cd.setData(variantTestResult.createTimeLineVariantsTests(variantSettings, inputCodeSettings));
+      cd.setData(variantTestResult.createTimelineVariantsTests(variantSettings, inputCodeSettings));
       currentDataList.add(cd);
     }
-    // timeline maxtreatmentlevel
+    // timeline.maxtreatmentlevel
     if (!mapExcludeDataItems.getOrDefault(TIMELINE_MAXTREATMENTLEVEL, false)) {
       cd = new CoronaDataItem();
       cd.setItemname(TIMELINE_MAXTREATMENTLEVEL);
       cd.setItemtype(ITEMTYPE_LIST);
-      Map<String, Map<Long, Set<Long>>> resultMaxTreatmentTimeline;
+      Map<String, Map<Long, Set<String>>> resultMaxTreatmentTimeline;
       Map<String, List<Long>> mapResultTreatment = new LinkedHashMap<>();
 
+      // The result contain the case numbers for debugging and the sums by date
       resultMaxTreatmentTimeline = timelineMaxtreatmentlevel.createMaxTreatmentTimeline(
           inputCodeSettings);
 
-      List<Long> listDate =
-          new ArrayList<>(resultMaxTreatmentTimeline.get(SUBITEMTYPE_DATE).keySet());
-      mapResultTreatment.put(SUBITEMTYPE_DATE, listDate);
-      for (Map.Entry<String, Map<Long, Set<Long>>> entry : resultMaxTreatmentTimeline.entrySet()) {
-        for (Map.Entry<Long, Set<Long>> secondEntry : entry.getValue().entrySet()) {
+      mapResultTreatment.put(SUBITEMTYPE_DATE, getDatesOutputList());
+
+      for (Map.Entry<String, Map<Long, Set<String>>> entry : resultMaxTreatmentTimeline.entrySet()) {
+        for (Map.Entry<Long, Set<String>> secondEntry : entry.getValue().entrySet()) {
           if (entry.getKey().equals(OUTPATIENT_ITEM.getValue())) {
             addValuesToTimelineMaxMap(OUTPATIENT_ITEM.getValue(), secondEntry.getValue(),
                 mapResultTreatment);
@@ -735,13 +748,11 @@ public class CoronaResults {
         cd = new CoronaDataItem();
         cd.setItemname(addCaseNrsToLabel(TIMELINE_MAXTREATMENTLEVEL));
         cd.setItemtype(ITEMTYPE_DEBUG);
-        Map<String, Map<Long, Set<Long>>> resultMaxTreatmentCaseNrs = new LinkedHashMap<>();
+        Map<String, Map<Long, Set<String>>> resultMaxTreatmentCaseNrs = new LinkedHashMap<>();
 
-        Set<Long> setDate = new LinkedHashSet<>(listDate);
-
-        for (Map.Entry<String, Map<Long, Set<Long>>> entry : resultMaxTreatmentTimeline.entrySet()) {
+        for (Map.Entry<String, Map<Long, Set<String>>> entry : resultMaxTreatmentTimeline.entrySet()) {
           String mapNameAndValues = entry.getKey();
-          Map<Long, Set<Long>> mapDateAndCaseNr = entry.getValue();
+          Map<Long, Set<String>> mapDateAndCaseNr = entry.getValue();
           if (mapNameAndValues.equals(OUTPATIENT_ITEM.getValue())) {
             resultMaxTreatmentCaseNrs.put(OUTPATIENT_ITEM.getValue(), mapDateAndCaseNr);
           } else if (mapNameAndValues.equals(NORMAL_WARD.getValue())) {
@@ -754,8 +765,8 @@ public class CoronaResults {
             resultMaxTreatmentCaseNrs.put(ICU_ECMO.getValue(), mapDateAndCaseNr);
           }
         }
-        Map<Long, Set<Long>> mapTempAndDate = new LinkedHashMap<>();
-        mapTempAndDate.put(0L, setDate);
+        // The date would be redundant in the debug information but is needed, since the rest endpoint is not accepting lists of type item without date lists
+        Map<Long, Set<String>> mapTempAndDate = new LinkedHashMap<>();
         resultMaxTreatmentCaseNrs.put(SUBITEMTYPE_DATE, mapTempAndDate);
 
         cd.setData(resultMaxTreatmentCaseNrs);
@@ -842,7 +853,7 @@ public class CoronaResults {
       cd.setItemname(TIMELINE_DEATHS);
       cd.setItemtype(ITEMTYPE_LIST);
 
-      ListNumberPair tlDeathPairList = timelineDeath.createTimeLineDeathMap();
+      ListNumberPair tlDeathPairList = timelineDeath.createTimelineDeathMap();
 
       cd.setData(tlDeathPairList);
 
@@ -1128,7 +1139,7 @@ public class CoronaResults {
     }
   }
 
-  private void addValuesToTimelineMaxMap(String item, Set<Long> value,
+  private void addValuesToTimelineMaxMap(String item, Set<String> value,
       Map<String, List<Long>> mapResultTreatment) {
     List<Long> tempList = new ArrayList<>();
     tempList.add((long) value.size());

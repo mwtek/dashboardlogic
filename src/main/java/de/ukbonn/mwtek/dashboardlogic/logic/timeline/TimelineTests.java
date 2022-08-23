@@ -19,6 +19,8 @@
  */
 package de.ukbonn.mwtek.dashboardlogic.logic.timeline;
 
+import static de.ukbonn.mwtek.dashboardlogic.logic.CoronaResultFunctionality.getDatesOutputList;
+
 import de.ukbonn.mwtek.dashboardlogic.enums.CoronaDashboardConstants;
 import de.ukbonn.mwtek.dashboardlogic.enums.QualitativeLabResultCodes;
 import de.ukbonn.mwtek.dashboardlogic.models.CoronaDataItem;
@@ -60,19 +62,14 @@ public class TimelineTests extends TimelineFunctionalities {
   public ListNumberPair createTimelineTestsMap() {
     log.debug("started createTimelineTestsMap");
     Instant startTimer = TimerTools.startTimer();
-    Map<Long, Long> valueDateMap = new ConcurrentHashMap<>();
-    List<Long> dateList = new ArrayList<>();
+    Map<Long, Long> valueDateMap = getDateMapWithoutValues();
     List<Long> valueList = new ArrayList<>();
 
     long endUnixTime = DateTools.getCurrentUnixTime();
 
     // Initialization of the map with the date entries to keep the order ascending
     long startDate = CoronaDashboardConstants.qualifyingDate;
-    while (startDate <= endUnixTime) {
-      // Initialize key (unix date) if not existent (important, since we have no values for some days )
-      valueDateMap.putIfAbsent(startDate, 0L);
-      startDate += CoronaDashboardConstants.dayInSeconds;
-    }
+
     List<Long> labEffectiveDates =
         listLabObservations.parallelStream().map(UkbObservation::getEffectiveDateTimeType)
             .map(x -> DateTools.dateToUnixTime(x.getValue())).toList();
@@ -94,10 +91,10 @@ public class TimelineTests extends TimelineFunctionalities {
     // order them by key ascending (just needed if we want to parallelize it; the first tries
     // were
     // not really promising tho because of too many write/read ops probably block each other)
-    divideMapValuesToLists(valueDateMap, dateList, valueList);
+    divideMapValuesToLists(valueDateMap, valueList);
 
     TimerTools.stopTimerAndLog(startTimer, "finished createTimelineTestsMap");
-    return new ListNumberPair(dateList, valueList);
+    return new ListNumberPair(getDatesOutputList(), valueList);
   }
 
   /**
@@ -109,23 +106,15 @@ public class TimelineTests extends TimelineFunctionalities {
   public ListNumberPair createTimelineTestPositiveMap(InputCodeSettings inputCodeSettings) {
     log.debug("started createTimelineTestPositiveMap");
     Instant startTimer = TimerTools.startTimer();
-    Map<Long, Long> tempMap = new ConcurrentHashMap<>();
-    ArrayList<Long> dateList = new ArrayList<>();
+    Map<Long, Long> valueDateMap = getDateMapWithoutValues();
     ArrayList<Long> valueList = new ArrayList<>();
     long currentUnixTime = DateTools.getCurrentUnixTime();
     List<String> observationPcrLoincCodes = inputCodeSettings.getObservationPcrLoincCodes();
 
-    // initialization of the map with the date entries to keep the order ascending
-    long startDate = CoronaDashboardConstants.qualifyingDate;
-    while (startDate <= currentUnixTime) {
-      // initialize key (unix date) if not existent (important, since we have 0 values for some days)
-      tempMap.putIfAbsent(startDate, 0L);
-      startDate += CoronaDashboardConstants.dayInSeconds;
-    }
-
     // Creation of a sublist with all positive covid observations
     // and reduce it to the effective dates of the funding's to make the data retrieval more efficient
     List<Long> labEffectiveDatesPositiveFundings = listLabObservations.parallelStream()
+        .filter(x -> x.hasCode() && x.getCode().hasCoding() && x.hasValueCodeableConcept())
         .filter(x -> (observationPcrLoincCodes.contains(
             x.getCode().getCoding().get(0).getCode())))
         .filter(x -> QualitativeLabResultCodes.getPositiveCodes()
@@ -140,7 +129,7 @@ public class TimelineTests extends TimelineFunctionalities {
         long checkingDateUnix = CoronaDashboardConstants.qualifyingDate;
         while (checkingDateUnix <= currentUnixTime && !obsFound) {
 
-          obsFound = addLabTestToTimeline(labEffective, checkingDateUnix, tempMap);
+          obsFound = addLabTestToTimeline(labEffective, checkingDateUnix, valueDateMap);
           checkingDateUnix += CoronaDashboardConstants.dayInSeconds; // add one day
         }
       });
@@ -148,9 +137,21 @@ public class TimelineTests extends TimelineFunctionalities {
       log.debug("issue while running createTimelineTestPositiveMap");
       ex.printStackTrace();
     }
-    divideMapValuesToLists(tempMap, dateList, valueList);
+    divideMapValuesToLists(valueDateMap, valueList);
     TimerTools.stopTimerAndLog(startTimer, "finished createTimelineTestPositiveMap");
-    return new ListNumberPair(dateList, valueList);
+    return new ListNumberPair(getDatesOutputList(), valueList);
+  }
+
+  /**
+   * Initializes a map that holds a list with all the midnight timestamps in the relevant time
+   * period and initializes them with a sum value 0.
+   */
+  private static Map<Long, Long> getDateMapWithoutValues() {
+    Map<Long, Long> valueDateMap = new ConcurrentHashMap<>();
+    for (int i = 0; i < getDatesOutputList().size(); i++) {
+      valueDateMap.put(getDatesOutputList().get(i), 0L);
+    }
+    return valueDateMap;
   }
 
   /**

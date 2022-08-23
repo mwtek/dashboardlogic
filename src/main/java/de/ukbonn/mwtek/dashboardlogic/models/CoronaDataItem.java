@@ -26,7 +26,7 @@ import lombok.Setter;
 
 /**
  * Model class that describes a single data item of the Corona Dashboard specification and provides
- * a representation in a JsonString.
+ * a representation in a json string.
  *
  * @author <a href="mailto:david.meyers@ukbonn.de">David Meyers</a>
  */

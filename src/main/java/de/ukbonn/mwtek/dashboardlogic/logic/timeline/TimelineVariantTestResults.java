@@ -17,6 +17,7 @@
  */
 package de.ukbonn.mwtek.dashboardlogic.logic.timeline;
 
+import static de.ukbonn.mwtek.dashboardlogic.logic.CoronaResultFunctionality.getDatesOutputList;
 import static de.ukbonn.mwtek.dashboardlogic.logic.CoronaResultFunctionality.isCodingValid;
 import static de.ukbonn.mwtek.dashboardlogic.tools.StringHelper.isAnyMatchSetWithString;
 
@@ -51,9 +52,9 @@ public class TimelineVariantTestResults {
     this.listObservation = listObservation;
   }
 
-  public Map<String, List<Integer>> createTimeLineVariantsTests(VariantSettings variantSettings,
+  public Map<String, List<Long>> createTimelineVariantsTests(VariantSettings variantSettings,
       InputCodeSettings inputCodeSettings) {
-    Map<String, List<Integer>> variantMap = new LinkedHashMap<>();
+    Map<String, List<Long>> variantMap = new LinkedHashMap<>();
     List<String> observationVariantLoincCodes = inputCodeSettings.getObservationVariantLoincCodes();
     // Initialization of a map with counts for each variant for each 24-h-period
     variantMap.put(CoronaFixedValues.DATE.getValue(), new ArrayList<>());
@@ -76,14 +77,14 @@ public class TimelineVariantTestResults {
     // initialization of the map with the date entries to keep the order ascending
     long startDate = CoronaDashboardConstants.qualifyingDate;
     while (startDate <= currentUnixTime) {
-      int alphaCount = 0;
-      int betaCount = 0;
-      int gammaCount = 0;
-      int deltaCount = 0;
-      int omicronCount = 0;
-      int otherVocCount = 0;
-      int nonVocCount = 0;
-      int unknownCount = 0;
+      long alphaCount = 0;
+      long betaCount = 0;
+      long gammaCount = 0;
+      long deltaCount = 0;
+      long omicronCount = 0;
+      long otherVocCount = 0;
+      long nonVocCount = 0;
+      long unknownCount = 0;
 
       final long checkDateUnix = startDate;
       final long nextDateUnix = startDate + CoronaDashboardConstants.dayInSeconds;
@@ -130,7 +131,6 @@ public class TimelineVariantTestResults {
           }
         }
       }
-      variantMap.get(CoronaFixedValues.DATE.getValue()).add((int) startDate);
       variantMap.get(CoronaFixedValues.VARIANT_ALPHA).add(alphaCount);
       variantMap.get(CoronaFixedValues.VARIANT_BETA).add(betaCount);
       variantMap.get(CoronaFixedValues.VARIANT_GAMMA).add(gammaCount);
@@ -142,6 +142,8 @@ public class TimelineVariantTestResults {
 
       startDate += CoronaDashboardConstants.dayInSeconds;
     }
+    variantMap
+        .put(CoronaFixedValues.DATE.getValue(), getDatesOutputList());
 
     return variantMap;
   }

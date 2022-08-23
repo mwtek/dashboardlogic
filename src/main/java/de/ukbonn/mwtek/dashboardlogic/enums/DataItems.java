@@ -44,6 +44,7 @@ public class DataItems {
   public static String CUMULATIVE_MAXTREATMENTLEVEL = "cumulative.maxtreatmentlevel";
   public static String CUMULATE_AGE_MAXTREATMENTLEVEL_NORMAL_WARD =
       "cumulative.age.maxtreatmentlevel.normal_ward";
+  public static String CUMULATIVE_AGE_MAXTREATMENTLEVEL_OUTPATIENT = "cumulative.age.maxtreatmentlevel.outpatient";
   public static String CUMULATIVE_AGE_MAXTREATMENTLEVEL_ICU =
       "cumulative.age.maxtreatmentlevel.icu";
   public static String CUMULATIVE_AGE_MAXTREATMENTLEVEL_ICU_UNDIFFERENTIATED =
@@ -54,7 +55,7 @@ public class DataItems {
       "cumulative.age.maxtreatmentlevel.icu_with_ecmo";
   public static String CUMULATIVE_ZIPCODE = "cumulative.zipcode";
   public static String TIMELINE_TESTS = "timeline.tests";
-  public static String TIMELINE_TESTS_POSITIVE = "timeline.tests.positive";
+  public static String TIMELINE_TEST_POSITIVE = "timeline.test.positive";
   public static String TIMELINE_MAXTREATMENTLEVEL = "timeline.maxtreatmentlevel";
   public static String TIMELINE_VARIANTTESTRESULTS = "timeline.varianttestresults";
   public static String TIMELINE_DEATHS = "timeline.deaths";

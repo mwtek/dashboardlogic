@@ -47,11 +47,10 @@ public class InputCodeSettings {
 
 
   @Getter
-  private List<String> procedureVentilationCodes = ImmutableList.of("40617009",
-      "57485005");
+  private List<String> procedureVentilationCodes;
 
   @Getter
-  private List<String> procedureEcmoCodes = ImmutableList.of("182744004");
+  private List<String> procedureEcmoCodes;
 
   public InputCodeSettings(List<String> observationPcrLoincCodes,
       List<String> observationVariantLoincCodes,

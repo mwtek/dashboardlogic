@@ -21,10 +21,12 @@ import java.util.List;
 
 /**
  * Export model for file generation that reports case/encounter ids of active cases separated by
- * treatment level
+ * treatment level.
  */
 public record CoronaTreatmentLevelExport(List<String> listNormalWard, List<String> listIcu,
                                          List<String> listIcuVent, List<String> listEcmo) {
+
+  private static final String deliminator = ";";
 
   public String toCsv() {
     StringBuilder sb = new StringBuilder();
@@ -33,24 +35,24 @@ public record CoronaTreatmentLevelExport(List<String> listNormalWard, List<Strin
     int maxSize = Math.max(listNormalWard.size(), listIcu.size());
     for (int i = 0; i < maxSize; i++) {
       if (listNormalWard.size() > i && listNormalWard.get(i) != null) {
-        sb.append(listNormalWard.get(i)).append(";");
+        sb.append(listNormalWard.get(i)).append(deliminator);
       } else {
-        sb.append(";");
+        sb.append(deliminator);
       }
       if (listIcu.size() > i && listIcu.get(i) != null) {
-        sb.append(listIcu.get(i)).append(";");
+        sb.append(listIcu.get(i)).append(deliminator);
       } else {
-        sb.append(";");
+        sb.append(deliminator);
       }
       if (listIcuVent.size() > i && listIcuVent.get(i) != null) {
-        sb.append(listIcuVent.get(i)).append(";");
+        sb.append(listIcuVent.get(i)).append(deliminator);
       } else {
-        sb.append(";");
+        sb.append(deliminator);
       }
       if (listEcmo.size() > i && listEcmo.get(i) != null) {
         sb.append(listEcmo.get(i));
       } else {
-        sb.append(";");
+        sb.append(deliminator);
       }
 
       sb.append("\n");

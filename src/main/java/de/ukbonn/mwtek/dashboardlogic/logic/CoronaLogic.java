@@ -428,12 +428,18 @@ public class CoronaLogic {
     Set<String> labSet = new HashSet<>();
     List<String> observationPcrLoincCodes = inputCodeSettings.getObservationPcrLoincCodes();
     for (UkbObservation labObs : listLabObservations) {
-      if (observationPcrLoincCodes.contains(
+      if (labObs.hasCode() && observationPcrLoincCodes.contains(
           labObs.getCode().getCoding().get(0).getCode())) {
-        if (QualitativeLabResultCodes.getPositiveCodes()
-            .contains(((CodeableConcept) labObs.getValue()).getCoding().get(0).getCode()
-            )) {
-          labSet.add(labObs.getCaseId());
+        if (labObs.hasValueCodeableConcept()) {
+          if (QualitativeLabResultCodes.getPositiveCodes()
+              .contains(((CodeableConcept) labObs.getValue()).getCoding().get(0).getCode()
+              )) {
+            labSet.add(labObs.getCaseId());
+          }
+        } // if
+        else {
+          log.warn("The observation resource with id " + labObs.getId()
+              + " that describes a covid pcr finding doesn't contain a valueCodeableConcept.");
         }
       }
     }

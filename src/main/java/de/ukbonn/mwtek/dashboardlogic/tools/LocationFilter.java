@@ -19,6 +19,9 @@
  */
 package de.ukbonn.mwtek.dashboardlogic.tools;
 
+import static de.ukbonn.mwtek.utilities.fhir.misc.FhirCodingTools.getCodeOfFirstCodeableConcept;
+import static de.ukbonn.mwtek.utilities.fhir.misc.FhirCodingTools.getCodeOfFirstCoding;
+
 import de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbLocation;
 
@@ -34,8 +37,13 @@ public class LocationFilter {
    * @return <code>True</code> if the given location describes an intensive care unit.
    */
   public static boolean isLocationIcu(UkbLocation loc) {
-    return loc.hasType() && loc.getType().get(0).getCoding().get(0).getCode()
-        .equals(CoronaFixedValues.ICU.getValue());
+    if (loc.hasType()) {
+      String codeLocationType = getCodeOfFirstCodeableConcept(loc.getType());
+      return codeLocationType != null && codeLocationType
+          .equals(CoronaFixedValues.ICU.getValue());
+    } else {
+      return false;
+    }
   }
 
   /**
@@ -45,7 +53,12 @@ public class LocationFilter {
    * @return <code>True</code> if the given location describes a ward.
    */
   public static boolean isLocationWard(UkbLocation loc) {
-    return loc.hasPhysicalType() && loc.getPhysicalType().hasCoding() && loc.getPhysicalType()
-        .getCoding().get(0).getCode().equals(CoronaFixedValues.WARD.getValue());
+    if (loc.hasPhysicalType()) {
+      String codePhysicalType = getCodeOfFirstCoding(loc.getPhysicalType().getCoding());
+      return codePhysicalType != null && codePhysicalType.equals(
+          CoronaFixedValues.WARD.getValue());
+    } else {
+      return false;
+    }
   }
 }

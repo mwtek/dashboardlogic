@@ -36,8 +36,8 @@ import org.hl7.fhir.r4.model.Coding;
 import org.hl7.fhir.r4.model.Observation;
 
 /**
- * This class is used for generating the data item {@link CoronaDataItem
- * cumulative.varianttestresults}.
+ * This class is used for generating the data item
+ * {@link CoronaDataItem cumulative.varianttestresults}.
  *
  * @author <a href="mailto:david.meyers@ukbonn.de">David Meyers</a>
  * @author <a href="mailto:berke_enes.dincel@ukbonn.de">Berke Enes Dincel</a>
@@ -74,11 +74,11 @@ public class CumulativeVariantTestResults {
     // Get all the coding-entries that contain loinc information
     try {
       variantCodings = listObservation.parallelStream()
-          .filter(x -> isCodingValid(x.getCode(), LOINC_SYSTEM.getValue(),
+          .filter(x -> isCodingValid(x.getCode(), LOINC_SYSTEM,
               observationVariantLoincCodes))
           .map(Observation::getValueCodeableConcept).filter(CodeableConcept::hasCoding).flatMap(
               x -> x.getCoding().stream().filter(Coding::hasSystem)
-                  .filter(y -> y.getSystem().equals(LOINC_SYSTEM.getValue()))).toList();
+                  .filter(y -> y.getSystem().equals(LOINC_SYSTEM))).toList();
 
       for (Coding variantCoding : variantCodings) {
         readCodingAndIncrementVariantMap(variantCoding, variantMap);
@@ -108,7 +108,8 @@ public class CumulativeVariantTestResults {
    * Reads the given LOINC variant code and increments the entry in the overall map.
    *
    * @param variantCoding {@link CodeableConcept#getCoding() CodeableConcept.coding} that contains
-   *                      the LOINC code for covid variants from {@link Observation#getValueCodeableConcept()}.
+   *                      the LOINC code for covid variants from
+   *                      {@link Observation#getValueCodeableConcept()}.
    * @param variantMap    Map that counts the frequencies per covid variant.
    */
   private void readCodingAndIncrementVariantMap(Coding variantCoding,

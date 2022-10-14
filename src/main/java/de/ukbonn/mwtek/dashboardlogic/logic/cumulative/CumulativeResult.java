@@ -17,12 +17,15 @@
  */
 package de.ukbonn.mwtek.dashboardlogic.logic.cumulative;
 
+import static de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues.LOINC_SYSTEM;
+import static de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues.SNOMED_SYSTEM;
+import static de.ukbonn.mwtek.utilities.fhir.misc.FhirCodingTools.isCodeInCodesystem;
+
 import de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues;
 import de.ukbonn.mwtek.dashboardlogic.enums.QualitativeLabResultCodes;
 import de.ukbonn.mwtek.dashboardlogic.models.CoronaDataItem;
 import de.ukbonn.mwtek.dashboardlogic.settings.InputCodeSettings;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbObservation;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -40,19 +43,22 @@ import org.hl7.fhir.r4.model.CodeableConcept;
 
 public class CumulativeResult {
 
-  List<UkbObservation> listObservations = new ArrayList<>();
+  List<UkbObservation> listObservations;
 
   public CumulativeResult(List<UkbObservation> listObservation) {
     this.listObservations = listObservation;
   }
+
+
+  private List<UkbObservation> covidObservations;
 
   /**
    * Determination of the laboratory tests of all patients for whom there is an outpatient,
    * pre-hospital, posthospital, day-care or full inpatient case in connection with the test
    * depending on the laboratory result.
    *
-   * @param labResult         The laboratory result to be filtered for (e.g. {@link
-   *                          CoronaFixedValues#POSITIVE}).
+   * @param labResult         The laboratory result to be filtered for (e.g.
+   *                          {@link CoronaFixedValues#POSITIVE}).
    * @param inputCodeSettings The configuration of the parameterizable codes such as the observation
    *                          codes or procedure codes.
    * @return Get tests of all patients for whom an outpatient, pre-hospital, posthospital, partial
@@ -61,36 +67,32 @@ public class CumulativeResult {
   public Set<UkbObservation> getObservationsByResult(CoronaFixedValues labResult,
       InputCodeSettings inputCodeSettings) {
     Set<UkbObservation> listObs = new HashSet<>();
-    List<String> observationPcrLoincCodes = inputCodeSettings.getObservationPcrLoincCodes();
+
+    // Initial filtering of the needed observations
+    if (covidObservations == null) {
+      covidObservations = listObservations.parallelStream()
+          .filter(x -> x.hasCode() && x.getCode().hasCoding() && x.hasValueCodeableConcept())
+          .filter(x -> isCodeInCodesystem(x.getCode().getCoding(),
+              inputCodeSettings.getObservationPcrLoincCodes(), LOINC_SYSTEM)).toList();
+    }
+
     switch (labResult) {
       case POSITIVE -> {
-        listObs = listObservations.parallelStream()
-            .filter(x -> x.hasCode() && x.getCode().hasCoding() && x.hasValueCodeableConcept())
-            .filter(x -> observationPcrLoincCodes.contains(
-                x.getCode().getCoding().get(0)
-                    .getCode()) && QualitativeLabResultCodes.getPositiveCodes()
-                .contains(((CodeableConcept) x.getValue()).getCoding().get(0)
-                    .getCode()))
+        listObs = covidObservations.parallelStream().filter(
+                x -> isCodeInCodesystem(((CodeableConcept) x.getValue()).getCoding(),
+                    QualitativeLabResultCodes.getPositiveCodes(), SNOMED_SYSTEM))
             .collect(Collectors.toSet());
       } // case
       case BORDERLINE -> {
-        listObs = listObservations.parallelStream()
-            .filter(x -> x.hasCode() && x.getCode().hasCoding() && x.hasValueCodeableConcept())
-            .filter(x -> observationPcrLoincCodes.contains(
-                x.getCode().getCoding().get(0)
-                    .getCode()) && QualitativeLabResultCodes.getBorderlineCodes()
-                .contains(((CodeableConcept) x.getValue()).getCoding().get(0)
-                    .getCode()))
+        listObs = covidObservations.parallelStream()
+            .filter(x -> isCodeInCodesystem(((CodeableConcept) x.getValue()).getCoding(),
+                QualitativeLabResultCodes.getBorderlineCodes(), SNOMED_SYSTEM))
             .collect(Collectors.toSet());
       } // case
       case NEGATIVE -> {
-        listObs = listObservations.parallelStream()
-            .filter(x -> x.hasCode() && x.getCode().hasCoding() && x.hasValueCodeableConcept())
-            .filter(x -> observationPcrLoincCodes.contains(
-                x.getCode().getCoding().get(0)
-                    .getCode()) && QualitativeLabResultCodes.getNegativeCodes()
-                .contains(((CodeableConcept) x.getValue()).getCoding().get(0)
-                    .getCode()))
+        listObs = covidObservations.parallelStream()
+            .filter(x -> isCodeInCodesystem(((CodeableConcept) x.getValue()).getCoding(),
+                QualitativeLabResultCodes.getNegativeCodes(), SNOMED_SYSTEM))
             .collect(Collectors.toSet());
       } // case
       default -> {

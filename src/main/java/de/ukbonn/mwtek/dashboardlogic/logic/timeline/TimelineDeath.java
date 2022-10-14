@@ -20,8 +20,8 @@ package de.ukbonn.mwtek.dashboardlogic.logic.timeline;
 import static de.ukbonn.mwtek.dashboardlogic.enums.CoronaDashboardConstants.dayInSeconds;
 import static de.ukbonn.mwtek.dashboardlogic.logic.CoronaResultFunctionality.getDatesOutputList;
 
-import de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues;
 import de.ukbonn.mwtek.dashboardlogic.enums.CoronaDashboardConstants;
+import de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues;
 import de.ukbonn.mwtek.dashboardlogic.logic.CoronaResultFunctionality;
 import de.ukbonn.mwtek.dashboardlogic.models.CoronaDataItem;
 import de.ukbonn.mwtek.dashboardlogic.tools.ListNumberPair;
@@ -68,7 +68,7 @@ public class TimelineDeath extends TimelineFunctionalities {
     List<Long> valueList = new ArrayList<>();
     ListNumberPair resultPair = new ListNumberPair();
 
-    //Current Date
+    //current date
     long currentUnixTime = DateTools.getCurrentUnixTime();
     //start date
     long tempDateUnix = CoronaDashboardConstants.qualifyingDate;

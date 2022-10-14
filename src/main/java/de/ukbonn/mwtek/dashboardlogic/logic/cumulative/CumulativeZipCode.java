@@ -25,10 +25,11 @@ import de.ukbonn.mwtek.utilities.generic.time.TimerTools;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
+import org.hl7.fhir.r4.model.Address;
 
 /**
  * This class is used for generating the data item {@link CoronaDataItem cumulative.zipcode}.
@@ -39,8 +40,8 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class CumulativeZipCode {
 
-  List<UkbEncounter> listEncounters = new ArrayList<>();
-  List<UkbPatient> listPatients = new ArrayList<>();
+  List<UkbEncounter> listEncounters;
+  List<UkbPatient> listPatients;
 
   public CumulativeZipCode(List<UkbEncounter> listEncounters, List<UkbPatient> listPatients) {
     this.listEncounters = listEncounters;
@@ -48,32 +49,38 @@ public class CumulativeZipCode {
   }
 
   /**
-   * Returns a list containing the postcode of each patient from Germany.
+   * Returns a list containing the zip code of each patient from germany.
    *
-   * @return List with all zipcodes of the given c19-positive patients
+   * @return List with all zip codes of the given c19-positive patients.
    */
   public List<String> createZipCodeList() {
     log.debug("started createZipCodeList");
     Instant startTime = TimerTools.startTimer();
-    Set<String> tempPidSet = new HashSet<>();
+    Set<String> tempPidSet;
     List<String> listResult = new ArrayList<>();
     // get pids from all positive cases
-    listEncounters.forEach(encounter -> {
-      if (encounter.hasExtension(CoronaFixedValues.POSITIVE_RESULT.getValue())) {
-        tempPidSet.add(encounter.getPatientId());
-      }
-    });
-    // save addresses from all positive cases
+    tempPidSet = listEncounters.parallelStream()
+        .filter(x -> x.hasExtension(CoronaFixedValues.POSITIVE_RESULT.getValue()))
+        .map(UkbEncounter::getPatientId).collect(
+            Collectors.toSet());
+
+    // Store zip codes from all positive cases
     for (UkbPatient patient : listPatients) {
       if (tempPidSet.contains(patient.getId())) {
-        if (patient.hasAddress() && patient.getAddress().get(0).getPostalCode() != null) {
-          if (patient.getAddress().get(0).getCountry()
+        if (patient.hasAddress()) {
+          // Since 'Strassenanschrift' and 'Postfach' got the same type in the kds profile it should be fine to take the first entry.
+          Address firstAddress = patient.getAddressFirstRep();
+          if (firstAddress.hasPostalCode() && firstAddress.hasCountry()
+              && firstAddress.getCountry()
               .equals(CoronaFixedValues.COUNTRY_CODE.getValue())) {
-            listResult.add(patient.getAddress().get(0).getPostalCode());
+            listResult.add(firstAddress.getPostalCode());
           } else {
             listResult.add("null");
           }
         } else {
+          // Usually we never should end here since it's a non-valid person resource then. (address is 1..*)
+          log.warn("Patient resource with id " + patient.getId()
+              + " got no address, but its a mandatory field! ");
           listResult.add("null");
         }
       }
@@ -82,5 +89,4 @@ public class CumulativeZipCode {
     TimerTools.stopTimerAndLog(startTime, "finished createZipCodeList");
     return listResult;
   }
-
 }

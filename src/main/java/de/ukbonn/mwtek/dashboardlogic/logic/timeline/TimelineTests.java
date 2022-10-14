@@ -19,7 +19,10 @@
  */
 package de.ukbonn.mwtek.dashboardlogic.logic.timeline;
 
+import static de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues.LOINC_SYSTEM;
+import static de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues.SNOMED_SYSTEM;
 import static de.ukbonn.mwtek.dashboardlogic.logic.CoronaResultFunctionality.getDatesOutputList;
+import static de.ukbonn.mwtek.utilities.fhir.misc.FhirCodingTools.isCodeInCodesystem;
 
 import de.ukbonn.mwtek.dashboardlogic.enums.CoronaDashboardConstants;
 import de.ukbonn.mwtek.dashboardlogic.enums.QualitativeLabResultCodes;
@@ -35,7 +38,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import lombok.extern.slf4j.Slf4j;
-import org.hl7.fhir.r4.model.CodeableConcept;
 
 /**
  * This class is used for generating the data item {@link CoronaDataItem timeline.tests}.
@@ -69,9 +71,9 @@ public class TimelineTests extends TimelineFunctionalities {
 
     // Initialization of the map with the date entries to keep the order ascending
     long startDate = CoronaDashboardConstants.qualifyingDate;
-
     List<Long> labEffectiveDates =
-        listLabObservations.parallelStream().map(UkbObservation::getEffectiveDateTimeType)
+        listLabObservations.parallelStream().filter(UkbObservation::hasEffectiveDateTimeType)
+            .map(UkbObservation::getEffectiveDateTimeType)
             .map(x -> DateTools.dateToUnixTime(x.getValue())).toList();
 
     labEffectiveDates.parallelStream().forEach(effective -> {
@@ -115,11 +117,11 @@ public class TimelineTests extends TimelineFunctionalities {
     // and reduce it to the effective dates of the funding's to make the data retrieval more efficient
     List<Long> labEffectiveDatesPositiveFundings = listLabObservations.parallelStream()
         .filter(x -> x.hasCode() && x.getCode().hasCoding() && x.hasValueCodeableConcept())
-        .filter(x -> (observationPcrLoincCodes.contains(
-            x.getCode().getCoding().get(0).getCode())))
-        .filter(x -> QualitativeLabResultCodes.getPositiveCodes()
-            .contains(((CodeableConcept) x.getValue()).getCoding().get(0).getCode())
-        )
+        .filter(x -> isCodeInCodesystem(x.getCode().getCoding(), observationPcrLoincCodes,
+            LOINC_SYSTEM)).filter(x -> isCodeInCodesystem(x.getValueCodeableConcept().getCoding(),
+            QualitativeLabResultCodes.getPositiveCodes(), SNOMED_SYSTEM))
+        .filter(UkbObservation::hasEffectiveDateTimeType)
+        // Caution with using getEffectiveDateTimeType since the default (if its null) will be a date object of the current time.
         .map(UkbObservation::getEffectiveDateTimeType)
         .map(x -> DateTools.dateToUnixTime(x.getValue())).toList();
 
@@ -155,8 +157,8 @@ public class TimelineTests extends TimelineFunctionalities {
   }
 
   /**
-   * Check whether a laboratory result belongs to the supplied date {@literal [Interval: day <->
-   * day+24h]} and subsequent incrementing if so.
+   * Check whether a laboratory result belongs to the supplied date
+   * {@literal [Interval: day <-> day+24h]} and subsequent incrementing if so.
    *
    * @param labFundDate  Date of the laboratory result
    * @param tempDateUnix Current day [unix time] which is checked and incremented if the reporting

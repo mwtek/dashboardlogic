@@ -17,10 +17,15 @@
  */
 package de.ukbonn.mwtek.dashboardlogic.logic;
 
+import static de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues.LOINC_SYSTEM;
+import static de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues.SNOMED_SYSTEM;
+import static de.ukbonn.mwtek.utilities.fhir.misc.FhirCodingTools.getCodeBySystem;
+import static de.ukbonn.mwtek.utilities.fhir.misc.FhirCodingTools.getCodeOfFirstCoding;
+
+import de.ukbonn.mwtek.dashboardlogic.CoronaDataItemGenerator;
 import de.ukbonn.mwtek.dashboardlogic.enums.CoronaDashboardConstants;
 import de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues;
 import de.ukbonn.mwtek.dashboardlogic.enums.QualitativeLabResultCodes;
-import de.ukbonn.mwtek.dashboardlogic.models.CoronaResults;
 import de.ukbonn.mwtek.dashboardlogic.models.CoronaTreatmentLevelExport;
 import de.ukbonn.mwtek.dashboardlogic.settings.InputCodeSettings;
 import de.ukbonn.mwtek.dashboardlogic.tools.LocationFilter;
@@ -54,6 +59,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
+import org.hl7.fhir.r4.model.Address;
 import org.hl7.fhir.r4.model.CodeableConcept;
 import org.hl7.fhir.r4.model.Coding;
 import org.hl7.fhir.r4.model.Encounter;
@@ -113,7 +119,8 @@ public class CoronaResultFunctionality {
         boolean isPositive = encounter.hasExtension(CoronaFixedValues.POSITIVE_RESULT.getValue());
         if (isPositive) {
           List<UkbProcedure> listIcuCurrentPatient =
-              listIcuProcedures.stream().filter(x -> x.getCaseId().equals(encounter.getId()))
+              listIcuProcedures.stream().filter(x -> x.getCaseId() != null)
+                  .filter(x -> x.getCaseId().equals(encounter.getId()))
                   .toList();
 
           if (listIcuCurrentPatient.isEmpty()) {
@@ -123,7 +130,8 @@ public class CoronaResultFunctionality {
               // if encounter is icu_vent or icu_Ecmo
               if (icu.getStatus().equals(ProcedureStatus.INPROGRESS)) {
                 if (icu.hasCode() && icu.getCode().hasCoding()) {
-                  String icuCode = icu.getCode().getCoding().get(0).getCode();
+                  // No hard system check as some providers may have the need to use ops instead of snomed.
+                  String icuCode = getCodeOfFirstCoding(icu.getCode().getCoding());
                   sortIcuToMap(icuCode, resultMap, encounter, inputCodeSettings);
                 } else {
                   log.warn(logMissingProcedureCode(icu.getId()));
@@ -189,6 +197,10 @@ public class CoronaResultFunctionality {
         .filter(LocationFilter::isLocationWard).filter(LocationFilter::isLocationIcu)
         .collect(Collectors.toList());
 
+    // Filter procedure resources to usable ones (e.g. encounter id must be set)
+    List<UkbProcedure> listIcuProceduresWithEncRef =
+        listIcuProcedures.stream().filter(x -> x.getCaseId() != null).toList();
+
     Map<String, List<UkbEncounter>> resultMap = new ConcurrentHashMap<>();
     resultMap.put(CoronaFixedValues.ICU.getValue(),
         Collections.synchronizedList(new ArrayList<>()));
@@ -213,11 +225,13 @@ public class CoronaResultFunctionality {
 
           // get all procedures of an encounter
           List<UkbProcedure> listIcuByEncounter =
-              listIcuProcedures.stream().filter(x -> x.getCaseId().equals(caseId)).toList();
+              listIcuProceduresWithEncRef.stream().filter(x -> x.getCaseId().equals(caseId))
+                  .toList();
 
           for (UkbProcedure icu : listIcuByEncounter) {
             if (icu.hasCode() && icu.getCode().hasCoding()) {
-              String icuCode = icu.getCode().getCoding().get(0).getCode();
+              // The procedure retrieval is not fixed to a system at the moment since some providers are using ops instead of snomed.
+              String icuCode = getCodeOfFirstCoding(icu.getCode().getCoding());
               sortIcuToMap(icuCode, resultMap, encounter, inputCodeSettings);
             } else {
               log.warn(logMissingProcedureCode(icu.getId()));
@@ -434,9 +448,10 @@ public class CoronaResultFunctionality {
     // go through each patient check if they are living in Bonn
     for (UkbPatient patient : listPatient) {
       try {
+        Address address = patient.getAddressFirstRep();
         mapIsBonnPatient.put(patient.getId(),
-            patient.getAddress().get(0).getCity() != null && patient.getAddress().get(0)
-                .getCity().equals(CoronaFixedValues.CITY_BONN.getValue()));
+            address.getCity() != null && address.getCity()
+                .equals(CoronaFixedValues.CITY_BONN.getValue()));
       } catch (Exception e) {
         log.debug("Patient: " + patient.getId() + " got no address/city");
         e.printStackTrace();
@@ -644,7 +659,8 @@ public class CoronaResultFunctionality {
 
     StringBuilder contactType = new StringBuilder();
     listType.forEach(ccType -> ccType.getCoding().forEach(codingType -> {
-      if (codingType.getSystem().equals(CoronaFixedValues.CASETYPE_KONTAKTART_SYSTEM.getValue())) {
+      if (codingType.hasSystem() && codingType.getSystem()
+          .equals(CoronaFixedValues.CASETYPE_KONTAKTART_SYSTEM.getValue())) {
         contactType.append(codingType.getCode());
       }
     }));
@@ -695,8 +711,8 @@ public class CoronaResultFunctionality {
   }
 
   /**
-   * Splits the system and resource part from the id in a fhir resource reference (e.g. {@literal
-   * http://fhirserver.com/r4/Location/123 -> 123})
+   * Splits the system and resource part from the id in a fhir resource reference (e.g.
+   * {@literal http://fhirserver.com/r4/Location/123 -> 123})
    *
    * @param fhirResourceReference A fhir resource reference
    * @return the plain id of the resource
@@ -712,10 +728,12 @@ public class CoronaResultFunctionality {
    * Export of a csv file that displays a list of case/encounter numbers of active cases separated
    * by treatment level when run through.
    *
-   * @param mapCurrentTreatmentlevelCasenrs {@link CoronaResults#getMapCurrentTreatmentlevelCasenrs()
+   * @param mapCurrentTreatmentlevelCasenrs {@link
+   *                                        CoronaDataItemGenerator#getMapCurrentTreatmentlevelCasenrs()
    *                                        Map} with the current case/encounter ids by treatment
    *                                        level.
-   * @param exportDirectory                 The directory to export to (e.g.: "C:\currentTreatmentlevelExport").
+   * @param exportDirectory                 The directory to export to (e.g.:
+   *                                        "C:\currentTreatmentlevelExport").
    * @param fileBaseName                    The base file name of the generated file (e.g.:
    *                                        "Caseids_inpatient_covid19_patients").
    */
@@ -779,9 +797,9 @@ public class CoronaResultFunctionality {
     return listUkbObservations.parallelStream()
         .filter(x -> x.hasCode() && x.getCode().hasCoding() && x.hasValueCodeableConcept())
         .filter(x -> observationPcrLoincCodes.contains(
-            x.getCode().getCoding().get(0).getCode()))
+            getCodeBySystem(x.getCode().getCoding(), LOINC_SYSTEM)))
         .filter(x -> QualitativeLabResultCodes.getPositiveCodes()
-            .contains(x.getValueCodeableConcept().getCoding().get(0).getCode()))
+            .contains(getCodeBySystem(x.getValueCodeableConcept().getCoding(), SNOMED_SYSTEM)))
         .map(UkbObservation::getPatientId).collect(Collectors.toSet());
   }
 
@@ -810,7 +828,8 @@ public class CoronaResultFunctionality {
    * Checking if the given {@link CodeableConcept#getCoding() coding} of a
    * <code>CodeableConcept</code> got a code that is part of the given value set.
    *
-   * @param codeableConcept The codings that need to be checked (e.g. {@link UkbObservation#getCode()}).
+   * @param codeableConcept The codings that need to be checked (e.g.
+   *                        {@link UkbObservation#getCode()}).
    * @param system          The system that should be checked.
    * @param validCodes      The codes that should be checked.
    * @return <code>True</code> if the system and a valid code is part of the coding.
@@ -827,8 +846,9 @@ public class CoronaResultFunctionality {
   }
 
   /**
-   * Determine via the discharge disposition which is part of {@link UkbEncounter#getHospitalization()}
-   * whether the patient is deceased within the scope of the case under review.
+   * Determine via the discharge disposition which is part of
+   * {@link UkbEncounter#getHospitalization()} whether the patient is deceased within the scope of
+   * the case under review.
    *
    * @param enc An instance of an {@link UkbEncounter} object
    * @return <code>false</code>, if no valid discharge disposition can be found in the {@link

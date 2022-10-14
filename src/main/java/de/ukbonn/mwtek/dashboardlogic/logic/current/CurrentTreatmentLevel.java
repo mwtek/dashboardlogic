@@ -17,6 +17,10 @@
  */
 package de.ukbonn.mwtek.dashboardlogic.logic.current;
 
+import static de.ukbonn.mwtek.dashboardlogic.tools.EncounterFilter.isActive;
+import static de.ukbonn.mwtek.dashboardlogic.tools.EncounterFilter.isCovidPositive;
+import static de.ukbonn.mwtek.utilities.fhir.misc.FhirCodingTools.getCodeOfFirstCoding;
+
 import de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues;
 import de.ukbonn.mwtek.dashboardlogic.logic.CoronaResultFunctionality;
 import de.ukbonn.mwtek.dashboardlogic.models.CoronaDataItem;
@@ -27,7 +31,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
-import org.hl7.fhir.r4.model.Encounter.EncounterStatus;
 import org.hl7.fhir.r4.model.Procedure;
 
 /**
@@ -71,27 +74,25 @@ public class CurrentTreatmentLevel {
 
     // check inpatient
     try {
-      listEncounterWithoutOutpatients.forEach(e -> {
-
+      listEncounterWithoutOutpatients.forEach(enc -> {
         AtomicBoolean stationary = new AtomicBoolean(false);
         // Check if encounter is active and has positive covid flagging
-        if (e.hasStatus() && e.getStatus() == EncounterStatus.INPROGRESS && e.hasExtension(
-            CoronaFixedValues.POSITIVE_RESULT.getValue())) {
+        if (isActive(enc) && isCovidPositive(enc)) {
           // Checking if encounter has a higher treatmentlevel
-          if (!listIcuEncounter.contains(e)) {
-            if (!listVentilationEncounter.contains(e) && !listEcmoEncounter.contains(e)) {
+          if (!listIcuEncounter.contains(enc)) {
+            if (!listVentilationEncounter.contains(enc) && !listEcmoEncounter.contains(enc)) {
               stationary.set(true);
             } else {
-              if (!hasActiveIcuProcedure(listIcuProcedures, e,
+              if (!hasActiveIcuProcedure(listIcuProcedures, enc,
                   inputCodeSettings.getProcedureVentilationCodes()) && !hasActiveIcuProcedure(
-                  listIcuProcedures, e, inputCodeSettings.getProcedureEcmoCodes())) {
+                  listIcuProcedures, enc, inputCodeSettings.getProcedureEcmoCodes())) {
                 stationary.set(true);
               }
             }
           }
         }
         if (stationary.get()) {
-          resultList.add(e);
+          resultList.add(enc);
         }
       });
     } catch (Exception e) {
@@ -101,14 +102,14 @@ public class CurrentTreatmentLevel {
   }
 
   /**
-   * Used to calculate the current treatmentlevel for the icu encounters, for
-   * current.treatmentlevel
+   * This method is used to calculate the current treatment level for the icu encounters, used in
+   * the data item 'current.treatmentlevel'.
    *
    * @param mapCurrentIcu     A list of all current inpatient c19-positive cases separated by
-   *                          treatment level
-   * @param icuTreatmentLevel The Icu treatment level for which the encounter are to be retrieved
-   *                          (e.g. {@link CoronaFixedValues#ICU})
-   * @return Returns a list of ongoing ICU Encounter
+   *                          treatment level.
+   * @param icuTreatmentLevel The icu treatment level for which the encounter are to be retrieved
+   *                          (e.g. {@link CoronaFixedValues#ICU}).
+   * @return Returns a list of ongoing icu encounter.
    */
   @SuppressWarnings("incomplete-switch")
   public List<UkbEncounter> getCurrentEncounterByIcuLevel(
@@ -116,22 +117,22 @@ public class CurrentTreatmentLevel {
       InputCodeSettings inputCodeSettings) {
     List<UkbEncounter> currentIcuList = new ArrayList<>();
 
-    List<UkbEncounter> listICUEncounter = mapCurrentIcu.get(CoronaFixedValues.ICU.getValue());
+    List<UkbEncounter> listIcuEncounter = mapCurrentIcu.get(CoronaFixedValues.ICU.getValue());
     List<UkbEncounter> listVentilationEncounter =
         mapCurrentIcu.get(CoronaFixedValues.ICU_VENTILATION.getValue());
     List<UkbEncounter> listEcmoEncounter = mapCurrentIcu.get(CoronaFixedValues.ICU_ECMO.getValue());
 
     boolean isPositive;
-    boolean hasPeriodEnd;
+    boolean isActive;
     try {
       switch (icuTreatmentLevel) {
         case ICU:
-          for (UkbEncounter encounter : listICUEncounter) {
-            isPositive = encounter.hasExtension(CoronaFixedValues.POSITIVE_RESULT.getValue());
-            hasPeriodEnd = encounter.getPeriod().hasEnd();
+          for (UkbEncounter encounter : listIcuEncounter) {
+            isPositive = isCovidPositive(encounter);
+            isActive = isActive(encounter);
 
             // check End, flag and appearance in higher treatmentlevel
-            if (!hasPeriodEnd && isPositive) {
+            if (isActive && isPositive) {
               if (!listVentilationEncounter.contains(encounter) && !listEcmoEncounter.contains(
                   encounter)) {
                 currentIcuList.add(encounter);
@@ -141,11 +142,11 @@ public class CurrentTreatmentLevel {
           break;
         case ICU_VENTILATION:
           for (UkbEncounter encounter : listVentilationEncounter) {
-            isPositive = encounter.hasExtension(CoronaFixedValues.POSITIVE_RESULT.getValue());
-            hasPeriodEnd = encounter.getPeriod().hasEnd();
+            isPositive = isCovidPositive(encounter);
+            isActive = isActive(encounter);
 
             // check End, flag, procedure status and appearance in higher treatmentlevel
-            if (!hasPeriodEnd && isPositive) {
+            if (isActive && isPositive) {
               for (UkbProcedure ventilation : listIcuProcedures) {
                 if (ventilation.getCaseId().equals(encounter.getId())) {
                   if (!listEcmoEncounter.contains(encounter)) {
@@ -171,11 +172,11 @@ public class CurrentTreatmentLevel {
           break;
         case ICU_ECMO:
           for (UkbEncounter encounter : listEcmoEncounter) {
-            isPositive = encounter.hasExtension(CoronaFixedValues.POSITIVE_RESULT.getValue());
-            hasPeriodEnd = encounter.getPeriod().hasEnd();
+            isPositive = isCovidPositive(encounter);
+            isActive = isActive(encounter);
 
             // check end, flag and procedure status
-            if (!hasPeriodEnd && isPositive) {
+            if (isActive && isPositive) {
               for (UkbProcedure ecmo : listIcuProcedures) {
                 if (ecmo.getCaseId().equals(encounter.getId())) {
                   if (hasActiveIcuProcedure(listIcuProcedures, encounter,
@@ -195,6 +196,7 @@ public class CurrentTreatmentLevel {
     return currentIcuList;
   }
 
+
   /**
    * Simple check whether the icu procedure is ongoing or already finished
    *
@@ -206,17 +208,11 @@ public class CurrentTreatmentLevel {
    */
   private static boolean hasActiveIcuProcedure(List<UkbProcedure> listIcu, UkbEncounter encounter,
       List<String> procedureCodes) {
-    boolean isActive = false;
-    for (UkbProcedure icu : listIcu) {
-      if (icu.getCaseId().equals(encounter.getId()) && icu.hasCode() && icu.getCode().hasCoding()
-          && procedureCodes.contains(
-          icu.getCode().getCoding().get(0)
-              .getCode())) {
-        if (icu.getStatus().equals(Procedure.ProcedureStatus.INPROGRESS)) {
-          isActive = true;
-        }
-      }
-    }
-    return isActive;
+    List<UkbProcedure> proceduresCurrentEncounter = listIcu.stream()
+        .filter(x -> x.getCaseId().equals(encounter.getId()))
+        .filter(x -> x.hasCode() && x.getCode().hasCoding())
+        .filter(x -> procedureCodes.contains(getCodeOfFirstCoding(x.getCode().getCoding())))
+        .filter(x -> x.getStatus().equals(Procedure.ProcedureStatus.INPROGRESS)).toList();
+    return proceduresCurrentEncounter.size() > 0;
   }
 }

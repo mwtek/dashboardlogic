@@ -113,7 +113,6 @@ public enum CoronaFixedValues {
   DIAG_RELIABILITY_A("A"),
   DIAG_RELIABILITY_G("G"),
   DIAG_RELIABILITY_V("V"),
-  LOINC_SYSTEM("http://loinc.org"),
 
   // Covid variant related codes
   VARIANT_ALPHA_CODE("LA31569-9"),
@@ -123,6 +122,11 @@ public enum CoronaFixedValues {
   VARIANT_OMICRON_CODE("LA33381-7"),
 
   DIAG_RELIABILITY_Z("Z");
+
+  // Terminology systems
+  public static final String LOINC_SYSTEM = "http://loinc.org";
+  public static final String SNOMED_SYSTEM = "http://snomed.info";
+
 
   // Display forms of the covid variants to check against
   public static final String VARIANT_ALPHA = "Alpha";

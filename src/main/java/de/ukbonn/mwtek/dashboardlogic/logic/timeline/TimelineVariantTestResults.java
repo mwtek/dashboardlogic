@@ -37,8 +37,8 @@ import org.hl7.fhir.r4.model.Coding;
 import org.hl7.fhir.r4.model.Observation;
 
 /**
- * This class is used for generating the data item {@link CoronaDataItem
- * timeline.varianttestresults}.
+ * This class is used for generating the data item
+ * {@link CoronaDataItem timeline.varianttestresults}.
  *
  * @author <a href="mailto:david.meyers@ukbonn.de">David Meyers</a>
  * @author <a href="mailto:berke_enes.dincel@ukbonn.de">Berke Enes Dincel</a>
@@ -68,7 +68,7 @@ public class TimelineVariantTestResults {
     variantMap.put(CoronaFixedValues.VARIANT_UNKNOWN, new ArrayList<>());
 
     List<UkbObservation> listVariantObservation = listObservation.stream()
-        .filter(x -> isCodingValid(x.getCode(), CoronaFixedValues.LOINC_SYSTEM.getValue(),
+        .filter(x -> isCodingValid(x.getCode(), CoronaFixedValues.LOINC_SYSTEM,
             observationVariantLoincCodes))
         .filter(Observation::hasValueCodeableConcept).toList();
 
@@ -97,14 +97,16 @@ public class TimelineVariantTestResults {
               x.getEffectiveDateTimeType().getValue())).toList();
 
       for (UkbObservation variantObservation : listFittingVariantObservation) {
-        boolean observationContainsLoinc =
-            variantObservation.getValueCodeableConcept().getCoding().stream().anyMatch(
-                x -> x.getSystem().equals(CoronaFixedValues.LOINC_SYSTEM.getValue()));
+//        boolean observationContainsLoinc =
+//            variantObservation.getValueCodeableConcept().getCoding().stream()
+//                .filter(x -> x.hasSystem()).anyMatch(
+//                    x -> x.getSystem().equals(CoronaFixedValues.LOINC_SYSTEM.getValue()));
 
         // If a LOINC notation is found, only this is read. Otherwise, an attempt is made to determine the variant information via the free text.
         for (Coding variantCoding : variantObservation.getValueCodeableConcept().getCoding()) {
           // For now the display values are checked since its more flexible if new variants appear or to generalize non-voc variants
-          if (variantCoding.getSystem().equals(CoronaFixedValues.LOINC_SYSTEM.getValue())) {
+          if (variantCoding.hasSystem() && variantCoding.getSystem()
+              .equals(CoronaFixedValues.LOINC_SYSTEM)) {
             switch (variantCoding.getCode()) {
               case CoronaFixedValues.VARIANT_ALPHA_LOINC -> alphaCount++;
               case CoronaFixedValues.VARIANT_BETA_LOINC -> betaCount++;

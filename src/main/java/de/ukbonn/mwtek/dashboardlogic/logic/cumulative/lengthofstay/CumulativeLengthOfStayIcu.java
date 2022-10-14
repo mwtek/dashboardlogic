@@ -19,6 +19,9 @@
  */
 package de.ukbonn.mwtek.dashboardlogic.logic.cumulative.lengthofstay;
 
+import static de.ukbonn.mwtek.utilities.fhir.misc.FhirCodingTools.isCodeOfFirstCodeableConceptEquals;
+import static de.ukbonn.mwtek.utilities.fhir.misc.FhirCodingTools.isCodeOfFirstCodingEquals;
+
 import de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues;
 import de.ukbonn.mwtek.dashboardlogic.enums.VitalStatus;
 import de.ukbonn.mwtek.dashboardlogic.logic.CoronaResultFunctionality;
@@ -39,8 +42,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.hl7.fhir.r4.model.Encounter;
 
 /**
- * This class is used for generating the data items {@link CoronaDataItem
- * cumulative.lengthofstay.icu} and the sub items.
+ * This class is used for generating the data items
+ * {@link CoronaDataItem cumulative.lengthofstay.icu} and the sub items.
  *
  * @author <a href="mailto:david.meyers@ukbonn.de">David Meyers</a>
  * @author <a href="mailto:berke_enes.dincel@ukbonn.de">Berke Enes Dincel</a>
@@ -87,10 +90,12 @@ public class CumulativeLengthOfStayIcu {
     // these hierarchy levels should be sufficient.
 
     List<String> listIcuLocationIds = listLocation.stream()
-        .filter(x -> x.hasPhysicalType() && x.getPhysicalType().getCoding().get(0).getCode()
-            .equals(CoronaFixedValues.WARD.getValue()))
-        .filter(x -> x.hasType() && x.getType().get(0).getCoding().get(0).getCode()
-            .equals(CoronaFixedValues.ICU.getValue())).map(UkbLocation::getId).toList();
+        .filter(
+            x -> x.hasPhysicalType() && isCodeOfFirstCodingEquals(x.getPhysicalType().getCoding(),
+                CoronaFixedValues.WARD.getValue()))
+        .filter(x -> x.hasType() && isCodeOfFirstCodeableConceptEquals(x.getType(),
+            CoronaFixedValues.ICU.getValue()))
+        .map(UkbLocation::getId).toList();
 
     // iterate through every encounter and calculates amount of time spent in icu
     for (UkbEncounter encounter : icuEncounterSet) {
@@ -113,7 +118,7 @@ public class CumulativeLengthOfStayIcu {
       }
       // go through each Location and calculate the time the spend in ICU
       for (Encounter.EncounterLocationComponent location : listIcuEncounterLocation) {
-        if (encounter.isPeriodStartExistent()) {
+        if (location.hasPeriod() && location.getPeriod().hasStart()) {
           LocalDateTime start =
               location.getPeriod().getStart().toInstant().atZone(ZoneId.systemDefault())
                   .toLocalDateTime();

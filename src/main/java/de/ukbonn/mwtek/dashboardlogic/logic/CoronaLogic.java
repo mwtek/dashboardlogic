@@ -19,6 +19,11 @@
  */
 package de.ukbonn.mwtek.dashboardlogic.logic;
 
+import static de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues.LOINC_SYSTEM;
+import static de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues.SNOMED_SYSTEM;
+import static de.ukbonn.mwtek.utilities.fhir.misc.FhirCodingTools.getCodingBySystem;
+import static de.ukbonn.mwtek.utilities.fhir.misc.FhirCodingTools.hasCode;
+
 import de.ukbonn.mwtek.dashboardlogic.enums.CoronaDashboardConstants;
 import de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues;
 import de.ukbonn.mwtek.dashboardlogic.enums.QualitativeLabResultCodes;
@@ -40,7 +45,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.hl7.fhir.r4.model.BooleanType;
-import org.hl7.fhir.r4.model.CodeableConcept;
 import org.hl7.fhir.r4.model.Coding;
 import org.hl7.fhir.r4.model.Extension;
 import org.hl7.fhir.r4.model.StringType;
@@ -289,8 +293,8 @@ public class CoronaLogic {
    * Creation of case id sets for the specific diagnosis codes with a given diagnostic reliability
    *
    * @param mapCaseIdU07                Map of all case numbers for a specific U07.* ICD code
-   * @param icdDiagnosisReliabilityCode ICD diagnosis confidence code (see {@link
-   *                                    CoronaFixedValues#DIAGNOSIS_SECURITY_BORDERLINE} for
+   * @param icdDiagnosisReliabilityCode ICD diagnosis confidence code (see
+   *                                    {@link CoronaFixedValues#DIAGNOSIS_SECURITY_BORDERLINE} for
    *                                    example)
    * @return Set of case numbers that have a specific diagnosis code and a given diagnostic
    * certainty
@@ -408,7 +412,6 @@ public class CoronaLogic {
             }
           }
         });
-
       }
     }
 
@@ -428,12 +431,18 @@ public class CoronaLogic {
     Set<String> labSet = new HashSet<>();
     List<String> observationPcrLoincCodes = inputCodeSettings.getObservationPcrLoincCodes();
     for (UkbObservation labObs : listLabObservations) {
-      if (labObs.hasCode() && observationPcrLoincCodes.contains(
-          labObs.getCode().getCoding().get(0).getCode())) {
-        if (labObs.hasValueCodeableConcept()) {
+      // Extracting the coding for the lab code and the value. If no coding can be found create a dummy for easier processing.
+      Coding loincCodePcrCoding = getCodingBySystem(labObs.getCode().getCoding(), LOINC_SYSTEM);
+      Coding obsQualitativeValue = getCodingBySystem(labObs.getValueCodeableConcept().getCoding(),
+          SNOMED_SYSTEM);
+
+      if (hasCode(loincCodePcrCoding) && observationPcrLoincCodes.contains(
+          loincCodePcrCoding.getCode())) {
+        // Checking the result
+        if (hasCode(obsQualitativeValue)) {
+          // Count the positive ones
           if (QualitativeLabResultCodes.getPositiveCodes()
-              .contains(((CodeableConcept) labObs.getValue()).getCoding().get(0).getCode()
-              )) {
+              .contains(obsQualitativeValue.getCode())) {
             labSet.add(labObs.getCaseId());
           }
         } // if

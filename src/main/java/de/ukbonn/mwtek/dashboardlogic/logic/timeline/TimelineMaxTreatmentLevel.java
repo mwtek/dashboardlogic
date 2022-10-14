@@ -19,6 +19,10 @@
  */
 package de.ukbonn.mwtek.dashboardlogic.logic.timeline;
 
+import static de.ukbonn.mwtek.utilities.fhir.misc.FhirCodingTools.getCodeOfFirstCoding;
+import static de.ukbonn.mwtek.utilities.fhir.misc.FhirCodingTools.isCodeOfFirstCodeableConceptEquals;
+import static de.ukbonn.mwtek.utilities.fhir.misc.FhirCodingTools.isCodeOfFirstCodingEquals;
+
 import de.ukbonn.mwtek.dashboardlogic.enums.CoronaDashboardConstants;
 import de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues;
 import de.ukbonn.mwtek.dashboardlogic.logic.CoronaResultFunctionality;
@@ -44,8 +48,8 @@ import org.hl7.fhir.r4.model.Encounter;
 import org.hl7.fhir.r4.model.Period;
 
 /**
- * This class is used for generating the data item {@link CoronaDataItem
- * timeline.maxtreatmentlevel}.
+ * This class is used for generating the data item
+ * {@link CoronaDataItem timeline.maxtreatmentlevel}.
  *
  * @author <a href="mailto:david.meyers@ukbonn.de">David Meyers</a>
  * @author <a href="mailto:berke_enes.dincel@ukbonn.de">Berke Enes Dincel</a>
@@ -117,10 +121,11 @@ public class TimelineMaxTreatmentLevel extends TimelineFunctionalities {
             CoronaFixedValues.POSITIVE_RESULT.getValue())).toList();
     try {
       List<String> listIcuIds = listLocations.parallelStream()
-          .filter(x -> x.hasPhysicalType() && x.getPhysicalType().getCoding().get(0).getCode()
-              .equals(CoronaFixedValues.WARD.getValue()))
-          .filter(x -> x.hasType() && x.getType().get(0).getCoding().get(0).getCode()
-              .equals(CoronaFixedValues.ICU.getValue())).map(UkbLocation::getId).toList();
+          .filter(
+              x -> x.hasPhysicalType() && isCodeOfFirstCodingEquals(x.getPhysicalType().getCoding()
+                  , CoronaFixedValues.WARD.getValue()))
+          .filter(x -> x.hasType() && isCodeOfFirstCodeableConceptEquals(x.getType(),
+              CoronaFixedValues.ICU.getValue())).map(UkbLocation::getId).toList();
       listIcuWardsId.addAll(listIcuIds);
     } catch (Exception e) {
       e.printStackTrace();
@@ -223,8 +228,8 @@ public class TimelineMaxTreatmentLevel extends TimelineFunctionalities {
                   List<Encounter.EncounterLocationComponent> listEncounterHasIcuLocation =
                       encounter.getLocation().stream()
                           .filter(location -> listIcuWardsId.contains(
-                              splitReference(location.getLocation().getReference(),
-                                  caseId))).toList();
+                              CoronaResultFunctionality.extractIdFromReference(
+                                  location.getLocation()))).toList();
                   // if there was no icu related treatmentlevel for this case before
                   if (!isIcu && !isVent && !isEcmo) {
                     // if the case contains no icu locations
@@ -348,7 +353,7 @@ public class TimelineMaxTreatmentLevel extends TimelineFunctionalities {
         long procedureStartUnix = DateTools.dateToUnixTime(procedurePeriod.getStart());
         long procedureEndUnix = DateTools.dateToUnixTime(procedurePeriod.getEnd());
         if (procedure.hasCode() && procedure.getCode().hasCoding()) {
-          String procedureCode = procedure.getCode().getCoding().get(0).getCode();
+          String procedureCode = getCodeOfFirstCoding(procedure.getCode().getCoding());
           // check if the procedure fits into the checked time span
           if (procedureStartUnix <= checkedDate && procedureEndUnix >= checkedDate) {
             checkVentOrEcmo(mapPrevMaxtreatmentlevel, mapIcuVentilationCaseId, mapIcuEcmoCaseId,

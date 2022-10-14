@@ -31,18 +31,6 @@ import java.util.Map;
 public class TimelineFunctionalities {
 
   /**
-   * Splits the resource part from the id in a fhir reference (e.g. {@literal Location/123 -> 123)}
-   *
-   * @param fhirResourceReference A string with a FHIR resource reference (e.g. {@literal
-   *                              Location/123})
-   * @return The plain id of the resource
-   */
-  public static String splitReference(String fhirResourceReference, String fhirId) {
-    String[] parts = fhirResourceReference.split("/");
-    return parts[parts.length - 1];
-  }
-
-  /**
    * Purpose of this auxiliary function is to divide the content of a map into two different lists
    *
    * @param tempMap   Map that maps a frequency value to a date (unixtime)

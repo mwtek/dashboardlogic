@@ -125,7 +125,7 @@ public enum CoronaFixedValues {
 
   // Terminology systems
   public static final String LOINC_SYSTEM = "http://loinc.org";
-  public static final String SNOMED_SYSTEM = "http://snomed.info";
+  public static final String SNOMED_SYSTEM = "http://snomed.info/sct";
 
 
   // Display forms of the covid variants to check against

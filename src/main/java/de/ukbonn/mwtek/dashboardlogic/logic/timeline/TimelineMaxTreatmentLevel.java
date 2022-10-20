@@ -45,6 +45,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.hl7.fhir.r4.model.Encounter;
+import org.hl7.fhir.r4.model.Encounter.EncounterLocationComponent;
 import org.hl7.fhir.r4.model.Period;
 
 /**
@@ -88,12 +89,12 @@ public class TimelineMaxTreatmentLevel extends TimelineFunctionalities {
     Map<String, Map<Long, Set<String>>> resultWithCaseNrsMap = new LinkedHashMap<>();
     // Map containing a set of case Ids for each day
     Map<Long, Set<String>> mapAmbulantCaseNr = Collections.synchronizedMap(new LinkedHashMap<>());
-    Map<Long, Set<String>> mapStationaryCaseNr = Collections.synchronizedMap(new LinkedHashMap<>());
-    Map<Long, Set<String>> mapIcuCaseNr = Collections.synchronizedMap(new LinkedHashMap<>());
-    Map<Long, Set<String>> mapIcuVentilationCaseNr =
+    Map<Long, Set<String>> mapNormalWardCaseNrs = Collections.synchronizedMap(
+        new LinkedHashMap<>());
+    Map<Long, Set<String>> mapIcuCaseNrs = Collections.synchronizedMap(new LinkedHashMap<>());
+    Map<Long, Set<String>> mapIcuVentCaseNrs =
         Collections.synchronizedMap(new LinkedHashMap<>());
-    Map<Long, Set<String>> mapIcuEcmoCaseNr = Collections.synchronizedMap(new LinkedHashMap<>());
-    Map<Long, Set<String>> mapInpatientCaseNr = Collections.synchronizedMap(new LinkedHashMap<>());
+    Map<Long, Set<String>> mapIcuEcmoCaseNrs = Collections.synchronizedMap(new LinkedHashMap<>());
     // used to save the maxtreatmentlevel up to the checked date
     Map<String, Set<String>> mapPrevMaxtreatmentlevel = new ConcurrentHashMap<>();
 
@@ -108,12 +109,9 @@ public class TimelineMaxTreatmentLevel extends TimelineFunctionalities {
         ConcurrentHashMap.newKeySet());
 
     // Determination of the location IDs of all intensive care units. Only the wards are
-    // considered,
-    // since in the location components within an Encounter resource, at best ward/room and bed
-    // are
-    // listed with identical time periods and the stay should only be evaluated once. The
-    // highest of
-    // these hierarchy levels should be sufficient.
+    // considered, since in the location components within an Encounter resource, at best ward/room and bed
+    // are listed with identical time periods and the stay should only be evaluated once. The
+    // highest of these hierarchy levels should be sufficient.
     List<String> listIcuWardsId = new ArrayList<>();
 
     List<UkbEncounter> listPositiveEncounter = listEncounters.parallelStream()
@@ -137,42 +135,40 @@ public class TimelineMaxTreatmentLevel extends TimelineFunctionalities {
     while (currentDate <= currentDayUnix) {
       long checkDate = currentDate;
       mapAmbulantCaseNr.put(checkDate, new HashSet<>());
-      mapStationaryCaseNr.put(checkDate, new HashSet<>());
-      mapIcuCaseNr.put(checkDate, new HashSet<>());
-      mapIcuVentilationCaseNr.put(checkDate, new HashSet<>());
-      mapIcuEcmoCaseNr.put(checkDate, new HashSet<>());
-      mapInpatientCaseNr.put(checkDate, new HashSet<>());
+      mapNormalWardCaseNrs.put(checkDate, new HashSet<>());
+      mapIcuCaseNrs.put(checkDate, new HashSet<>());
+      mapIcuVentCaseNrs.put(checkDate, new HashSet<>());
+      mapIcuEcmoCaseNrs.put(checkDate, new HashSet<>());
 
       Map<String, Object> locks = new ConcurrentHashMap<>();
 
       // filter the encounter to ones that can have intersection with the date that is current
       // checked
-      // TODO verify this
       listPositiveEncounter.stream().filter(UkbEncounter::isPeriodStartExistent)
           .filter(x -> DateTools.dateToUnixTime(x.getPeriod()
-              .getStart()) - CoronaDashboardConstants.dayInSeconds <= checkDate)
+              .getStart()) - CoronaDashboardConstants.dayInSeconds < checkDate)
           .filter(x -> DateTools.dateToUnixTime(x.getPeriod().getEnd() == null ?
               DateTools.getCurrentDateTime() :
               x.getPeriod().getEnd()) + CoronaDashboardConstants.dayInSeconds >= checkDate)
           .forEach(encounter -> {
-            String caseId = encounter.getId();
-            String casePid = encounter.getPatientId();
+            String encounterId = encounter.getId();
+            String patientId = encounter.getPatientId();
 
             // Prevent multiple cases of a patient from being processed at the same time
-            locks.putIfAbsent(casePid, new Object());
+            locks.putIfAbsent(patientId, new Object());
             long caseStartUnix = DateTools.dateToUnixTime(encounter.getPeriod().getStart());
 
-            synchronized (locks.get(casePid)) {
+            synchronized (locks.get(patientId)) {
               boolean isStationary =
                   mapPrevMaxtreatmentlevel.get(CoronaFixedValues.NORMAL_WARD.getValue())
-                      .contains(casePid);
+                      .contains(patientId);
               boolean isIcu = mapPrevMaxtreatmentlevel.get(CoronaFixedValues.ICU.getValue())
-                  .contains(casePid);
+                  .contains(patientId);
               boolean isVent =
                   mapPrevMaxtreatmentlevel.get(CoronaFixedValues.ICU_VENTILATION.getValue())
-                      .contains(casePid);
+                      .contains(patientId);
               boolean isEcmo = mapPrevMaxtreatmentlevel.get(CoronaFixedValues.ICU_ECMO.getValue())
-                  .contains(casePid);
+                  .contains(patientId);
               // if the case is ambulant, check the pids of the previous maxtreatmentlevels
               // and if none are similar with the current case than note the case as ambulant
               if (CoronaResultFunctionality.isCaseClassOutpatient(encounter)) {
@@ -184,19 +180,19 @@ public class TimelineMaxTreatmentLevel extends TimelineFunctionalities {
 
                 // Normal ward
                 if (isStationary) {
-                  listMaxStatPidCheck.add(casePid);
+                  listMaxStatPidCheck.add(patientId);
                 }
                 // ICU
                 if (isIcu) {
-                  listMaxIcuPidCheck.add(casePid);
+                  listMaxIcuPidCheck.add(patientId);
                 }
                 // Ventilation
                 if (isVent) {
-                  listMaxIcuVentPidCheck.add(casePid);
+                  listMaxIcuVentPidCheck.add(patientId);
                 }
                 // ECMO
                 if (isEcmo) {
-                  listMaxIcuEcmoPidCheck.add(casePid);
+                  listMaxIcuEcmoPidCheck.add(patientId);
                 }
 
                 // list containing every encounter with a currently higher treatmentlevel than 'outpatient'.
@@ -210,9 +206,9 @@ public class TimelineMaxTreatmentLevel extends TimelineFunctionalities {
                   if (caseStartUnix >= checkDate && caseStartUnix <= (checkDate
                       + CoronaDashboardConstants.dayInSeconds)) {
 
-                    mapAmbulantCaseNr.get(checkDate).add(caseId);
+                    mapAmbulantCaseNr.get(checkDate).add(encounterId);
                     mapPrevMaxtreatmentlevel.get(CoronaFixedValues.OUTPATIENT_ITEM.getValue())
-                        .add(casePid);
+                        .add(patientId);
                   }
                 }
               }
@@ -223,8 +219,8 @@ public class TimelineMaxTreatmentLevel extends TimelineFunctionalities {
                 }
                 long caseEndUnix = DateTools.dateToUnixTime(encounter.getPeriod().getEnd());
                 // The admission date needs to be before the start date and the discharge date needs to be
-                // after the currentDate to get the whole time span
-                if (caseStartUnix <= checkDate && caseEndUnix >= checkDate) {
+                // after the date that is going to be checked to get the whole time span
+                if (caseStartUnix < checkDate && caseEndUnix >= checkDate) {
                   List<Encounter.EncounterLocationComponent> listEncounterHasIcuLocation =
                       encounter.getLocation().stream()
                           .filter(location -> listIcuWardsId.contains(
@@ -234,66 +230,60 @@ public class TimelineMaxTreatmentLevel extends TimelineFunctionalities {
                   if (!isIcu && !isVent && !isEcmo) {
                     // if the case contains no icu locations
                     if (listEncounterHasIcuLocation.isEmpty()) {
-
-                      mapStationaryCaseNr.get(checkDate).add(caseId);
-                      mapInpatientCaseNr.get(checkDate).add(caseId);
+                      mapNormalWardCaseNrs.get(checkDate).add(encounterId);
                       mapPrevMaxtreatmentlevel.get(CoronaFixedValues.NORMAL_WARD.getValue())
-                          .add(casePid);
+                          .add(patientId);
                     } else {
                       // check if there are any icu procedures currently going on
                       List<UkbProcedure> listEncounterIcuProcedure = listIcuProcedures.stream()
-                          .filter(icu -> caseId.equals(icu.getCaseId()))
+                          .filter(icu -> encounterId.equals(icu.getCaseId()))
                           .toList();
                       // if there is no ICU Procedure, check if it is currently considered
                       // as ICU or stationary
                       if (listEncounterIcuProcedure.isEmpty()) {
                         encounterStationTypeCheckProcess(listEncounterHasIcuLocation, checkDate,
-                            mapPrevMaxtreatmentlevel, mapStationaryCaseNr, mapIcuCaseNr,
-                            mapInpatientCaseNr, caseId, casePid);
+                            mapPrevMaxtreatmentlevel, mapNormalWardCaseNrs, mapIcuCaseNrs,
+                            encounterId, patientId);
                       } else {
                         // check and sort if it is a ventilation or ecmo case
                         sortToVentOrEcmoTimeline(listEncounterIcuProcedure,
-                            listEncounterHasIcuLocation, caseId, casePid, isVent, isEcmo,
-                            checkDate, mapStationaryCaseNr, mapIcuCaseNr,
-                            mapIcuVentilationCaseNr, mapIcuEcmoCaseNr, mapInpatientCaseNr,
-                            mapPrevMaxtreatmentlevel, inputCodeSettings);
+                            listEncounterHasIcuLocation, encounterId, patientId, false, false,
+                            checkDate, mapNormalWardCaseNrs, mapIcuCaseNrs, mapIcuVentCaseNrs,
+                            mapIcuEcmoCaseNrs, mapPrevMaxtreatmentlevel, inputCodeSettings);
                       }
                     }
                   }
                   // if an ICU case was found
                   else if (isIcu && !isVent && !isEcmo) {
                     List<UkbProcedure> listEncounterIcuProcedure = listIcuProcedures.stream()
-                        .filter(icu -> caseId.equals(icu.getCaseId()))
+                        .filter(icu -> encounterId.equals(icu.getCaseId()))
                         .collect(Collectors.toList());
 
                     if (listEncounterIcuProcedure.isEmpty()) {
-                      mapIcuCaseNr.get(checkDate).add(caseId);
-                      mapInpatientCaseNr.get(checkDate).add(caseId);
-                      mapPrevMaxtreatmentlevel.get(CoronaFixedValues.ICU.getValue()).add(casePid);
+                      mapIcuCaseNrs.get(checkDate).add(encounterId);
+                      mapPrevMaxtreatmentlevel.get(CoronaFixedValues.ICU.getValue()).add(patientId);
                     } else {
                       sortToVentOrEcmoTimeline(listEncounterIcuProcedure,
-                          listEncounterHasIcuLocation, caseId, casePid, isVent, isEcmo,
-                          checkDate, mapStationaryCaseNr, mapIcuCaseNr,
-                          mapIcuVentilationCaseNr, mapInpatientCaseNr, mapIcuEcmoCaseNr,
-                          mapPrevMaxtreatmentlevel, inputCodeSettings);
+                          listEncounterHasIcuLocation, encounterId, patientId, false, false,
+                          checkDate, mapNormalWardCaseNrs, mapIcuCaseNrs, mapIcuVentCaseNrs,
+                          mapIcuEcmoCaseNrs, mapPrevMaxtreatmentlevel, inputCodeSettings);
                     }
                   }
                   // if a ventilation case was found
                   else if (isVent && !isEcmo) {
                     List<UkbProcedure> listEncounterIcuProcedure = listIcuProcedures.stream()
-                        .filter(icu -> caseId.equals(icu.getCaseId()))
+                        .filter(icu -> encounterId.equals(icu.getCaseId()))
                         .collect(Collectors.toList());
                     sortToVentOrEcmoTimeline(listEncounterIcuProcedure,
-                        listEncounterHasIcuLocation, caseId, casePid, isVent, isEcmo,
-                        checkDate, mapStationaryCaseNr, mapIcuCaseNr,
-                        mapIcuVentilationCaseNr, mapIcuEcmoCaseNr, mapInpatientCaseNr,
-                        mapPrevMaxtreatmentlevel, inputCodeSettings);
+                        listEncounterHasIcuLocation, encounterId, patientId, true, false,
+                        checkDate, mapNormalWardCaseNrs, mapIcuCaseNrs, mapIcuVentCaseNrs,
+                        mapIcuEcmoCaseNrs, mapPrevMaxtreatmentlevel, inputCodeSettings);
                   }
                   // if an ecmo case was found
                   else {
-                    mapIcuEcmoCaseNr.get(checkDate).add(caseId);
+                    mapIcuEcmoCaseNrs.get(checkDate).add(encounterId);
                     mapPrevMaxtreatmentlevel.get(CoronaFixedValues.ICU_ECMO.getValue())
-                        .add(casePid);
+                        .add(patientId);
                   }
                 } // if date check
               } // else if Stationary check
@@ -302,11 +292,10 @@ public class TimelineMaxTreatmentLevel extends TimelineFunctionalities {
       currentDate += CoronaDashboardConstants.dayInSeconds;
     } // while
     resultWithCaseNrsMap.put(CoronaFixedValues.OUTPATIENT_ITEM.getValue(), mapAmbulantCaseNr);
-    resultWithCaseNrsMap.put(CoronaFixedValues.NORMAL_WARD.getValue(), mapStationaryCaseNr);
-    resultWithCaseNrsMap.put(CoronaFixedValues.ICU.getValue(), mapIcuCaseNr);
-    resultWithCaseNrsMap.put(CoronaFixedValues.ICU_VENTILATION.getValue(), mapIcuVentilationCaseNr);
-    resultWithCaseNrsMap.put(CoronaFixedValues.ICU_ECMO.getValue(), mapIcuEcmoCaseNr);
-    resultWithCaseNrsMap.put(CoronaFixedValues.CASESTATUS_INPATIENT.getValue(), mapInpatientCaseNr);
+    resultWithCaseNrsMap.put(CoronaFixedValues.NORMAL_WARD.getValue(), mapNormalWardCaseNrs);
+    resultWithCaseNrsMap.put(CoronaFixedValues.ICU.getValue(), mapIcuCaseNrs);
+    resultWithCaseNrsMap.put(CoronaFixedValues.ICU_VENTILATION.getValue(), mapIcuVentCaseNrs);
+    resultWithCaseNrsMap.put(CoronaFixedValues.ICU_ECMO.getValue(), mapIcuEcmoCaseNrs);
 
     TimerTools.stopTimerAndLog(startTimer, "finished createMaxTreatmentTimeline");
     return resultWithCaseNrsMap;
@@ -317,33 +306,30 @@ public class TimelineMaxTreatmentLevel extends TimelineFunctionalities {
    * Adds the current {@link UkbEncounter} to a list if he has had artificial respiration or ECMO
    *
    * @param listEncounterIcuProcedures  The {@link UkbProcedure} resources, which include
-   *                                    information about ECMO / artificial ventilation periods
-   * @param listEncounterHasIcuLocation List containing all icu locations of an encounter
-   * @param checkedDate                 The date [unixtime] that is going to be checked
-   * @param mapIcuVentilationCaseId     A map that contains the case ids of every ventilation case,
-   *                                    sorted by the date
-   * @param mapIcuEcmoCaseId            A map that contains the case ids of every ecmo case, sorted
-   *                                    by the date
-   * @param mapPrevMaxtreatmentlevel    A map with the previous maxtreatmentlevel of an encounter
-   * @param mapStationaryCaseNr         A map that contains the case ids of every stationary case,
-   *                                    sorted by the date
-   * @param mapIcuCaseNr                A map that contains the case ids of every icu case, sorted
-   *                                    by the date
-   * @param mapInpatientCaseId          A map that contains the case id of all inpatient encounter
-   * @param caseId                      id of the Encounter that is supposed to be checked
-   * @param isEcmo                      check if the encounter has any ecmo related resources
-   *                                    attached to it
-   * @param isVent                      check if the encounter has any ventilation related resources
-   *                                    attached to it
+   *                                    information about ECMO / artificial ventilation periods.
+   * @param listEncounterHasIcuLocation List containing all icu locations of an encounter.
+   * @param caseId                      The id of the Encounter that is supposed to be checked.
+   * @param isVent                      Check if the encounter has any ventilation related resources
+   *                                    attached to it.
+   * @param isEcmo                      Check if the encounter has any ecmo related resources
+   *                                    attached to it.
+   * @param checkedDate                 The date [unix time] that is going to be checked.
+   * @param mapNormalWardCaseNrs        A map that contains the case ids of every stationary case,
+   *                                    sorted by the date.
+   * @param mapIcuCaseNrs               A map that contains the case ids of every icu case, sorted
+   *                                    by the date.
+   * @param mapIcuVentCaseNrs           A map that contains the case ids of every ventilation case,
+   *                                    sorted by the date.
+   * @param mapIcuEcmoCaseNrs           A map that contains the case ids of every ecmo case, sorted
+   *                                    by the date.
+   * @param mapPrevMaxtreatmentlevel    A map with the previous maxtreatmentlevel of an encounter.
    */
   private static void sortToVentOrEcmoTimeline(List<UkbProcedure> listEncounterIcuProcedures,
-      List<Encounter.EncounterLocationComponent> listEncounterHasIcuLocation, String caseId,
+      List<EncounterLocationComponent> listEncounterHasIcuLocation, String caseId,
       String casePid, Boolean isVent, Boolean isEcmo, Long checkedDate,
-      Map<Long, Set<String>> mapStationaryCaseNr, Map<Long, Set<String>> mapIcuCaseNr,
-      Map<Long, Set<String>> mapIcuVentilationCaseId, Map<Long, Set<String>> mapIcuEcmoCaseId,
-      Map<Long, Set<String>> mapInpatientCaseId, Map<String, Set<String>> mapPrevMaxtreatmentlevel,
-      InputCodeSettings inputCodeSettings) {
-
+      Map<Long, Set<String>> mapNormalWardCaseNrs, Map<Long, Set<String>> mapIcuCaseNrs,
+      Map<Long, Set<String>> mapIcuVentCaseNrs, Map<Long, Set<String>> mapIcuEcmoCaseNrs,
+      Map<String, Set<String>> mapPrevMaxtreatmentlevel, InputCodeSettings inputCodeSettings) {
     for (UkbProcedure procedure : listEncounterIcuProcedures) {
       try {
         Period procedurePeriod = procedure.getPerformedPeriod();
@@ -355,19 +341,21 @@ public class TimelineMaxTreatmentLevel extends TimelineFunctionalities {
         if (procedure.hasCode() && procedure.getCode().hasCoding()) {
           String procedureCode = getCodeOfFirstCoding(procedure.getCode().getCoding());
           // check if the procedure fits into the checked time span
-          if (procedureStartUnix <= checkedDate && procedureEndUnix >= checkedDate) {
-            checkVentOrEcmo(mapPrevMaxtreatmentlevel, mapIcuVentilationCaseId, mapIcuEcmoCaseId,
-                mapInpatientCaseId, procedureCode, caseId, casePid, isEcmo, checkedDate,
-                inputCodeSettings);
+          if (procedureStartUnix < checkedDate && procedureEndUnix >= checkedDate) {
+            isVent = isVent(mapPrevMaxtreatmentlevel, mapIcuVentCaseNrs, procedureCode, caseId,
+                casePid, checkedDate, inputCodeSettings);
+            isEcmo = isEcmo(mapPrevMaxtreatmentlevel, mapIcuEcmoCaseNrs, procedureCode, caseId,
+                casePid, checkedDate, inputCodeSettings);
           }
           // check if the end date of the procedure fits into the checked time span
-          else if (procedureEndUnix <= checkedDate && procedureEndUnix >= (checkedDate
+          else if (procedureEndUnix < checkedDate && procedureEndUnix >= (checkedDate
               - CoronaDashboardConstants.dayInSeconds)) {
             long difference = checkedDate - procedureEndUnix;
-            if (difference <= CoronaDashboardConstants.dayInSeconds) {
-              checkVentOrEcmo(mapPrevMaxtreatmentlevel, mapIcuVentilationCaseId, mapIcuEcmoCaseId,
-                  mapInpatientCaseId, procedureCode, caseId, casePid, isEcmo,
-                  checkedDate, inputCodeSettings);
+            if (difference < CoronaDashboardConstants.dayInSeconds) {
+              isVent = isVent(mapPrevMaxtreatmentlevel, mapIcuVentCaseNrs, procedureCode, caseId,
+                  casePid, checkedDate, inputCodeSettings);
+              isEcmo = isEcmo(mapPrevMaxtreatmentlevel, mapIcuEcmoCaseNrs, procedureCode, caseId,
+                  casePid, checkedDate, inputCodeSettings);
             }
           }
         }
@@ -379,38 +367,29 @@ public class TimelineMaxTreatmentLevel extends TimelineFunctionalities {
     }
     // check if the case was added, into the map containing the previous maxtreatmentlevels
     if (!isVent && !isEcmo) {
-      // if neither ecmo nor encounter, then check if case is icu or stationary again
+      // if neither ecmo nor vent was found, then check if case is icu or stationary again
       encounterStationTypeCheckProcess(listEncounterHasIcuLocation, checkedDate,
-          mapPrevMaxtreatmentlevel, mapStationaryCaseNr, mapIcuCaseNr, mapInpatientCaseId, caseId,
-          casePid);
-    } else {
+          mapPrevMaxtreatmentlevel, mapNormalWardCaseNrs, mapIcuCaseNrs, caseId, casePid);
+    } else if (!isEcmo) {
       // purpose is to make sure that the maxtreatmentlevels of the case is still marked correctly,
       // even though the time check does not apply anymore.
-      if (isVent) {
-        if (!isEcmo) {
-          mapIcuVentilationCaseId.get(checkedDate).add(caseId);
-          mapPrevMaxtreatmentlevel.get(CoronaFixedValues.ICU_VENTILATION.getValue()).add(casePid);
-        } else {
-          mapIcuEcmoCaseId.get(checkedDate).add(caseId);
-          mapPrevMaxtreatmentlevel.get(CoronaFixedValues.ICU_ECMO.getValue()).add(casePid);
-        }
-      }
+      mapIcuVentCaseNrs.get(checkedDate).add(caseId);
+      mapPrevMaxtreatmentlevel.get(CoronaFixedValues.ICU_VENTILATION.getValue()).add(casePid);
     }
   }
 
   /**
-   * This process is used to determine, whether an encounter, would be seen as an ICU or an
+   * This process is used to determine, whether an encounter, would be seen as an ICU or as a
    * stationary encounter
    *
    * @param listEncounterHasIcuLocation Icu locations of an encounter
    * @param checkedDate                 The current date that is being checked
    * @param mapPrevMaxtreatmentlevel    Map containing all previous maxtreatmentlevels up to the
    *                                    checked date
-   * @param mapStationaryCaseNr         Map containing all case ids of stationary cases, sorted by
+   * @param mapStationaryCaseNrs        Map containing all case ids of stationary cases, sorted by
    *                                    the date
-   * @param mapIcuCaseNr                Map containing all case ids of ICU cases, sorted by the
+   * @param mapIcuCaseNrs               Map containing all case ids of ICU cases, sorted by the
    *                                    date
-   * @param mapInpatientCaseNr          A map that contains the case id of all inpatient encounter
    * @param caseId                      The id of the encounter that is supposed to be checked
    * @param casePid                     Patient id of the patient resource attached to the
    *                                    encounter
@@ -418,10 +397,9 @@ public class TimelineMaxTreatmentLevel extends TimelineFunctionalities {
   private static void encounterStationTypeCheckProcess(
       List<Encounter.EncounterLocationComponent> listEncounterHasIcuLocation, Long checkedDate,
       Map<String, Set<String>> mapPrevMaxtreatmentlevel,
-      Map<Long, Set<String>> mapStationaryCaseNr, Map<Long, Set<String>> mapIcuCaseNr,
-      Map<Long, Set<String>> mapInpatientCaseNr, String caseId, String casePid) {
+      Map<Long, Set<String>> mapStationaryCaseNrs, Map<Long, Set<String>> mapIcuCaseNrs,
+      String caseId, String casePid) {
     List<Encounter.EncounterLocationComponent> listCheckDateLocation = new ArrayList<>();
-
     // iterate through the icu locations
     for (Encounter.EncounterLocationComponent location : listEncounterHasIcuLocation) {
       if (!location.getPeriod().hasEnd()) {
@@ -431,18 +409,16 @@ public class TimelineMaxTreatmentLevel extends TimelineFunctionalities {
       long locationDateStartUnix = DateTools.dateToUnixTime(location.getPeriod().getStart());
       long locationDateEndUnix = DateTools.dateToUnixTime(location.getPeriod().getEnd());
       // check if checkedDate fits into the time span of the icu location
-      if (locationDateStartUnix <= checkedDate && locationDateEndUnix >= checkedDate) {
+      if (locationDateStartUnix < checkedDate && locationDateEndUnix >= checkedDate) {
         listCheckDateLocation.add(location);
       }
     }
     // if not currently in icu, then it is still a StationWard case
     if (listCheckDateLocation.isEmpty()) {
-      mapStationaryCaseNr.get(checkedDate).add(caseId);
-      mapInpatientCaseNr.get(checkedDate).add(caseId);
+      mapStationaryCaseNrs.get(checkedDate).add(caseId);
       mapPrevMaxtreatmentlevel.get(CoronaFixedValues.NORMAL_WARD.getValue()).add(casePid);
     } else {
-      mapIcuCaseNr.get(checkedDate).add(caseId);
-      mapInpatientCaseNr.get(checkedDate).add(caseId);
+      mapIcuCaseNrs.get(checkedDate).add(caseId);
       mapPrevMaxtreatmentlevel.get(CoronaFixedValues.ICU.getValue()).add(casePid);
     }
   }
@@ -454,43 +430,57 @@ public class TimelineMaxTreatmentLevel extends TimelineFunctionalities {
    * @param mapPrevMaxtreatmentlevel The previous maximum treatment level.
    * @param mapIcuVentilationCaseId  A map containing the case id of every ventilation case sorted
    *                                 by the date.
-   * @param mapIcuEcmoCaseId         A map containing the case id of every ecmo case sorted by the
-   *                                 date.
-   * @param mapInpatientCaseId       A map containing the case id of every inpatient case sorted by
-   *                                 the date.
    * @param procedureCode            The {@link UkbProcedure procedure.code.coding.code} that
    *                                 defines the resource as ecmo, ventilation or other procedure.
    * @param caseId                   The id of the {@link UkbEncounter} that is supposed to be
    *                                 checked.
    * @param casePid                  The Patient id of the Patient Resource attached to the
    *                                 Encounter.
-   * @param isEcmo                   Check if encounter has any ecmo resources attached to it
    * @param checkedDate              The current date that is being checked.
    */
-  private static void checkVentOrEcmo(Map<String, Set<String>> mapPrevMaxtreatmentlevel,
-      Map<Long, Set<String>> mapIcuVentilationCaseId, Map<Long, Set<String>> mapIcuEcmoCaseId,
-      Map<Long, Set<String>> mapInpatientCaseId, String procedureCode, String caseId,
-      String casePid, Boolean isEcmo, Long checkedDate, InputCodeSettings inputCodeSettings) {
+  private static boolean isVent(Map<String, Set<String>> mapPrevMaxtreatmentlevel,
+      Map<Long, Set<String>> mapIcuVentilationCaseId, String procedureCode, String caseId,
+      String casePid, Long checkedDate, InputCodeSettings inputCodeSettings) {
+    boolean isVent = false;
     // check if the case would be seen as a ventilation case
     if (inputCodeSettings.getProcedureVentilationCodes().contains(procedureCode)) {
+      isVent = true;
       // check if the case was not already marked as an ecmo case
-      if (!isEcmo) {
-        mapInpatientCaseId.get(checkedDate).add(caseId);
-        mapIcuVentilationCaseId.computeIfPresent(checkedDate, (k, v) -> {
-          v.add(caseId);
-          return v;
-        });
-        mapPrevMaxtreatmentlevel.computeIfPresent(CoronaFixedValues.ICU_VENTILATION.getValue(),
-            (k, v) -> {
-              v.add(casePid);
-              return v;
-            });
-      }
+      mapIcuVentilationCaseId.computeIfPresent(checkedDate, (k, v) -> {
+        v.add(caseId);
+        return v;
+      });
+      mapPrevMaxtreatmentlevel.computeIfPresent(CoronaFixedValues.ICU_VENTILATION.getValue(),
+          (k, v) -> {
+            v.add(casePid);
+            return v;
+          });
     }
-    // check if the case would be seen as an ecmo case
-    else if (inputCodeSettings.getProcedureEcmoCodes().contains(procedureCode)) {
-      mapInpatientCaseId.get(checkedDate).add(caseId);
+    return isVent;
+  }
 
+  /**
+   * Purpose of the function is to find out whether the encounter is seen as a ventilation or ecmo
+   * encounter
+   *
+   * @param mapPrevMaxtreatmentlevel The previous maximum treatment level.
+   * @param mapIcuEcmoCaseId         A map containing the case id of every ecmo case sorted by the
+   *                                 date.
+   * @param procedureCode            The {@link UkbProcedure procedure.code.coding.code} that
+   *                                 defines the resource as ecmo, ventilation or other procedure.
+   * @param caseId                   The id of the {@link UkbEncounter} that is supposed to be
+   *                                 checked.
+   * @param casePid                  The Patient id of the Patient Resource attached to the
+   *                                 Encounter.
+   * @param checkedDate              The current date that is being checked.
+   */
+  private static boolean isEcmo(Map<String, Set<String>> mapPrevMaxtreatmentlevel,
+      Map<Long, Set<String>> mapIcuEcmoCaseId, String procedureCode, String caseId,
+      String casePid, Long checkedDate, InputCodeSettings inputCodeSettings) {
+    boolean isEcmo = false;
+    // check if the case would be seen as an ecmo case
+    if (inputCodeSettings.getProcedureEcmoCodes().contains(procedureCode)) {
+      isEcmo = true;
       mapIcuEcmoCaseId.computeIfPresent(checkedDate, (k, v) -> {
         v.add(caseId);
         return v;
@@ -500,5 +490,6 @@ public class TimelineMaxTreatmentLevel extends TimelineFunctionalities {
         return v;
       });
     }
+    return isEcmo;
   }
 }

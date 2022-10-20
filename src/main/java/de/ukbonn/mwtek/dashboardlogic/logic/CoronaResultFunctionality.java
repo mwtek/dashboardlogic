@@ -19,8 +19,8 @@ package de.ukbonn.mwtek.dashboardlogic.logic;
 
 import static de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues.LOINC_SYSTEM;
 import static de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues.SNOMED_SYSTEM;
-import static de.ukbonn.mwtek.utilities.fhir.misc.FhirCodingTools.getCodeBySystem;
 import static de.ukbonn.mwtek.utilities.fhir.misc.FhirCodingTools.getCodeOfFirstCoding;
+import static de.ukbonn.mwtek.utilities.fhir.misc.FhirCodingTools.isCodeInCodesystem;
 
 import de.ukbonn.mwtek.dashboardlogic.CoronaDataItemGenerator;
 import de.ukbonn.mwtek.dashboardlogic.enums.CoronaDashboardConstants;
@@ -146,8 +146,7 @@ public class CoronaResultFunctionality {
         }
       });
 
-      // check whether or not one of the icu encounter still has
-      // a on going ventilation or ecmo attached
+      // Checking if one of the ICU encounters still has a running ventilation or ecmo is connected
       for (UkbEncounter encounter : resultMap.get(CoronaFixedValues.ICU.getValue())) {
         if (resultMap.get(CoronaFixedValues.ICU_VENTILATION.getValue())
             .contains(encounter) || resultMap.get(CoronaFixedValues.ICU_ECMO.getValue())
@@ -688,11 +687,9 @@ public class CoronaResultFunctionality {
    * @return <code>True</code>, if the case class of the encounter is "inpatient"
    */
   public static boolean isCaseClassInpatient(UkbEncounter encounter) {
-    return encounter.getClass_()
-        .getCode() != null && (
-        CoronaFixedValues.ENCOUNTER_CLASS_INPATIENT_CODES.contains(encounter.getClass_().getCode())
-            && !isCaseTypePrestationary(
-            encounter.getType()));
+    return encounter.hasClass_() && isCodeInCodesystem(encounter.getClass_().getCode(),
+        CoronaFixedValues.ENCOUNTER_CLASS_INPATIENT_CODES) && !isCaseTypePrestationary(
+        encounter.getType());
   }
 
   /**
@@ -703,11 +700,9 @@ public class CoronaResultFunctionality {
    * @return <code>True</code>, if the case class of the encounter is "outpatient".
    */
   public static boolean isCaseClassOutpatient(UkbEncounter encounter) {
-    return encounter.getClass_()
-        .getCode() != null && (
-        CoronaFixedValues.ENCOUNTER_CLASS_OUTPATIENT_CODES.contains(encounter.getClass_().getCode())
-            || isCaseTypePrestationary(
-            encounter.getType()));
+    return encounter.hasClass_() && isCodeInCodesystem(encounter.getClass_().getCode(),
+        CoronaFixedValues.ENCOUNTER_CLASS_OUTPATIENT_CODES) || isCaseTypePrestationary(
+        encounter.getType());
   }
 
   /**
@@ -796,10 +791,10 @@ public class CoronaResultFunctionality {
     List<String> observationPcrLoincCodes = inputCodeSettings.getObservationPcrLoincCodes();
     return listUkbObservations.parallelStream()
         .filter(x -> x.hasCode() && x.getCode().hasCoding() && x.hasValueCodeableConcept())
-        .filter(x -> observationPcrLoincCodes.contains(
-            getCodeBySystem(x.getCode().getCoding(), LOINC_SYSTEM)))
-        .filter(x -> QualitativeLabResultCodes.getPositiveCodes()
-            .contains(getCodeBySystem(x.getValueCodeableConcept().getCoding(), SNOMED_SYSTEM)))
+        .filter(x -> isCodeInCodesystem(x.getCode().getCoding(), observationPcrLoincCodes,
+            LOINC_SYSTEM))
+        .filter(x -> isCodeInCodesystem(x.getValueCodeableConcept().getCoding(),
+            QualitativeLabResultCodes.getPositiveCodes(), SNOMED_SYSTEM))
         .map(UkbObservation::getPatientId).collect(Collectors.toSet());
   }
 

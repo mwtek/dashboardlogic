@@ -20,6 +20,7 @@ package de.ukbonn.mwtek.dashboardlogic.logic.cumulative;
 
 import de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues;
 import de.ukbonn.mwtek.dashboardlogic.examples.InputCodeSettingsExampleData;
+import de.ukbonn.mwtek.dashboardlogic.logic.cumulative.results.CumulativeResult;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbObservation;
 import java.util.ArrayList;
 import java.util.List;

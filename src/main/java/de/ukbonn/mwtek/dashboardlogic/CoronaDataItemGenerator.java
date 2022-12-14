@@ -83,8 +83,6 @@ import de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues;
 import de.ukbonn.mwtek.dashboardlogic.enums.VitalStatus;
 import de.ukbonn.mwtek.dashboardlogic.logic.CoronaLogic;
 import de.ukbonn.mwtek.dashboardlogic.logic.CoronaResultFunctionality;
-import de.ukbonn.mwtek.dashboardlogic.logic.cumulative.CumulativeResult;
-import de.ukbonn.mwtek.dashboardlogic.logic.cumulative.CumulativeVariantTestResults;
 import de.ukbonn.mwtek.dashboardlogic.logic.cumulative.CumulativeZipCode;
 import de.ukbonn.mwtek.dashboardlogic.logic.cumulative.age.CumulativeAge;
 import de.ukbonn.mwtek.dashboardlogic.logic.cumulative.gender.CumulativeGender;
@@ -93,6 +91,8 @@ import de.ukbonn.mwtek.dashboardlogic.logic.cumulative.lengthofstay.CumulativeLe
 import de.ukbonn.mwtek.dashboardlogic.logic.cumulative.lengthofstay.CumulativeLengthOfStayIcu;
 import de.ukbonn.mwtek.dashboardlogic.logic.cumulative.maxtreatmentlevel.CumulativeMaxTreatmentLevel;
 import de.ukbonn.mwtek.dashboardlogic.logic.cumulative.maxtreatmentlevel.CumulativeMaxTreatmentLevelAge;
+import de.ukbonn.mwtek.dashboardlogic.logic.cumulative.results.CumulativeResult;
+import de.ukbonn.mwtek.dashboardlogic.logic.cumulative.results.CumulativeVariantTestResults;
 import de.ukbonn.mwtek.dashboardlogic.logic.current.CurrentMaxTreatmentLevel;
 import de.ukbonn.mwtek.dashboardlogic.logic.current.CurrentTreatmentLevel;
 import de.ukbonn.mwtek.dashboardlogic.logic.current.age.CurrentMaxTreatmentLevelAge;
@@ -678,7 +678,7 @@ public class CoronaDataItemGenerator {
       cd = new CoronaDataItem();
       cd.setItemname(TIMELINE_TESTS);
       cd.setItemtype(ITEMTYPE_LIST);
-      ListNumberPair testsMap = timelineTests.createTimelineTestsMap();
+      ListNumberPair testsMap = timelineTests.createTimelineTestsMap(inputCodeSettings);
 
       cd.setData(testsMap);
       currentDataList.add(cd);

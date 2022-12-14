@@ -19,16 +19,14 @@
  */
 package de.ukbonn.mwtek.dashboardlogic.logic.timeline;
 
-import static de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues.LOINC_SYSTEM;
-import static de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues.SNOMED_SYSTEM;
+import static de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues.POSITIVE;
 import static de.ukbonn.mwtek.dashboardlogic.logic.CoronaResultFunctionality.getDatesOutputList;
-import static de.ukbonn.mwtek.utilities.fhir.misc.FhirCodingTools.isCodeInCodesystem;
 
 import de.ukbonn.mwtek.dashboardlogic.enums.CoronaDashboardConstants;
-import de.ukbonn.mwtek.dashboardlogic.enums.QualitativeLabResultCodes;
 import de.ukbonn.mwtek.dashboardlogic.models.CoronaDataItem;
 import de.ukbonn.mwtek.dashboardlogic.settings.InputCodeSettings;
 import de.ukbonn.mwtek.dashboardlogic.tools.ListNumberPair;
+import de.ukbonn.mwtek.dashboardlogic.tools.ObservationFilter;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbObservation;
 import de.ukbonn.mwtek.utilities.generic.time.DateTools;
 import de.ukbonn.mwtek.utilities.generic.time.TimerTools;
@@ -36,6 +34,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import lombok.extern.slf4j.Slf4j;
 
@@ -50,6 +49,8 @@ public class TimelineTests extends TimelineFunctionalities {
 
   public List<UkbObservation> listLabObservations;
 
+  private Set<UkbObservation> covidObservations;
+
   public TimelineTests(List<UkbObservation> listLabObservation) {
     super();
     this.listLabObservations = listLabObservation;
@@ -61,18 +62,23 @@ public class TimelineTests extends TimelineFunctionalities {
    *
    * @return ListNumberPair with all tests held from the qualifying date up to today
    */
-  public ListNumberPair createTimelineTestsMap() {
+  public ListNumberPair createTimelineTestsMap(InputCodeSettings inputCodeSettings) {
     log.debug("started createTimelineTestsMap");
     Instant startTimer = TimerTools.startTimer();
     Map<Long, Long> valueDateMap = getDateMapWithoutValues();
     List<Long> valueList = new ArrayList<>();
 
+    // Checking the loinc pcr codes in the observation to detect pcr findings.
+    if (covidObservations == null) {
+      covidObservations = ObservationFilter.getCovidObservations(
+          listLabObservations, inputCodeSettings);
+    }
+
     long endUnixTime = DateTools.getCurrentUnixTime();
 
     // Initialization of the map with the date entries to keep the order ascending
-    long startDate = CoronaDashboardConstants.qualifyingDate;
     List<Long> labEffectiveDates =
-        listLabObservations.parallelStream().filter(UkbObservation::hasEffectiveDateTimeType)
+        covidObservations.parallelStream().filter(UkbObservation::hasEffectiveDateTimeType)
             .map(UkbObservation::getEffectiveDateTimeType)
             .map(x -> DateTools.dateToUnixTime(x.getValue())).toList();
 
@@ -111,26 +117,35 @@ public class TimelineTests extends TimelineFunctionalities {
     Map<Long, Long> valueDateMap = getDateMapWithoutValues();
     ArrayList<Long> valueList = new ArrayList<>();
     long currentUnixTime = DateTools.getCurrentUnixTime();
-    List<String> observationPcrLoincCodes = inputCodeSettings.getObservationPcrLoincCodes();
+    if (covidObservations == null) {
+      covidObservations = ObservationFilter.getCovidObservations(listLabObservations,
+          inputCodeSettings);
+    }
 
     // Creation of a sublist with all positive covid observations
     // and reduce it to the effective dates of the funding's to make the data retrieval more efficient
-    List<Long> labEffectiveDatesPositiveFundings = listLabObservations.parallelStream()
-        .filter(x -> x.hasCode() && x.getCode().hasCoding() && x.hasValueCodeableConcept())
-        .filter(x -> isCodeInCodesystem(x.getCode().getCoding(), observationPcrLoincCodes,
-            LOINC_SYSTEM)).filter(x -> isCodeInCodesystem(x.getValueCodeableConcept().getCoding(),
-            QualitativeLabResultCodes.getPositiveCodes(), SNOMED_SYSTEM))
-        .filter(UkbObservation::hasEffectiveDateTimeType)
-        // Caution with using getEffectiveDateTimeType since the default (if its null) will be a date object of the current time.
-        .map(UkbObservation::getEffectiveDateTimeType)
-        .map(x -> DateTools.dateToUnixTime(x.getValue())).toList();
+    // 1) Detection by Observation value.
+    List<Long> labEffectiveDatesOfPositives = new ArrayList<>(
+        ObservationFilter.getObservationsByValue(
+                covidObservations, POSITIVE).parallelStream()
+            .filter(UkbObservation::hasEffectiveDateTimeType)
+            // Caution with using getEffectiveDateTimeType since the default (if its null) will be a date object of the current time.
+            .map(UkbObservation::getEffectiveDateTimeType)
+            .map(x -> DateTools.dateToUnixTime(x.getValue())).toList());
+
+    // 2) Detection by Observation interpretation.
+    labEffectiveDatesOfPositives.addAll(
+        ObservationFilter.getObservationsByInterpretation(covidObservations, POSITIVE)
+            .parallelStream().filter(UkbObservation::hasEffectiveDateTimeType)
+            // Caution with using getEffectiveDateTimeType since the default (if its null) will be a date object of the current time.
+            .map(UkbObservation::getEffectiveDateTimeType)
+            .map(x -> DateTools.dateToUnixTime(x.getValue())).toList());
 
     try {
-      labEffectiveDatesPositiveFundings.parallelStream().forEach(labEffective -> {
+      labEffectiveDatesOfPositives.parallelStream().forEach(labEffective -> {
         Boolean obsFound = false;
         long checkingDateUnix = CoronaDashboardConstants.qualifyingDate;
         while (checkingDateUnix <= currentUnixTime && !obsFound) {
-
           obsFound = addLabTestToTimeline(labEffective, checkingDateUnix, valueDateMap);
           checkingDateUnix += CoronaDashboardConstants.dayInSeconds; // add one day
         }

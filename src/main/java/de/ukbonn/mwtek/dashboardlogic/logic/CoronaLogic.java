@@ -20,13 +20,14 @@
 package de.ukbonn.mwtek.dashboardlogic.logic;
 
 import static de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues.LOINC_SYSTEM;
-import static de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues.SNOMED_SYSTEM;
-import static de.ukbonn.mwtek.utilities.fhir.misc.FhirCodingTools.getCodingBySystem;
-import static de.ukbonn.mwtek.utilities.fhir.misc.FhirCodingTools.hasCode;
+import static de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues.POSITIVE;
+import static de.ukbonn.mwtek.dashboardlogic.tools.ObservationFilter.getCaseIdsByObsInterpretation;
+import static de.ukbonn.mwtek.dashboardlogic.tools.ObservationFilter.getCaseIdsByObsValue;
+import static de.ukbonn.mwtek.dashboardlogic.tools.ObservationFilter.getCovidObservations;
+import static de.ukbonn.mwtek.utilities.fhir.misc.FhirCodingTools.isCodeInCodesystem;
 
 import de.ukbonn.mwtek.dashboardlogic.enums.CoronaDashboardConstants;
 import de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues;
-import de.ukbonn.mwtek.dashboardlogic.enums.QualitativeLabResultCodes;
 import de.ukbonn.mwtek.dashboardlogic.settings.InputCodeSettings;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbCondition;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
@@ -47,6 +48,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.hl7.fhir.r4.model.BooleanType;
 import org.hl7.fhir.r4.model.Coding;
 import org.hl7.fhir.r4.model.Extension;
+import org.hl7.fhir.r4.model.Resource;
 import org.hl7.fhir.r4.model.StringType;
 
 /**
@@ -421,38 +423,35 @@ public class CoronaLogic {
   /**
    * Creation of a set of caseIds that have a SARS-CoV-2 positive lab result.
    *
-   * @param listLabObservations list with {@link UkbObservation observation resources}.
-   * @param inputCodeSettings   The configuration of the parameterizable codes such as the
-   *                            observation codes or procedure codes.
+   * @param labObservations   A list with {@link UkbObservation observation resources}.
+   * @param inputCodeSettings The configuration of the parameterizable codes such as the observation
+   *                          codes or procedure codes.
    * @return set of case ids that have a SARS-CoV-2 positive lab result
    */
-  public static Set<String> getCaseIdsWithPositiveLabObs(List<UkbObservation> listLabObservations,
+  public static Set<String> getCaseIdsWithPositiveLabObs(List<UkbObservation> labObservations,
       InputCodeSettings inputCodeSettings) {
-    Set<String> labSet = new HashSet<>();
-    List<String> observationPcrLoincCodes = inputCodeSettings.getObservationPcrLoincCodes();
-    for (UkbObservation labObs : listLabObservations) {
-      // Extracting the coding for the lab code and the value. If no coding can be found create a dummy for easier processing.
-      Coding loincCodePcrCoding = getCodingBySystem(labObs.getCode().getCoding(), LOINC_SYSTEM);
-      Coding obsQualitativeValue = getCodingBySystem(labObs.getValueCodeableConcept().getCoding(),
-          SNOMED_SYSTEM);
+    Set<String> positiveCaseIds;
+    Set<UkbObservation> covidObservations = getCovidObservations(labObservations,
+        inputCodeSettings);
 
-      if (hasCode(loincCodePcrCoding) && observationPcrLoincCodes.contains(
-          loincCodePcrCoding.getCode())) {
-        // Checking the result
-        if (hasCode(obsQualitativeValue)) {
-          // Count the positive ones
-          if (QualitativeLabResultCodes.getPositiveCodes()
-              .contains(obsQualitativeValue.getCode())) {
-            labSet.add(labObs.getCaseId());
-          }
-        } // if
-        else {
-          log.warn("The observation resource with id " + labObs.getId()
-              + " that describes a covid pcr finding doesn't contain a valueCodeableConcept.");
-        }
-      }
-    }
-    return labSet;
+    // For logging purposes we look for observations that contain a covid coding but don't have any values
+    Set<String> covidObservationsWithoutResult = labObservations.parallelStream()
+        .filter(x -> x.hasCode() && x.getCode().hasCoding())
+        .filter(x -> isCodeInCodesystem(x.getCode().getCoding(),
+            inputCodeSettings.getObservationPcrLoincCodes(), LOINC_SYSTEM))
+        .filter(x -> !(x.hasValueCodeableConcept() || x.hasInterpretation())).map(Resource::getId)
+        .collect(Collectors.toSet());
+
+    covidObservationsWithoutResult.forEach(x -> {
+      log.warn("The observation resource with id " + x
+          + " that describes a covid pcr finding doesn't contain a valueCodeableConcept or an expected interpretation coding.");
+    });
+
+    // Adding the ones with positive value and then the ones with positive interpretation code.
+    positiveCaseIds = getCaseIdsByObsValue(covidObservations, POSITIVE);
+    positiveCaseIds.addAll(getCaseIdsByObsInterpretation(covidObservations, POSITIVE));
+
+    return positiveCaseIds;
   }
 
   /**

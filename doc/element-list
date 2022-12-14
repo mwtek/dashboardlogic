@@ -7,6 +7,7 @@ de.ukbonn.mwtek.dashboardlogic.logic.cumulative.age
 de.ukbonn.mwtek.dashboardlogic.logic.cumulative.gender
 de.ukbonn.mwtek.dashboardlogic.logic.cumulative.lengthofstay
 de.ukbonn.mwtek.dashboardlogic.logic.cumulative.maxtreatmentlevel
+de.ukbonn.mwtek.dashboardlogic.logic.cumulative.results
 de.ukbonn.mwtek.dashboardlogic.logic.current
 de.ukbonn.mwtek.dashboardlogic.logic.current.age
 de.ukbonn.mwtek.dashboardlogic.logic.timeline

@@ -17,15 +17,16 @@
  */
 package de.ukbonn.mwtek.dashboardlogic.logic;
 
-import static de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues.LOINC_SYSTEM;
-import static de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues.SNOMED_SYSTEM;
+import static de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues.POSITIVE;
+import static de.ukbonn.mwtek.dashboardlogic.tools.ObservationFilter.getCovidObservations;
+import static de.ukbonn.mwtek.dashboardlogic.tools.ObservationFilter.getPatientIdsByObsInterpretation;
+import static de.ukbonn.mwtek.dashboardlogic.tools.ObservationFilter.getPatientIdsByObsValue;
 import static de.ukbonn.mwtek.utilities.fhir.misc.FhirCodingTools.getCodeOfFirstCoding;
 import static de.ukbonn.mwtek.utilities.fhir.misc.FhirCodingTools.isCodeInCodesystem;
 
 import de.ukbonn.mwtek.dashboardlogic.CoronaDataItemGenerator;
 import de.ukbonn.mwtek.dashboardlogic.enums.CoronaDashboardConstants;
 import de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues;
-import de.ukbonn.mwtek.dashboardlogic.enums.QualitativeLabResultCodes;
 import de.ukbonn.mwtek.dashboardlogic.models.CoronaTreatmentLevelExport;
 import de.ukbonn.mwtek.dashboardlogic.settings.InputCodeSettings;
 import de.ukbonn.mwtek.dashboardlogic.tools.LocationFilter;
@@ -780,22 +781,27 @@ public class CoronaResultFunctionality {
   /**
    * Identification of all patients who have at least one case with a positive SARS-CoV-2 pcr test.
    *
-   * @param listUkbObservations List with the {@link UkbObservation SARS-CoV-2 lab findings}.
-   * @param inputCodeSettings   The configuration of the parameterizable codes such as the
-   *                            observation codes or procedure codes.
+   * @param ukbObservations   List with the {@link UkbObservation SARS-CoV-2 lab findings}.
+   * @param inputCodeSettings The configuration of the parameterizable codes such as the observation
+   *                          codes or procedure codes.
    * @return List with the patients ids of all patients who have at least one case with a positive
    * SARS-CoV-2 pcr tests
    */
   public static Collection<String> getPidsWithPosCovidLabResult(
-      List<UkbObservation> listUkbObservations, InputCodeSettings inputCodeSettings) {
-    List<String> observationPcrLoincCodes = inputCodeSettings.getObservationPcrLoincCodes();
-    return listUkbObservations.parallelStream()
-        .filter(x -> x.hasCode() && x.getCode().hasCoding() && x.hasValueCodeableConcept())
-        .filter(x -> isCodeInCodesystem(x.getCode().getCoding(), observationPcrLoincCodes,
-            LOINC_SYSTEM))
-        .filter(x -> isCodeInCodesystem(x.getValueCodeableConcept().getCoding(),
-            QualitativeLabResultCodes.getPositiveCodes(), SNOMED_SYSTEM))
-        .map(UkbObservation::getPatientId).collect(Collectors.toSet());
+      List<UkbObservation> ukbObservations, InputCodeSettings inputCodeSettings) {
+
+    // The extraction is based on a subset of the observations, namely just the covid related ones.
+    Set<UkbObservation> covidObservations = getCovidObservations(ukbObservations,
+        inputCodeSettings);
+
+    // 1) Identification by Observation.value
+    Set<String> positivePatientIds = getPatientIdsByObsValue(covidObservations, POSITIVE);
+
+    // 2) Identification by Observation.interpretation
+    positivePatientIds.addAll(
+        getPatientIdsByObsInterpretation(covidObservations, POSITIVE));
+
+    return positivePatientIds;
   }
 
   /**

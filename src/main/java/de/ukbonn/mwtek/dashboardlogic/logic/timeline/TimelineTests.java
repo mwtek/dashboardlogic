@@ -1,5 +1,4 @@
 /*
- *
  *  Copyright (C) 2021 University Hospital Bonn - All Rights Reserved You may use, distribute and
  *  modify this code under the GPL 3 license. THERE IS NO WARRANTY FOR THE PROGRAM, TO THE EXTENT
  *  PERMITTED BY APPLICABLE LAW. EXCEPT WHEN OTHERWISE STATED IN WRITING THE COPYRIGHT HOLDERS AND/OR
@@ -13,9 +12,8 @@
  *  ARISING OUT OF THE USE OR INABILITY TO USE THE PROGRAM (INCLUDING BUT NOT LIMITED TO LOSS OF DATA
  *  OR DATA BEING RENDERED INACCURATE OR LOSSES SUSTAINED BY YOU OR THIRD PARTIES OR A FAILURE OF THE
  *  PROGRAM TO OPERATE WITH ANY OTHER PROGRAMS), EVEN IF SUCH HOLDER OR OTHER PARTY HAS BEEN ADVISED
- *  OF THE POSSIBILITY OF SUCH DAMAGES. You should have received a copy of the GPL 3 license with *
+ *  OF THE POSSIBILITY OF SUCH DAMAGES. You should have received a copy of the GPL 3 license with
  *  this file. If not, visit http://www.gnu.de/documents/gpl-3.0.en.html
- *
  */
 package de.ukbonn.mwtek.dashboardlogic.logic.timeline;
 
@@ -66,7 +64,7 @@ public class TimelineTests extends TimelineFunctionalities {
     log.debug("started createTimelineTestsMap");
     Instant startTimer = TimerTools.startTimer();
     Map<Long, Long> valueDateMap = getDateMapWithoutValues();
-    List<Long> valueList = new ArrayList<>();
+    List<Long> valueList;
 
     // Checking the loinc pcr codes in the observation to detect pcr findings.
     if (covidObservations == null) {
@@ -97,9 +95,8 @@ public class TimelineTests extends TimelineFunctionalities {
     });
 
     // order them by key ascending (just needed if we want to parallelize it; the first tries
-    // were
-    // not really promising tho because of too many write/read ops probably block each other)
-    divideMapValuesToLists(valueDateMap, valueList);
+    // were not really promising tho because of too many write/read ops probably block each other)
+    valueList = divideMapValuesToLists(valueDateMap);
 
     TimerTools.stopTimerAndLog(startTimer, "finished createTimelineTestsMap");
     return new ListNumberPair(getDatesOutputList(), valueList);
@@ -115,7 +112,7 @@ public class TimelineTests extends TimelineFunctionalities {
     log.debug("started createTimelineTestPositiveMap");
     Instant startTimer = TimerTools.startTimer();
     Map<Long, Long> valueDateMap = getDateMapWithoutValues();
-    ArrayList<Long> valueList = new ArrayList<>();
+    List<Long> valueList = new ArrayList<>();
     long currentUnixTime = DateTools.getCurrentUnixTime();
     if (covidObservations == null) {
       covidObservations = ObservationFilter.getCovidObservations(listLabObservations,
@@ -151,10 +148,9 @@ public class TimelineTests extends TimelineFunctionalities {
         }
       });
     } catch (Exception ex) {
-      log.debug("issue while running createTimelineTestPositiveMap");
-      ex.printStackTrace();
+      log.error("Error while running createTimelineTestPositiveMap", ex);
     }
-    divideMapValuesToLists(valueDateMap, valueList);
+    valueList = divideMapValuesToLists(valueDateMap);
     TimerTools.stopTimerAndLog(startTimer, "finished createTimelineTestPositiveMap");
     return new ListNumberPair(getDatesOutputList(), valueList);
   }

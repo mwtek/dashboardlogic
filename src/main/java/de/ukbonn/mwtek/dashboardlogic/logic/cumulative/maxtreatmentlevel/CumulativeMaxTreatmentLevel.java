@@ -1,3 +1,21 @@
+/*
+ *  Copyright (C) 2021 University Hospital Bonn - All Rights Reserved You may use, distribute and
+ *  modify this code under the GPL 3 license. THERE IS NO WARRANTY FOR THE PROGRAM, TO THE EXTENT
+ *  PERMITTED BY APPLICABLE LAW. EXCEPT WHEN OTHERWISE STATED IN WRITING THE COPYRIGHT HOLDERS AND/OR
+ *  OTHER PARTIES PROVIDE THE PROGRAM “AS IS” WITHOUT WARRANTY OF ANY KIND, EITHER EXPRESSED OR
+ *  IMPLIED, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ *  A PARTICULAR PURPOSE. THE ENTIRE RISK AS TO THE QUALITY AND PERFORMANCE OF THE PROGRAM IS WITH
+ *  YOU. SHOULD THE PROGRAM PROVE DEFECTIVE, YOU ASSUME THE COST OF ALL NECESSARY SERVICING, REPAIR
+ *  OR CORRECTION. IN NO EVENT UNLESS REQUIRED BY APPLICABLE LAW OR AGREED TO IN WRITING WILL ANY
+ *  COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MODIFIES AND/OR CONVEYS THE PROGRAM AS PERMITTED ABOVE,
+ *  BE LIABLE TO YOU FOR DAMAGES, INCLUDING ANY GENERAL, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES
+ *  ARISING OUT OF THE USE OR INABILITY TO USE THE PROGRAM (INCLUDING BUT NOT LIMITED TO LOSS OF DATA
+ *  OR DATA BEING RENDERED INACCURATE OR LOSSES SUSTAINED BY YOU OR THIRD PARTIES OR A FAILURE OF THE
+ *  PROGRAM TO OPERATE WITH ANY OTHER PROGRAMS), EVEN IF SUCH HOLDER OR OTHER PARTY HAS BEEN ADVISED
+ *  OF THE POSSIBILITY OF SUCH DAMAGES. You should have received a copy of the GPL 3 license with
+ *  this file. If not, visit http://www.gnu.de/documents/gpl-3.0.en.html
+ */
+
 package de.ukbonn.mwtek.dashboardlogic.logic.cumulative.maxtreatmentlevel;
 
 import de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues;
@@ -16,7 +34,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
-import org.jetbrains.annotations.NotNull;
 
 
 /**
@@ -50,7 +67,7 @@ public class CumulativeMaxTreatmentLevel {
   @SuppressWarnings("incomplete-switch")
   public List<UkbEncounter> getCumulativeByClass(
       Map<String, List<UkbEncounter>> mapIcu, CoronaFixedValues treatmentLevel,
-      HashMap<String, List<UkbEncounter>> mapPositiveEncounterByClass) {
+      Map<String, List<UkbEncounter>> mapPositiveEncounterByClass) {
     Set<String> ambulantPidSet = new HashSet<>();
     Set<String> stationaryPidSet = new HashSet<>();
     List<UkbEncounter> listResult = new ArrayList<>();
@@ -60,7 +77,7 @@ public class CumulativeMaxTreatmentLevel {
     for (Map.Entry<String, List<UkbEncounter>> entry : mapPositiveEncounterByClass.entrySet()) {
       List<UkbEncounter> value = entry.getValue();
       switch (treatmentLevel) {
-        case OUTPATIENT_ITEM: // check which case is ambulant and does not have the twelve Days Logic
+        case OUTPATIENT_ITEM -> { // check which case is ambulant and does not have the twelve Days Logic
           for (UkbEncounter encounter : value) {
             if (CoronaResultFunctionality.isCaseClassOutpatient(
                 encounter) && !encounter.hasExtension(
@@ -68,8 +85,8 @@ public class CumulativeMaxTreatmentLevel {
               ambulantPidSet.add(encounter.getPatientId());
             }
           }
-          break;
-        case INPATIENT_ITEM: // check if stationary and is not any kind of ICU
+        }
+        case INPATIENT_ITEM -> { // check if stationary and is not any kind of ICU
           for (UkbEncounter e : value) {
             if (CoronaResultFunctionality.isCaseClassInpatient(e)) {
               // check if icu
@@ -80,7 +97,7 @@ public class CumulativeMaxTreatmentLevel {
               }
             }
           }
-          break;
+        }
       }
     }
     // print out only the most recent cases in case a patient has more than one case with same
@@ -107,7 +124,7 @@ public class CumulativeMaxTreatmentLevel {
    * @return List of encounters that all have different pids
    */
   private List<UkbEncounter> youngestCaseLogic(String treatmentLevel,
-      HashMap<String, List<UkbEncounter>> mapPositiveEncounterByClass,
+      Map<String, List<UkbEncounter>> mapPositiveEncounterByClass,
       Set<String> setInpatientPids) {
     Map<String, List<UkbEncounter>> pidEncounterMap = new HashMap<>();
     try {
@@ -150,8 +167,8 @@ public class CumulativeMaxTreatmentLevel {
           }
         }
       }
-    } catch (Exception e) {
-      e.printStackTrace();
+    } catch (Exception ex) {
+      log.error("Error in the 'youngest case' determination logic: ", ex);
     }
     List<UkbEncounter> listEndResult = new ArrayList<>();
     // check if some pids still have multiple encounter assigned to them
@@ -286,9 +303,8 @@ public class CumulativeMaxTreatmentLevel {
    * @return List of {@link UkbEncounter} resources of first positive covid cases of transferred
    * patients.
    */
-  @NotNull
   private List<UkbEncounter> getPatientsFirstCovidEncounter(
-      HashMap<String, List<UkbEncounter>> mapPidCase) {
+      Map<String, List<UkbEncounter>> mapPidCase) {
     List<UkbEncounter> encounters = new ArrayList<>();
     for (Map.Entry<String, List<UkbEncounter>> mapEncountersByPid : mapPidCase.entrySet()) {
       encounters.add(getFirstCovidPositiveCase(mapEncountersByPid));
@@ -315,7 +331,7 @@ public class CumulativeMaxTreatmentLevel {
    * @param mapPidAndCase Map consisting of encounter sorted by their pids.
    * @param encounter     The {@link UkbEncounter} that has to be added.
    */
-  private void addPidToMap(HashMap<String, List<UkbEncounter>> mapPidAndCase,
+  private void addPidToMap(Map<String, List<UkbEncounter>> mapPidAndCase,
       UkbEncounter encounter) {
     if (mapPidAndCase.containsKey(encounter.getPatientId())) {
       mapPidAndCase.get(encounter.getPatientId()).add(encounter);

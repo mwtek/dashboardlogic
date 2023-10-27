@@ -1,5 +1,4 @@
 /*
- *
  *  Copyright (C) 2021 University Hospital Bonn - All Rights Reserved You may use, distribute and
  *  modify this code under the GPL 3 license. THERE IS NO WARRANTY FOR THE PROGRAM, TO THE EXTENT
  *  PERMITTED BY APPLICABLE LAW. EXCEPT WHEN OTHERWISE STATED IN WRITING THE COPYRIGHT HOLDERS AND/OR
@@ -13,9 +12,8 @@
  *  ARISING OUT OF THE USE OR INABILITY TO USE THE PROGRAM (INCLUDING BUT NOT LIMITED TO LOSS OF DATA
  *  OR DATA BEING RENDERED INACCURATE OR LOSSES SUSTAINED BY YOU OR THIRD PARTIES OR A FAILURE OF THE
  *  PROGRAM TO OPERATE WITH ANY OTHER PROGRAMS), EVEN IF SUCH HOLDER OR OTHER PARTY HAS BEEN ADVISED
- *  OF THE POSSIBILITY OF SUCH DAMAGES. You should have received a copy of the GPL 3 license with *
+ *  OF THE POSSIBILITY OF SUCH DAMAGES. You should have received a copy of the GPL 3 license with
  *  this file. If not, visit http://www.gnu.de/documents/gpl-3.0.en.html
- *
  */
 package de.ukbonn.mwtek.dashboardlogic.logic.current;
 
@@ -45,7 +43,7 @@ import lombok.extern.slf4j.Slf4j;
 public class CurrentMaxTreatmentLevel {
 
   public List<UkbEncounter> listEncounters;
-  private List<UkbEncounter> listEncountersInpatients;
+  private List<UkbEncounter> facilityContactsInpatients;
 
   public CurrentMaxTreatmentLevel(List<UkbEncounter> listEncounter) {
     this.listEncounters = listEncounter;
@@ -66,8 +64,8 @@ public class CurrentMaxTreatmentLevel {
     Instant startTimer = TimerTools.startTimer();
 
     // Initialize list that filters on inpatient cases
-    if (listEncountersInpatients == null) {
-      listEncountersInpatients =
+    if (facilityContactsInpatients == null) {
+      facilityContactsInpatients =
           listEncounters.parallelStream().filter(CoronaResultFunctionality::isCaseClassInpatient)
               .toList();
     }
@@ -85,8 +83,8 @@ public class CurrentMaxTreatmentLevel {
     // Check whether the current encounters had a higher treatmentlevel before.
     try {
       switch (treatmentLevel) {
-        case INPATIENT_ITEM:
-          for (UkbEncounter currentEncounter : listEncountersInpatients) {
+        case INPATIENT_ITEM -> {
+          for (UkbEncounter currentEncounter : facilityContactsInpatients) {
             isPositive = isCovidPositive(currentEncounter);
             isActive = isActive(currentEncounter);
 
@@ -101,10 +99,10 @@ public class CurrentMaxTreatmentLevel {
               }
             }
           }
-          break;
+        }
         // ICU: Same procedure as above
-        case ICU:
-          for (UkbEncounter currentEncounter : listEncountersInpatients) {
+        case ICU -> {
+          for (UkbEncounter currentEncounter : facilityContactsInpatients) {
             isPositive = isCovidPositive(currentEncounter);
             isActive = isActive(currentEncounter);
 
@@ -115,10 +113,10 @@ public class CurrentMaxTreatmentLevel {
               }
             }
           }
-          break;
+        }
         // Ventilation
-        case ICU_VENTILATION:
-          for (UkbEncounter currentEncounter : listEncountersInpatients) {
+        case ICU_VENTILATION -> {
+          for (UkbEncounter currentEncounter : facilityContactsInpatients) {
             isPositive = isCovidPositive(currentEncounter);
             isActive = isActive(currentEncounter);
 
@@ -130,10 +128,10 @@ public class CurrentMaxTreatmentLevel {
               }
             }
           }
-          break;
+        }
         // ECMO
-        case ICU_ECMO:
-          for (UkbEncounter currentEncounter : listEncountersInpatients) {
+        case ICU_ECMO -> {
+          for (UkbEncounter currentEncounter : facilityContactsInpatients) {
             isPositive = isCovidPositive(currentEncounter);
             isActive = isActive(currentEncounter);
 
@@ -141,10 +139,10 @@ public class CurrentMaxTreatmentLevel {
               listResult.add(currentEncounter);
             }
           }
-          break;
+        }
       }
-    } catch (Exception e) {
-      e.printStackTrace();
+    } catch (Exception ex) {
+      log.error("Error in the getNumberOfCurrentMaxTreatmentLevel method. ", ex);
     }
     TimerTools.stopTimerAndLog(startTimer, "finished getNumberOfCurrentMaxTreatmentLevel");
     return listResult;

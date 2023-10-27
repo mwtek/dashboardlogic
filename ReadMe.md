@@ -40,8 +40,8 @@ The following software must be available to execute the program:
 - Java 17 (JDK mandatory for compilation, OpenJDK recommended)
 - Apache Maven (mandatory for compilation)
 
-It is recommended to have both programs installed in a way that the correct versions of *java* and *
-mvn* are found in the system path.
+It is recommended to have both programs installed in a way that the correct versions of *java* and
+*mvn* are found in the system path.
 
 In addition, at least 4 GB of free RAM, preferably 8 GB, should be available. The size depends on
 the number of resources that have to be retrieved from the FHIR server. In a test with ~ 500,000

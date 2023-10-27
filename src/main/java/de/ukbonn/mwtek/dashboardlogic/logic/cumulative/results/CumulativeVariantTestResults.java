@@ -84,9 +84,8 @@ public class CumulativeVariantTestResults {
         readCodingAndIncrementVariantMap(variantCoding, variantMap);
       }
     } catch (Exception ex) {
-      ex.printStackTrace();
+      log.error("Error in the covid variant retrieval ", ex);
     }
-
     return variantMap;
   }
 
@@ -142,9 +141,10 @@ public class CumulativeVariantTestResults {
           incrementVariantCount(variantMap, CoronaFixedValues.VARIANT_NON_VOC);
         } else {
           incrementVariantCount(variantMap, CoronaFixedValues.VARIANT_UNKNOWN);
-          log.debug(
-              "No support for covid variant with loinc code: " + variantCoding.getCode()
-                  + " and display: " + variantCoding.getDisplay());
+          // The log message got commented out since it could contain patient data and fills the logs heavily. If there is urgent need comment it in again.
+//          log.debug(
+//              "No support for covid variant with loinc code: " + variantCoding.getCode()
+//                  + " and display: " + variantCoding.getDisplay());
         }
       }
     }

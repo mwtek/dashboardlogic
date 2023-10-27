@@ -1,5 +1,4 @@
 /*
- *
  *  Copyright (C) 2021 University Hospital Bonn - All Rights Reserved You may use, distribute and
  *  modify this code under the GPL 3 license. THERE IS NO WARRANTY FOR THE PROGRAM, TO THE EXTENT
  *  PERMITTED BY APPLICABLE LAW. EXCEPT WHEN OTHERWISE STATED IN WRITING THE COPYRIGHT HOLDERS AND/OR
@@ -13,30 +12,22 @@
  *  ARISING OUT OF THE USE OR INABILITY TO USE THE PROGRAM (INCLUDING BUT NOT LIMITED TO LOSS OF DATA
  *  OR DATA BEING RENDERED INACCURATE OR LOSSES SUSTAINED BY YOU OR THIRD PARTIES OR A FAILURE OF THE
  *  PROGRAM TO OPERATE WITH ANY OTHER PROGRAMS), EVEN IF SUCH HOLDER OR OTHER PARTY HAS BEEN ADVISED
- *  OF THE POSSIBILITY OF SUCH DAMAGES. You should have received a copy of the GPL 3 license with *
+ *  OF THE POSSIBILITY OF SUCH DAMAGES. You should have received a copy of the GPL 3 license with
  *  this file. If not, visit http://www.gnu.de/documents/gpl-3.0.en.html
- *
  */
-package de.ukbonn.mwtek.dashboardlogic.models;
 
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+package de.ukbonn.mwtek.dashboardlogic.predictiondata.ukb.renalreplacement.enums;
 
 /**
- * Model class that describes a single data item of the Corona Dashboard specification and provides a representation in
- * a json string.
+ * Class with constants names for the different data items
  *
  * @author <a href="mailto:david.meyers@ukbonn.de">David Meyers</a>
  */
-@Getter
-@Setter
-@AllArgsConstructor
-@NoArgsConstructor
-public class CoronaDataItem {
+public class RenalReplacementRiskDataItems {
 
-  private String itemname;
-  private String itemtype;
-  private Object data;
+  public static final String CURRENT_RENAL_REPLACEMENT_RISK =
+      "current.renalreplacementrisk";
+  public static final String TIMELINE_RENAL_REPLACEMENT_RISK =
+      "timeline.renalreplacementrisk";
+  public static final String CUMULATIVE_RENAL_REPLACEMENT_RISK_ROC = "cumulative.renalreplacementrisk.roc";
 }

@@ -1,5 +1,4 @@
 /*
- *
  *  Copyright (C) 2021 University Hospital Bonn - All Rights Reserved You may use, distribute and
  *  modify this code under the GPL 3 license. THERE IS NO WARRANTY FOR THE PROGRAM, TO THE EXTENT
  *  PERMITTED BY APPLICABLE LAW. EXCEPT WHEN OTHERWISE STATED IN WRITING THE COPYRIGHT HOLDERS AND/OR
@@ -13,9 +12,8 @@
  *  ARISING OUT OF THE USE OR INABILITY TO USE THE PROGRAM (INCLUDING BUT NOT LIMITED TO LOSS OF DATA
  *  OR DATA BEING RENDERED INACCURATE OR LOSSES SUSTAINED BY YOU OR THIRD PARTIES OR A FAILURE OF THE
  *  PROGRAM TO OPERATE WITH ANY OTHER PROGRAMS), EVEN IF SUCH HOLDER OR OTHER PARTY HAS BEEN ADVISED
- *  OF THE POSSIBILITY OF SUCH DAMAGES. You should have received a copy of the GPL 3 license with *
+ *  OF THE POSSIBILITY OF SUCH DAMAGES. You should have received a copy of the GPL 3 license with
  *  this file. If not, visit http://www.gnu.de/documents/gpl-3.0.en.html
- *
  */
 package de.ukbonn.mwtek.dashboardlogic.logic.cumulative.lengthofstay;
 
@@ -71,7 +69,7 @@ public class CumulativeLengthOfStayIcu {
    * @return A Map that links a patient id to a map that containing the length of stay in the
    * hospital and all the case ids from which this total was calculated
    */
-  public HashMap<String, Map<Long, Set<String>>> createIcuLengthOfStayList(
+  public Map<String, Map<Long, Set<String>>> createIcuLengthOfStayList(
       Map<String, List<UkbEncounter>> mapIcu) {
 
     log.debug("started createIcuLengthOfStayList");
@@ -106,15 +104,16 @@ public class CumulativeLengthOfStayIcu {
       List<Encounter.EncounterLocationComponent> listIcuEncounterLocation = new ArrayList<>();
       try {
         for (Encounter.EncounterLocationComponent location : encounter.getLocation()) {
-          if (location.getLocation() != null || !location.getLocation().isEmpty()) {
+          if (location.getLocation() != null || !location.getLocation()
+              .isEmpty()) {
             if (listIcuLocationIds.contains(
                 CoronaResultFunctionality.extractIdFromReference(location.getLocation()))) {
               listIcuEncounterLocation.add(location);
             }
           }
         }
-      } catch (Exception e) {
-        e.printStackTrace();
+      } catch (Exception ex) {
+        log.error("Error in the createIcuLengthOfStayList generation ", ex);
       }
       // go through each Location and calculate the time the spend in ICU
       for (Encounter.EncounterLocationComponent location : listIcuEncounterLocation) {
@@ -154,7 +153,7 @@ public class CumulativeLengthOfStayIcu {
    *                   be added to the previous total.
    * @param encounter  {@link UkbEncounter} that is considered
    */
-  private void addIcuHours(HashMap<String, Map<Long, Set<String>>> mapResult, String patientId,
+  private void addIcuHours(Map<String, Map<Long, Set<String>>> mapResult, String patientId,
       Long hoursToAdd, UkbEncounter encounter) {
     // checks if there is already a time saved for the patient
     if (mapResult.containsKey(patientId)) {
@@ -182,7 +181,7 @@ public class CumulativeLengthOfStayIcu {
 
   /**
    * Create a map containing the length of stay in hours for icu cases, where the patients did not
-   * deceased
+   * decease
    * <p>
    * used by cumulative.lengthofstay.icu.alive and dead
    *
@@ -192,7 +191,7 @@ public class CumulativeLengthOfStayIcu {
    *                         class
    * @return Map with the number of Icu stay hours of all non-deceased patients per PatientId
    */
-  public HashMap<String, Map<Long, Set<String>>> createIcuLengthListByVitalstatus(
+  public Map<String, Map<Long, Set<String>>> createIcuLengthListByVitalstatus(
       VitalStatus vitalStatus, Map<String, Map<Long, Set<String>>> mapIcuLengthList,
       Map<String, List<UkbEncounter>> mapIcu) {
     log.debug("started createIcuLengthListByVitalstatus");

@@ -103,6 +103,7 @@ import de.ukbonn.mwtek.dashboardlogic.logic.timeline.TimelineVariantTestResults;
 import de.ukbonn.mwtek.dashboardlogic.models.CoronaDataItem;
 import de.ukbonn.mwtek.dashboardlogic.settings.InputCodeSettings;
 import de.ukbonn.mwtek.dashboardlogic.settings.VariantSettings;
+import de.ukbonn.mwtek.dashboardlogic.tools.EncounterFilter;
 import de.ukbonn.mwtek.dashboardlogic.tools.ListNumberPair;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbCondition;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
@@ -138,6 +139,8 @@ public class CoronaDataItemGenerator {
   List<UkbObservation> listObservations;
   List<UkbPatient> listPatients;
   List<UkbEncounter> listEncounters;
+
+  List<UkbEncounter> listFacilityContactEncounters;
   List<UkbProcedure> listIcuProcedures;
   List<UkbLocation> listLocations;
 
@@ -200,47 +203,54 @@ public class CoronaDataItemGenerator {
     reportMissingFields(listEncounters);
 
     // Marking encounter resources as covid positive via setting of extensions
-    CoronaLogic.flagCases(listEncounters, listConditions, listObservations,
+    CoronaLogic.flagEncounters(listEncounters, listConditions, listObservations,
         inputCodeSettings);
 
-    HashMap<String, List<UkbEncounter>> mapPositiveEncounterByClass =
-        CoronaResultFunctionality.createEncounterMap(listEncounters);
+    // The current status allows us to filter on contact level encounter only since the Encounter.location usage is not clear defined (should it be part of the facility level resources or just on department+supply level resources?)
+    listFacilityContactEncounters = listEncounters.parallelStream()
+        .filter(EncounterFilter::isFacilityContact).toList();
+
+    Map<String, List<UkbEncounter>> mapPositiveEncounterByClass =
+        CoronaResultFunctionality.createEncounterMap(listFacilityContactEncounters);
 
     Map<String, List<UkbEncounter>> mapIcu =
-        CoronaResultFunctionality.createIcuMap(listEncounters, listLocations,
+        CoronaResultFunctionality.createIcuMap(listFacilityContactEncounters, listLocations,
             listIcuProcedures, inputCodeSettings);
     /* used for current logic */
     Map<String, List<UkbEncounter>> mapCurrentIcu =
-        CoronaResultFunctionality.createCurrentIcuMap(listEncounters, listLocations,
+        CoronaResultFunctionality.createCurrentIcuMap(listFacilityContactEncounters, listLocations,
             listIcuProcedures, inputCodeSettings);
 
     // CurrentLogic Classes
     CurrentTreatmentLevel currentTreatmentlevel =
-        new CurrentTreatmentLevel(listEncounters, listIcuProcedures);
+        new CurrentTreatmentLevel(listFacilityContactEncounters, listIcuProcedures);
     CurrentMaxTreatmentLevel currentMaxTreatmentlevel =
-        new CurrentMaxTreatmentLevel(listEncounters);
+        new CurrentMaxTreatmentLevel(listFacilityContactEncounters);
 
     // CumulativeLogic classes
-    CumulativeAge cumulativeAge = new CumulativeAge(listEncounters, listPatients);
-    CumulativeGender cumulativeGender = new CumulativeGender(listEncounters, listPatients);
+    CumulativeAge cumulativeAge = new CumulativeAge(listFacilityContactEncounters, listPatients);
+    CumulativeGender cumulativeGender = new CumulativeGender(listFacilityContactEncounters,
+        listPatients);
     CumulativeLengthOfStayHospital cumulativeLengthOfStayHospital =
-        new CumulativeLengthOfStayHospital(listEncounters);
+        new CumulativeLengthOfStayHospital(listFacilityContactEncounters);
     CumulativeLengthOfStayIcu cumulativeLengthOfStayIcu =
-        new CumulativeLengthOfStayIcu(listEncounters, listLocations);
+        new CumulativeLengthOfStayIcu(listFacilityContactEncounters, listLocations);
     CumulativeMaxTreatmentLevelAge cumulativeMaxtreatmentLevelAge =
         new CumulativeMaxTreatmentLevelAge(listPatients);
     CumulativeMaxTreatmentLevel cumulativeMaxtreatmentLevel =
-        new CumulativeMaxTreatmentLevel(listEncounters);
+        new CumulativeMaxTreatmentLevel(listFacilityContactEncounters);
     CumulativeResult cumulativeResult = new CumulativeResult(listObservations);
-    CumulativeZipCode cumulativeZipCode = new CumulativeZipCode(listEncounters, listPatients);
+    CumulativeZipCode cumulativeZipCode = new CumulativeZipCode(listFacilityContactEncounters,
+        listPatients);
     CumulativeVariantTestResults cumulativeVariantTestResults =
         new CumulativeVariantTestResults(listObservations);
 
     // Timeline Classes
     TimelineMaxTreatmentLevel timelineMaxtreatmentlevel =
-        new TimelineMaxTreatmentLevel(listEncounters, listIcuProcedures, listLocations);
+        new TimelineMaxTreatmentLevel(listFacilityContactEncounters, listIcuProcedures,
+            listLocations);
     TimelineTests timelineTests = new TimelineTests(listObservations);
-    TimelineDeath timelineDeath = new TimelineDeath(listEncounters);
+    TimelineDeath timelineDeath = new TimelineDeath(listFacilityContactEncounters);
 
     // Partial lists of current cases broken down by case status
     List<UkbEncounter> listCurrentStandardWardEncounter = new ArrayList<>();
@@ -523,13 +533,13 @@ public class CoronaDataItemGenerator {
       Map<String, Number> cumulativeGenderMap = new LinkedHashMap<>();
 
       cumulativeGenderMap.put(MALE_SPECIFICATION.getValue(),
-          cumulativeGender.getGenderCount(listEncounters, listPatients,
+          cumulativeGender.getGenderCount(listFacilityContactEncounters, listPatients,
               GENDER_MALE.getValue()));
       cumulativeGenderMap.put(FEMALE_SPECIFICATION.getValue(),
-          cumulativeGender.getGenderCount(listEncounters, listPatients,
+          cumulativeGender.getGenderCount(listFacilityContactEncounters, listPatients,
               GENDER_FEMALE.getValue()));
       cumulativeGenderMap.put(DIVERSE_SPECIFICATION.getValue(),
-          cumulativeGender.getGenderCount(listEncounters, listPatients,
+          cumulativeGender.getGenderCount(listFacilityContactEncounters, listPatients,
               GENDER_DIVERSE.getValue()));
 
       cd.setData(cumulativeGenderMap);
@@ -566,7 +576,7 @@ public class CoronaDataItemGenerator {
       cd.setData(mapCumulativeMaxtreatmentlevel);
       currentDataList.add(cd);
 
-      // add casenrs
+      // adding case ids on demand
       if (debug) {
         cd = new CoronaDataItem();
         cd.setItemname(addCaseNrsToLabel(CUMULATIVE_MAXTREATMENTLEVEL));
@@ -749,8 +759,8 @@ public class CoronaDataItemGenerator {
       cd.setData(mapResultTreatment);
       currentDataList.add(cd);
 
-      // show casenrs for mtl plausibility checks
       // timeline maxtreatmentlevel
+      // case ids can be shown for plausibility checks
       if (debug) {
         cd = new CoronaDataItem();
         cd.setItemname(addCaseNrsToLabel(TIMELINE_MAXTREATMENTLEVEL));
@@ -881,16 +891,16 @@ public class CoronaDataItemGenerator {
           Arrays.asList("0000", "0100", "0110", "0111", "1000", "1100", "1110", "1111"));
 
       aggData.put("value", new ArrayList<>());
-      LinkedHashMap<CoronaFixedValues, List<UkbEncounter>> listCrosstabmaxtreatmentlevels =
+      LinkedHashMap<CoronaFixedValues, List<UkbEncounter>> listCrosstabMaxtreatmentlevels =
           new LinkedHashMap<>();
-      listCrosstabmaxtreatmentlevels.put(INPATIENT_ITEM, listCurrentStandardWardEncounter);
-      listCrosstabmaxtreatmentlevels.put(ICU, listCurrentIcuEncounter);
+      listCrosstabMaxtreatmentlevels.put(INPATIENT_ITEM, listCurrentStandardWardEncounter);
+      listCrosstabMaxtreatmentlevels.put(ICU, listCurrentIcuEncounter);
 
       List<UkbEncounter> listVentEncounter = new ArrayList<>(listCurrentVentEncounter);
-      listCrosstabmaxtreatmentlevels.put(ICU_VENTILATION, listVentEncounter);
+      listCrosstabMaxtreatmentlevels.put(ICU_VENTILATION, listVentEncounter);
 
       List<UkbEncounter> listEcmoEncounter = new ArrayList<>(listCurrentEcmoEncounter);
-      listCrosstabmaxtreatmentlevels.put(ICU_ECMO, listEcmoEncounter);
+      listCrosstabMaxtreatmentlevels.put(ICU_ECMO, listEcmoEncounter);
 
       Set<UkbEncounter> setAllCurrentEncounter = new HashSet<>();
 
@@ -907,7 +917,7 @@ public class CoronaDataItemGenerator {
           .filter(patient -> setEncounterPatientIds.contains(patient.getId()))
           .collect(Collectors.toList());
       List<String[]> ukbCrossTabList =
-          CoronaResultFunctionality.generateCrosstabList(listCrosstabmaxtreatmentlevels,
+          CoronaResultFunctionality.generateCrosstabList(listCrosstabMaxtreatmentlevels,
               listCurrentPatients);
       if (debug) {
         aggData.put("casenrs", ukbCrossTabList);
@@ -997,7 +1007,7 @@ public class CoronaDataItemGenerator {
         cd.setItemname(CUMULATIVE_LENGTHOFSTAY_ICU_DEAD);
         cd.setItemtype(ITEMTYPE_LIST);
 
-        HashMap<String, Map<Long, Set<String>>> mapLengthOfStayDead =
+        Map<String, Map<Long, Set<String>>> mapLengthOfStayDead =
             cumulativeLengthOfStayIcu.createIcuLengthListByVitalstatus(VitalStatus.DEAD,
                 mapIcuLengthList, mapIcu);
 
@@ -1034,7 +1044,7 @@ public class CoronaDataItemGenerator {
       cd = new CoronaDataItem();
       cd.setItemname(CUMULATIVE_LENGTHOFSTAY_HOSPITAL);
       cd.setItemtype(ITEMTYPE_LIST);
-      HashMap<String, Map<Long, List<String>>> mapDays =
+      Map<String, Map<Long, List<String>>> mapDays =
           cumulativeLengthOfStayHospital.createMapDaysHospitalList();
 
       List<Long> listHospitalDays = new ArrayList<>();
@@ -1066,9 +1076,9 @@ public class CoronaDataItemGenerator {
         cd.setItemname(CUMULATIVE_LENGTHOFSTAY_HOSPITAL_ALIVE);
         cd.setItemtype(ITEMTYPE_LIST);
 
-        HashMap<String, Map<Long, List<String>>> mapDaysAlive =
+        Map<String, Map<Long, List<String>>> mapDaysAlive =
             cumulativeLengthOfStayHospital.createLengthOfStayHospitalByVitalstatus(
-                listEncounters, mapDays, ALIVE.getValue());
+                listFacilityContactEncounters, mapDays, ALIVE.getValue());
         List<Long> listHospitalAliveDays = new ArrayList<>();
         List<String> listHospitalAliveCaseId = new ArrayList<>();
 
@@ -1098,9 +1108,9 @@ public class CoronaDataItemGenerator {
         cd.setItemname(CUMULATIVE_LENGTHOFSTAY_HOSPITAL_DEAD);
         cd.setItemtype(ITEMTYPE_LIST);
 
-        HashMap<String, Map<Long, List<String>>> mapDaysDead =
+        Map<String, Map<Long, List<String>>> mapDaysDead =
             cumulativeLengthOfStayHospital.createLengthOfStayHospitalByVitalstatus(
-                listEncounters, mapDays, DEAD.getValue());
+                listFacilityContactEncounters, mapDays, DEAD.getValue());
         List<Long> listHospitalDeadDays = new ArrayList<>();
         List<String> listHospitalDeadCaseId = new ArrayList<>();
 

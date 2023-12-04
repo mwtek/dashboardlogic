@@ -23,17 +23,17 @@ import de.ukbonn.mwtek.utilities.fhir.misc.StaticValueProvider;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
 
 /**
- * Class with all textual fixed values necessary for the creation of the Json class and data
- * processing (e.g. DataItems designations, formatting, flags).
+ * Class with all textual fixed values necessary for the creation of the Json class and data processing (e.g. DataItems
+ * designations, formatting, flags).
  *
  * @author <a href="mailto:david.meyers@ukbonn.de">David Meyers</a>
  * @author <a href="mailto:berke_enes.dincel@ukbonn.de">Berke Enes Dincel</a>
  */
 public enum CoronaFixedValues {
   // COVID-States
-  POSITIVE_RESULT(StaticValueProvider.system + "/covidResultPositive"),
-  NEGATIVE_RESULT(StaticValueProvider.system + "/covidResultNegative"),
-  BORDERLINE_RESULT(StaticValueProvider.system + "/covidResultBorderLine"),
+  POSITIVE_RESULT(StaticValueProvider.SYSTEM + "/covidResultPositive"),
+  NEGATIVE_RESULT(StaticValueProvider.SYSTEM + "/covidResultNegative"),
+  BORDERLINE_RESULT(StaticValueProvider.SYSTEM + "/covidResultBorderLine"),
   TWELVE_DAYS_LOGIC("12 Days Timespan"),
 
   // DateFormat
@@ -129,6 +129,10 @@ public enum CoronaFixedValues {
 
   public static final String OBSERVATION_INTERPRETATION_SYSTEM = "http://terminology.hl7.org/CodeSystem/v3-ObservationInterpretation";
 
+  // Encounter.type.coding.kontaktebene
+  public static final String CONTACT_LEVEL_SYSTEM = "http://fhir.de/CodeSystem/Kontaktebene";
+  public static final String CONTACT_LEVEL_FACILITY_CODE = "einrichtungskontakt";
+
 
   // Display forms of the covid variants to check against
   public static final String VARIANT_ALPHA = "Alpha";
@@ -174,19 +178,17 @@ public enum CoronaFixedValues {
       ImmutableList.of(DIAG_RELIABILITY_A);
 
   /**
-   * List of valid {@link UkbEncounter#getClass_() encounter.class.code} codes for inpatient
-   * encounters. Both the value set from the case module version 1.0 and 2.0 are checked. <a
-   * href="https://simplifier.net/packages/de.basisprofil.r4/1.0.0/files/397957">The value set of
-   * version 2.0 can be found here.</a>.
+   * List of valid {@link UkbEncounter#getClass_() encounter.class.code} codes for inpatient encounters. Both the value
+   * set from the case module version 1.0 and 2.0 are checked. <a href="https://simplifier.net/packages/de.basisprofil.r4/1.0.0/files/397957">The
+   * value set of version 2.0 can be found here.</a>.
    */
   public static final ImmutableList<String> ENCOUNTER_CLASS_INPATIENT_CODES =
       ImmutableList.of("IMP", "stationaer");
 
   /**
-   * List of valid {@link UkbEncounter#getClass_() encounter.class.code} codes for outpatient
-   * encounters. Both the value set from the case module version 1.0 and 2.0 are checked. <a
-   * href="https://simplifier.net/packages/de.basisprofil.r4/1.0.0/files/397957">The value set of
-   * version 2.0 can be found here.</a>.
+   * List of valid {@link UkbEncounter#getClass_() encounter.class.code} codes for outpatient encounters. Both the value
+   * set from the case module version 1.0 and 2.0 are checked. <a href="https://simplifier.net/packages/de.basisprofil.r4/1.0.0/files/397957">The
+   * value set of version 2.0 can be found here.</a>.
    */
   public static final ImmutableList<String> ENCOUNTER_CLASS_OUTPATIENT_CODES =
       ImmutableList.of("AMB", "ambulant");

@@ -29,7 +29,13 @@ public class CoronaDashboardConstants {
   /**
    * Effective date from which medical cases are subject to the Corona logic workflow
    */
-  public final static long qualifyingDate = 1580083200; // 27.01.
+  public final static long qualifyingDate = 1580083200; // 27.01.2020
+
+  /**
+   * Calendar year from which medical cases are subject to the corona logic workflow. Used in
+   * parallelization of the data requests.
+   */
+  public final static int qualifyingYear = 2020; // 27.01.
 
   /**
    * The duration of a day in seconds

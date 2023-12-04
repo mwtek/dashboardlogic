@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * This class contains some auxiliary functions that are used in the logic of the timelines.
@@ -33,19 +34,21 @@ public class TimelineFunctionalities {
   /**
    * Purpose of this auxiliary function is to divide the content of a map into two different lists
    *
-   * @param tempMap   Map that maps a frequency value to a date (unixtime)
-   * @param valueList Output list with the values (frequencies per day)
+   * @param tempMap Map that maps a frequency value to a date (unixtime)
    */
-  public static void divideMapValuesToLists(Map<Long, Long> tempMap,
-      List<Long> valueList) {
+  public static List<Long> divideMapValuesToLists(Map<Long, Long> tempMap) {
 
-    // get a list with the keys in ascending order (output requirement)
     List<Long> listKeys = new ArrayList<>(tempMap.keySet());
     Collections.sort(listKeys);
-
-    listKeys.forEach(key -> {
-      Long value = tempMap.get(key);
-      valueList.add(value);
-    });
+    return listKeys.stream().map(tempMap::get).collect(Collectors.toList());
+//
+//    // get a list with the keys in ascending order (output requirement)
+//    List<Long> listKeys = new ArrayList<>(tempMap.keySet());
+//    Collections.sort(listKeys);
+//
+//    listKeys.forEach(key -> {
+//      Long value = tempMap.get(key);
+//      valueList.add(value);
+//    });
   }
 }

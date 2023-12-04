@@ -1,19 +1,19 @@
 /*
- * Copyright (C) 2021 University Hospital Bonn - All Rights Reserved You may use, distribute and
- * modify this code under the GPL 3 license. THERE IS NO WARRANTY FOR THE PROGRAM, TO THE EXTENT
- * PERMITTED BY APPLICABLE LAW. EXCEPT WHEN OTHERWISE STATED IN WRITING THE COPYRIGHT HOLDERS AND/OR
- * OTHER PARTIES PROVIDE THE PROGRAM “AS IS” WITHOUT WARRANTY OF ANY KIND, EITHER EXPRESSED OR
- * IMPLIED, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
- * A PARTICULAR PURPOSE. THE ENTIRE RISK AS TO THE QUALITY AND PERFORMANCE OF THE PROGRAM IS WITH
- * YOU. SHOULD THE PROGRAM PROVE DEFECTIVE, YOU ASSUME THE COST OF ALL NECESSARY SERVICING, REPAIR
- * OR CORRECTION. IN NO EVENT UNLESS REQUIRED BY APPLICABLE LAW OR AGREED TO IN WRITING WILL ANY
- * COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MODIFIES AND/OR CONVEYS THE PROGRAM AS PERMITTED ABOVE,
- * BE LIABLE TO YOU FOR DAMAGES, INCLUDING ANY GENERAL, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES
- * ARISING OUT OF THE USE OR INABILITY TO USE THE PROGRAM (INCLUDING BUT NOT LIMITED TO LOSS OF DATA
- * OR DATA BEING RENDERED INACCURATE OR LOSSES SUSTAINED BY YOU OR THIRD PARTIES OR A FAILURE OF THE
- * PROGRAM TO OPERATE WITH ANY OTHER PROGRAMS), EVEN IF SUCH HOLDER OR OTHER PARTY HAS BEEN ADVISED
- * OF THE POSSIBILITY OF SUCH DAMAGES. You should have received a copy of the GPL 3 license with *
- * this file. If not, visit http://www.gnu.de/documents/gpl-3.0.en.html
+ *  Copyright (C) 2021 University Hospital Bonn - All Rights Reserved You may use, distribute and
+ *  modify this code under the GPL 3 license. THERE IS NO WARRANTY FOR THE PROGRAM, TO THE EXTENT
+ *  PERMITTED BY APPLICABLE LAW. EXCEPT WHEN OTHERWISE STATED IN WRITING THE COPYRIGHT HOLDERS AND/OR
+ *  OTHER PARTIES PROVIDE THE PROGRAM “AS IS” WITHOUT WARRANTY OF ANY KIND, EITHER EXPRESSED OR
+ *  IMPLIED, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ *  A PARTICULAR PURPOSE. THE ENTIRE RISK AS TO THE QUALITY AND PERFORMANCE OF THE PROGRAM IS WITH
+ *  YOU. SHOULD THE PROGRAM PROVE DEFECTIVE, YOU ASSUME THE COST OF ALL NECESSARY SERVICING, REPAIR
+ *  OR CORRECTION. IN NO EVENT UNLESS REQUIRED BY APPLICABLE LAW OR AGREED TO IN WRITING WILL ANY
+ *  COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MODIFIES AND/OR CONVEYS THE PROGRAM AS PERMITTED ABOVE,
+ *  BE LIABLE TO YOU FOR DAMAGES, INCLUDING ANY GENERAL, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES
+ *  ARISING OUT OF THE USE OR INABILITY TO USE THE PROGRAM (INCLUDING BUT NOT LIMITED TO LOSS OF DATA
+ *  OR DATA BEING RENDERED INACCURATE OR LOSSES SUSTAINED BY YOU OR THIRD PARTIES OR A FAILURE OF THE
+ *  PROGRAM TO OPERATE WITH ANY OTHER PROGRAMS), EVEN IF SUCH HOLDER OR OTHER PARTY HAS BEEN ADVISED
+ *  OF THE POSSIBILITY OF SUCH DAMAGES. You should have received a copy of the GPL 3 license with
+ *  this file. If not, visit http://www.gnu.de/documents/gpl-3.0.en.html
  */
 package de.ukbonn.mwtek.dashboardlogic.logic.cumulative.age;
 
@@ -60,7 +60,8 @@ public class CumulativeAge {
    * <p>
    * Called by cumulative.age
    *
-   * @param caseClass the class of an encounter (e.g. {@link CoronaFixedValues#CASESTATUS_INPATIENT})
+   * @param caseClass the class of an encounter (e.g.
+   *                  {@link CoronaFixedValues#CASESTATUS_INPATIENT})
    * @return returns list of age of all positive patients, who fulfill the caseStatus criteria
    */
   public List<Integer> getAgeDistributionsByCaseClass(String caseClass) {
@@ -128,14 +129,14 @@ public class CumulativeAge {
    * <p>
    * called by <code>cumulative.age.alive</code> and <code>.dead</code>
    *
-   * @param vitalStatus                 The vital-status of a patient (e.g. {@link
-   *                                    VitalStatus#ALIVE})
+   * @param vitalStatus                 The vital-status of a patient (e.g.
+   *                                    {@link VitalStatus#ALIVE})
    * @param mapPositiveEncounterByClass Map with the c19-positive encounters separated by CaseClass
    * @return List with the ages of the c19-positive patients for the respective {@link VitalStatus}
    */
   @Deprecated
   public List<Integer> getAgeCountByVitalStatus(VitalStatus vitalStatus,
-      HashMap<String, List<UkbEncounter>> mapPositiveEncounterByClass) {
+      Map<String, List<UkbEncounter>> mapPositiveEncounterByClass) {
     log.debug("started getAgeCountByVitalStatus [vitalStatus: " + vitalStatus + "]");
     Instant startTime = TimerTools.startTimer();
 
@@ -165,13 +166,13 @@ public class CumulativeAge {
    * Create a map that identifies the first admission date of a patient's first positive Covid case
    * and assigns it to the PID. This is the reference point for calculating the age.
    *
-   * @param vitalStatus                 The vital-status of a patient (e.g. {@link
-   *                                    VitalStatus#ALIVE})
+   * @param vitalStatus                 The vital-status of a patient (e.g.
+   *                                    {@link VitalStatus#ALIVE})
    * @param mapPositiveEncounterByClass Map with all positive encounters, grouped by case class
    * @return Map that assigns the admission date of the patient's first c19 positive case to a pid
    */
   private Map<String, Date> createPidAgeMap(VitalStatus vitalStatus,
-      HashMap<String, List<UkbEncounter>> mapPositiveEncounterByClass) {
+      Map<String, List<UkbEncounter>> mapPositiveEncounterByClass) {
     Map<String, Date> pidMap = new HashMap<>();
     for (Map.Entry<String, List<UkbEncounter>> entry : mapPositiveEncounterByClass.entrySet()) {
       List<UkbEncounter> tempEncounterListByClass = entry.getValue();
@@ -183,24 +184,22 @@ public class CumulativeAge {
 
         switch (vitalStatus) {
           // The split between live and dead cohorts is no longer needed and has been deprecated.
-          case ALIVE:
+          case ALIVE -> {
             // Check dischargeCoding whether it is empty or does not have "07" as code
             // add pid to set and map id criteria are fulfilled
             if (!CoronaResultFunctionality.isPatientDeceased(encounter)) {
               pidMap.put(currentPid, checkIfEncounterHasEarlierCase(pidMap, encounter));
             }
-            break;
-          case DEAD:
+          }
+          case DEAD -> {
             // Same here just reversed
             if (!dischargeCoding.isEmpty()) {
               if (CoronaResultFunctionality.isPatientDeceased(encounter)) {
                 pidMap.put(currentPid, checkIfEncounterHasEarlierCase(pidMap, encounter));
               }
             }
-            break;
-          case ALL:
-            pidMap.put(currentPid, checkIfEncounterHasEarlierCase(pidMap, encounter));
-            break;
+          }
+          case ALL -> pidMap.put(currentPid, checkIfEncounterHasEarlierCase(pidMap, encounter));
         }
       }
     }

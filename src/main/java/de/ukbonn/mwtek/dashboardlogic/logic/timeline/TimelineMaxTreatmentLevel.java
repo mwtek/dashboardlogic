@@ -1,5 +1,4 @@
 /*
- *
  *  Copyright (C) 2021 University Hospital Bonn - All Rights Reserved You may use, distribute and
  *  modify this code under the GPL 3 license. THERE IS NO WARRANTY FOR THE PROGRAM, TO THE EXTENT
  *  PERMITTED BY APPLICABLE LAW. EXCEPT WHEN OTHERWISE STATED IN WRITING THE COPYRIGHT HOLDERS AND/OR
@@ -13,9 +12,8 @@
  *  ARISING OUT OF THE USE OR INABILITY TO USE THE PROGRAM (INCLUDING BUT NOT LIMITED TO LOSS OF DATA
  *  OR DATA BEING RENDERED INACCURATE OR LOSSES SUSTAINED BY YOU OR THIRD PARTIES OR A FAILURE OF THE
  *  PROGRAM TO OPERATE WITH ANY OTHER PROGRAMS), EVEN IF SUCH HOLDER OR OTHER PARTY HAS BEEN ADVISED
- *  OF THE POSSIBILITY OF SUCH DAMAGES. You should have received a copy of the GPL 3 license with *
+ *  OF THE POSSIBILITY OF SUCH DAMAGES. You should have received a copy of the GPL 3 license with
  *  this file. If not, visit http://www.gnu.de/documents/gpl-3.0.en.html
- *
  */
 package de.ukbonn.mwtek.dashboardlogic.logic.timeline;
 
@@ -125,8 +123,8 @@ public class TimelineMaxTreatmentLevel extends TimelineFunctionalities {
           .filter(x -> x.hasType() && isCodeOfFirstCodeableConceptEquals(x.getType(),
               CoronaFixedValues.ICU.getValue())).map(UkbLocation::getId).toList();
       listIcuWardsId.addAll(listIcuIds);
-    } catch (Exception e) {
-      e.printStackTrace();
+    } catch (Exception ex) {
+      log.error("Error in the creation of the maxtreatmentlevel timeline ", ex);
     }
 
     long currentDate = CoronaDashboardConstants.qualifyingDate;

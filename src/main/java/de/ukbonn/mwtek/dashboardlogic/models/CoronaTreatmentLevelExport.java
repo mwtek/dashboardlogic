@@ -35,22 +35,22 @@ public record CoronaTreatmentLevelExport(List<String> listNormalWard, List<Strin
     int maxSize = Math.max(listNormalWard.size(), listIcu.size());
     for (int i = 0; i < maxSize; i++) {
       if (listNormalWard.size() > i && listNormalWard.get(i) != null) {
-        sb.append(listNormalWard.get(i)).append(deliminator);
+        sb.append(listNormalWard.get(i).replace("-000000-EK", "")).append(deliminator);
       } else {
         sb.append(deliminator);
       }
       if (listIcu.size() > i && listIcu.get(i) != null) {
-        sb.append(listIcu.get(i)).append(deliminator);
+        sb.append(listIcu.get(i).replace("-000000-EK", "")).append(deliminator);
       } else {
         sb.append(deliminator);
       }
       if (listIcuVent.size() > i && listIcuVent.get(i) != null) {
-        sb.append(listIcuVent.get(i)).append(deliminator);
+        sb.append(listIcuVent.get(i).replace("-000000-EK", "")).append(deliminator);
       } else {
         sb.append(deliminator);
       }
       if (listEcmo.size() > i && listEcmo.get(i) != null) {
-        sb.append(listEcmo.get(i));
+        sb.append(listEcmo.get(i).replace("-000000-EK", ""));
       } else {
         sb.append(deliminator);
       }

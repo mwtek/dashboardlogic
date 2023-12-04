@@ -1,19 +1,19 @@
 /*
- * Copyright (C) 2021 University Hospital Bonn - All Rights Reserved You may use, distribute and
- * modify this code under the GPL 3 license. THERE IS NO WARRANTY FOR THE PROGRAM, TO THE EXTENT
- * PERMITTED BY APPLICABLE LAW. EXCEPT WHEN OTHERWISE STATED IN WRITING THE COPYRIGHT HOLDERS AND/OR
- * OTHER PARTIES PROVIDE THE PROGRAM “AS IS” WITHOUT WARRANTY OF ANY KIND, EITHER EXPRESSED OR
- * IMPLIED, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
- * A PARTICULAR PURPOSE. THE ENTIRE RISK AS TO THE QUALITY AND PERFORMANCE OF THE PROGRAM IS WITH
- * YOU. SHOULD THE PROGRAM PROVE DEFECTIVE, YOU ASSUME THE COST OF ALL NECESSARY SERVICING, REPAIR
- * OR CORRECTION. IN NO EVENT UNLESS REQUIRED BY APPLICABLE LAW OR AGREED TO IN WRITING WILL ANY
- * COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MODIFIES AND/OR CONVEYS THE PROGRAM AS PERMITTED ABOVE,
- * BE LIABLE TO YOU FOR DAMAGES, INCLUDING ANY GENERAL, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES
- * ARISING OUT OF THE USE OR INABILITY TO USE THE PROGRAM (INCLUDING BUT NOT LIMITED TO LOSS OF DATA
- * OR DATA BEING RENDERED INACCURATE OR LOSSES SUSTAINED BY YOU OR THIRD PARTIES OR A FAILURE OF THE
- * PROGRAM TO OPERATE WITH ANY OTHER PROGRAMS), EVEN IF SUCH HOLDER OR OTHER PARTY HAS BEEN ADVISED
- * OF THE POSSIBILITY OF SUCH DAMAGES. You should have received a copy of the GPL 3 license with *
- * this file. If not, visit http://www.gnu.de/documents/gpl-3.0.en.html
+ *  Copyright (C) 2021 University Hospital Bonn - All Rights Reserved You may use, distribute and
+ *  modify this code under the GPL 3 license. THERE IS NO WARRANTY FOR THE PROGRAM, TO THE EXTENT
+ *  PERMITTED BY APPLICABLE LAW. EXCEPT WHEN OTHERWISE STATED IN WRITING THE COPYRIGHT HOLDERS AND/OR
+ *  OTHER PARTIES PROVIDE THE PROGRAM “AS IS” WITHOUT WARRANTY OF ANY KIND, EITHER EXPRESSED OR
+ *  IMPLIED, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ *  A PARTICULAR PURPOSE. THE ENTIRE RISK AS TO THE QUALITY AND PERFORMANCE OF THE PROGRAM IS WITH
+ *  YOU. SHOULD THE PROGRAM PROVE DEFECTIVE, YOU ASSUME THE COST OF ALL NECESSARY SERVICING, REPAIR
+ *  OR CORRECTION. IN NO EVENT UNLESS REQUIRED BY APPLICABLE LAW OR AGREED TO IN WRITING WILL ANY
+ *  COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MODIFIES AND/OR CONVEYS THE PROGRAM AS PERMITTED ABOVE,
+ *  BE LIABLE TO YOU FOR DAMAGES, INCLUDING ANY GENERAL, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES
+ *  ARISING OUT OF THE USE OR INABILITY TO USE THE PROGRAM (INCLUDING BUT NOT LIMITED TO LOSS OF DATA
+ *  OR DATA BEING RENDERED INACCURATE OR LOSSES SUSTAINED BY YOU OR THIRD PARTIES OR A FAILURE OF THE
+ *  PROGRAM TO OPERATE WITH ANY OTHER PROGRAMS), EVEN IF SUCH HOLDER OR OTHER PARTY HAS BEEN ADVISED
+ *  OF THE POSSIBILITY OF SUCH DAMAGES. You should have received a copy of the GPL 3 license with
+ *  this file. If not, visit http://www.gnu.de/documents/gpl-3.0.en.html
  */
 package de.ukbonn.mwtek.dashboardlogic.logic;
 
@@ -53,7 +53,6 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -162,8 +161,8 @@ public class CoronaResultFunctionality {
         }
       }
       resultMap.get(CoronaFixedValues.ICU.getValue()).removeAll(listRemovedEncounter);
-    } catch (Exception e) {
-      e.printStackTrace();
+    } catch (Exception ex) {
+      log.error("Error in the current icu map creation ", ex);
     }
     TimerTools.stopTimerAndLog(startTimer, "finished createCurrentIcuMap");
     return resultMap;
@@ -378,12 +377,11 @@ public class CoronaResultFunctionality {
    * @param listEncounters A list with {@linkplain UkbEncounter} resources
    * @return map Where encounter are sorted after stationary and ambulant
    */
-  public static HashMap<String, List<UkbEncounter>> createEncounterMap(
+  public static Map<String, List<UkbEncounter>> createEncounterMap(
       List<UkbEncounter> listEncounters) {
-    HashMap<String, List<UkbEncounter>> encounterMap = new HashMap<>();
+    Map<String, List<UkbEncounter>> encounterMap = new HashMap<>();
 
     log.debug("started createEncounterMap");
-
     Instant startTimer = TimerTools.startTimer();
 
     encounterMap.put(CoronaFixedValues.OUTPATIENT_ITEM.getValue(), new ArrayList<>());
@@ -431,7 +429,7 @@ public class CoronaResultFunctionality {
    * @return List with the crosstab states and their values
    */
   public static List<String[]> generateCrosstabList(
-      LinkedHashMap<CoronaFixedValues, List<UkbEncounter>> mapCumulativeMaxTreatments,
+      Map<CoronaFixedValues, List<UkbEncounter>> mapCumulativeMaxTreatments,
       List<UkbPatient> listPatient) {
     log.debug("started generateCrosstabList");
     Instant startTimer = TimerTools.startTimer();
@@ -453,8 +451,7 @@ public class CoronaResultFunctionality {
             address.getCity() != null && address.getCity()
                 .equals(CoronaFixedValues.CITY_BONN.getValue()));
       } catch (Exception e) {
-        log.debug("Patient: " + patient.getId() + " got no address/city");
-        e.printStackTrace();
+        log.warn("Patient: " + patient.getId() + " got no address/city");
       }
     }
     // iterate through each encounter, and sort them to the right list
@@ -464,34 +461,34 @@ public class CoronaResultFunctionality {
         if (mapIsBonnPatient.containsKey(encounter.getPatientId())) {
           boolean isBonn = mapIsBonnPatient.get(encounter.getPatientId());
           switch (key) {
-            case INPATIENT_ITEM:
+            case INPATIENT_ITEM -> {
               if (isBonn) {
                 listOnlyBonn.add(encounter.getId());
               } else {
                 listNoBonn.add(encounter.getId());
               }
-              break;
-            case ICU:
+            }
+            case ICU -> {
               if (isBonn) {
                 listBonnAndIcu.add(encounter.getId());
               } else {
                 listNoBonnAndIcu.add(encounter.getId());
               }
-              break;
-            case ICU_VENTILATION:
+            }
+            case ICU_VENTILATION -> {
               if (isBonn) {
                 listBonnAndVent.add(encounter.getId());
               } else {
                 listNoBonnAndVent.add(encounter.getId());
               }
-              break;
-            case ICU_ECMO:
+            }
+            case ICU_ECMO -> {
               if (isBonn) {
                 listBonnAndEcmo.add(encounter.getId());
               } else {
                 listNoBonnAndEcmo.add(encounter.getId());
               }
-              break;
+            }
           }
         }
       }
@@ -532,7 +529,7 @@ public class CoronaResultFunctionality {
   }
 
   /**
-   * Filling the given maxtreatmentlevel casenrs map for debug purposes.
+   * Filling the given maxtreatmentlevel case id map for debug purposes.
    *
    * @param listCumulativeEncounter   Sublist with encounters that have already been used in the
    *                                  "cumulative.treatmentlevel" data item.
@@ -542,7 +539,7 @@ public class CoronaResultFunctionality {
    */
   public static void createCumulativeMaxDebug(List<UkbEncounter> listCumulativeEncounter,
       String treatmentLevel,
-      HashMap<String, Map<String, List<String>>> resultMaxTreatmentCaseNrs) {
+      Map<String, Map<String, List<String>>> resultMaxTreatmentCaseNrs) {
     listCumulativeEncounter.forEach(e -> {
       String pid = e.getPatientId();
       if (resultMaxTreatmentCaseNrs.get(treatmentLevel).containsKey(pid)) {
@@ -735,7 +732,7 @@ public class CoronaResultFunctionality {
    */
   @SuppressWarnings("unused")
   public static void generateCurrentTreatmentLevelList(
-      HashMap<String, List<String>> mapCurrentTreatmentlevelCasenrs, String exportDirectory,
+      Map<String, List<String>> mapCurrentTreatmentlevelCasenrs, String exportDirectory,
       String fileBaseName) {
 
     CoronaTreatmentLevelExport treatmentLevelExport = new CoronaTreatmentLevelExport(

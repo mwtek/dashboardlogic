@@ -17,26 +17,8 @@
  *  this file. If not, visit http://www.gnu.de/documents/gpl-3.0.en.html
  *
  */
-package de.ukbonn.mwtek.dashboardlogic.models;
 
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+package de.ukbonn.mwtek.dashboardlogic.predictiondata.ukb.renalreplacement.enums;
 
-/**
- * Model class that describes a single data item of the Corona Dashboard specification and provides a representation in
- * a json string.
- *
- * @author <a href="mailto:david.meyers@ukbonn.de">David Meyers</a>
- */
-@Getter
-@Setter
-@AllArgsConstructor
-@NoArgsConstructor
-public class CoronaDataItem {
+public enum RenalReplacementRiskParameters {ENCOUNTER, START_REPLACEMENT, BODY_WEIGHT, URINE_OUTPUT, CREATININE, LACTATE, UREA, EPISODES}
 
-  private String itemname;
-  private String itemtype;
-  private Object data;
-}

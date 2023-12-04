@@ -124,9 +124,9 @@ public class TimelineVariantTestResults {
                   nonVocCount++;
                 } else {
                   unknownCount++;
-                  log.debug(
-                      "No support for covid variant with loinc code: " + variantCoding.getCode()
-                          + " and display: " + variantCoding.getDisplay());
+//                  log.debug(
+//                      "No support for covid variant with loinc code: " + variantCoding.getCode()
+//                          + " and display: " + variantCoding.getDisplay());
                 }
               }
             }

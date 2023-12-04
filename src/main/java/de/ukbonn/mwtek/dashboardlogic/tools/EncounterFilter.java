@@ -18,8 +18,14 @@
 
 package de.ukbonn.mwtek.dashboardlogic.tools;
 
+import static de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues.CONTACT_LEVEL_FACILITY_CODE;
+import static de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues.CONTACT_LEVEL_SYSTEM;
+
 import de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
+import java.util.List;
+import lombok.NonNull;
+import org.hl7.fhir.r4.model.Coding;
 import org.hl7.fhir.r4.model.Encounter.EncounterStatus;
 
 /**
@@ -39,6 +45,58 @@ public class EncounterFilter {
    */
   public static boolean isActive(UkbEncounter encounter) {
     return encounter.hasStatus() && encounter.getStatus() == EncounterStatus.INPROGRESS;
+  }
+
+  /**
+   * Determines whether the passed encounter type is a facility contact ("Einrichtungskontakt"). To
+   * make it backwards compatible we count any missing type as facility contact aswell!
+   */
+  public static boolean isFacilityContact(UkbEncounter encounter) {
+    // Warning: the behavior of the getType method of the HAPI library is misleading.
+    // If an encounter resource has 2 encodings in a type, then it has 2 entries in the list attribute "Type".
+    if (encounter.hasType()) {
+      List<Coding> contactLevelTypeCodings = encounter.getType().stream()
+          .flatMap(x -> x.getCoding().stream())
+          .filter(Coding::hasSystem).filter(x -> x.getSystem().equals(CONTACT_LEVEL_SYSTEM))
+          .toList();
+
+      // Search for the code for facility contact.
+      for (Coding contactLevelType : contactLevelTypeCodings) {
+        if (contactLevelType.getCode().equals(CONTACT_LEVEL_FACILITY_CODE)) {
+          return true;
+        }
+      }
+      // No support for the contact level yet -> mark the resource as a facility contact, as its most likely the top level
+      if (contactLevelTypeCodings.size() == 0) {
+        return true;
+      }
+    }
+
+    // To make the project backwards compatible we count any missing type as facility contact aswell!
+    // no type in resource -> count it as facility contact
+    return !encounter.hasType();
+  }
+
+  /**
+   * Checks whether the given encounter is currently in an ICU location or not.
+   *
+   * @param encounter      The encounter to check.
+   * @param icuLocationIds The list of ICU location IDs to check against. If its empty it will
+   *                       return {@code False}.
+   * @return {@code True}  if the encounter is currently in an ICU location; otherwise,
+   * {@code False}.
+   */
+  public static boolean isCurrentlyOnIcu(@NonNull UkbEncounter encounter,
+      List<String> icuLocationIds) {
+
+    if (icuLocationIds == null || icuLocationIds.isEmpty()) {
+      return false;
+    }
+
+    // Find the active transfer and if one can be found check if it's an icu location.
+    return encounter.getLocation().stream()
+        .filter(x -> x.hasPeriod() && !x.getPeriod().hasEnd())
+        .anyMatch(x -> icuLocationIds.contains(x.getLocation().getIdBase()));
   }
 
 }

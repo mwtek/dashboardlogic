@@ -1,19 +1,19 @@
 /*
- * Copyright (C) 2021 University Hospital Bonn - All Rights Reserved You may use, distribute and
- * modify this code under the GPL 3 license. THERE IS NO WARRANTY FOR THE PROGRAM, TO THE EXTENT
- * PERMITTED BY APPLICABLE LAW. EXCEPT WHEN OTHERWISE STATED IN WRITING THE COPYRIGHT HOLDERS AND/OR
- * OTHER PARTIES PROVIDE THE PROGRAM “AS IS” WITHOUT WARRANTY OF ANY KIND, EITHER EXPRESSED OR
- * IMPLIED, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
- * A PARTICULAR PURPOSE. THE ENTIRE RISK AS TO THE QUALITY AND PERFORMANCE OF THE PROGRAM IS WITH
- * YOU. SHOULD THE PROGRAM PROVE DEFECTIVE, YOU ASSUME THE COST OF ALL NECESSARY SERVICING, REPAIR
- * OR CORRECTION. IN NO EVENT UNLESS REQUIRED BY APPLICABLE LAW OR AGREED TO IN WRITING WILL ANY
- * COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MODIFIES AND/OR CONVEYS THE PROGRAM AS PERMITTED ABOVE,
- * BE LIABLE TO YOU FOR DAMAGES, INCLUDING ANY GENERAL, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES
- * ARISING OUT OF THE USE OR INABILITY TO USE THE PROGRAM (INCLUDING BUT NOT LIMITED TO LOSS OF DATA
- * OR DATA BEING RENDERED INACCURATE OR LOSSES SUSTAINED BY YOU OR THIRD PARTIES OR A FAILURE OF THE
- * PROGRAM TO OPERATE WITH ANY OTHER PROGRAMS), EVEN IF SUCH HOLDER OR OTHER PARTY HAS BEEN ADVISED
- * OF THE POSSIBILITY OF SUCH DAMAGES. You should have received a copy of the GPL 3 license with *
- * this file. If not, visit http://www.gnu.de/documents/gpl-3.0.en.html
+ *  Copyright (C) 2021 University Hospital Bonn - All Rights Reserved You may use, distribute and
+ *  modify this code under the GPL 3 license. THERE IS NO WARRANTY FOR THE PROGRAM, TO THE EXTENT
+ *  PERMITTED BY APPLICABLE LAW. EXCEPT WHEN OTHERWISE STATED IN WRITING THE COPYRIGHT HOLDERS AND/OR
+ *  OTHER PARTIES PROVIDE THE PROGRAM “AS IS” WITHOUT WARRANTY OF ANY KIND, EITHER EXPRESSED OR
+ *  IMPLIED, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ *  A PARTICULAR PURPOSE. THE ENTIRE RISK AS TO THE QUALITY AND PERFORMANCE OF THE PROGRAM IS WITH
+ *  YOU. SHOULD THE PROGRAM PROVE DEFECTIVE, YOU ASSUME THE COST OF ALL NECESSARY SERVICING, REPAIR
+ *  OR CORRECTION. IN NO EVENT UNLESS REQUIRED BY APPLICABLE LAW OR AGREED TO IN WRITING WILL ANY
+ *  COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MODIFIES AND/OR CONVEYS THE PROGRAM AS PERMITTED ABOVE,
+ *  BE LIABLE TO YOU FOR DAMAGES, INCLUDING ANY GENERAL, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES
+ *  ARISING OUT OF THE USE OR INABILITY TO USE THE PROGRAM (INCLUDING BUT NOT LIMITED TO LOSS OF DATA
+ *  OR DATA BEING RENDERED INACCURATE OR LOSSES SUSTAINED BY YOU OR THIRD PARTIES OR A FAILURE OF THE
+ *  PROGRAM TO OPERATE WITH ANY OTHER PROGRAMS), EVEN IF SUCH HOLDER OR OTHER PARTY HAS BEEN ADVISED
+ *  OF THE POSSIBILITY OF SUCH DAMAGES. You should have received a copy of the GPL 3 license with
+ *  this file. If not, visit http://www.gnu.de/documents/gpl-3.0.en.html
  */
 package de.ukbonn.mwtek.dashboardlogic.logic.current;
 
@@ -25,12 +25,16 @@ import de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues;
 import de.ukbonn.mwtek.dashboardlogic.logic.CoronaResultFunctionality;
 import de.ukbonn.mwtek.dashboardlogic.models.CoronaDataItem;
 import de.ukbonn.mwtek.dashboardlogic.settings.InputCodeSettings;
+import de.ukbonn.mwtek.dashboardlogic.tools.EncounterFilter;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbProcedure;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
+import lombok.extern.slf4j.Slf4j;
 import org.hl7.fhir.r4.model.Procedure;
 
 /**
@@ -39,7 +43,7 @@ import org.hl7.fhir.r4.model.Procedure;
  * @author <a href="mailto:david.meyers@ukbonn.de">David Meyers</a>
  * @author <a href="mailto:berke_enes.dincel@ukbonn.de">Berke Enes Dincel</a>
  */
-
+@Slf4j
 public class CurrentTreatmentLevel {
 
   private final List<UkbEncounter> listEncounters;
@@ -78,7 +82,7 @@ public class CurrentTreatmentLevel {
         AtomicBoolean stationary = new AtomicBoolean(false);
         // Check if encounter is active and has positive covid flagging
         if (isActive(enc) && isCovidPositive(enc)) {
-          // Checking if encounter has a higher treatmentlevel
+          // Checking if encounter has a higher treatment-level
           if (!listIcuEncounter.contains(enc)) {
             if (!listVentilationEncounter.contains(enc) && !listEcmoEncounter.contains(enc)) {
               stationary.set(true);
@@ -91,12 +95,13 @@ public class CurrentTreatmentLevel {
             }
           }
         }
+        // Since
         if (stationary.get()) {
           resultList.add(enc);
         }
       });
-    } catch (Exception e) {
-      e.printStackTrace();
+    } catch (Exception ex) {
+      log.error("Error in the retrieval of the current standard ward encounter", ex);
     }
     return resultList;
   }
@@ -117,17 +122,27 @@ public class CurrentTreatmentLevel {
       InputCodeSettings inputCodeSettings) {
     List<UkbEncounter> currentIcuList = new ArrayList<>();
 
-    List<UkbEncounter> listIcuEncounter = mapCurrentIcu.get(CoronaFixedValues.ICU.getValue());
+    Set<UkbEncounter> icuFacilityContacts = mapCurrentIcu.get(CoronaFixedValues.ICU.getValue())
+        .parallelStream().filter(EncounterFilter::isFacilityContact).collect(
+            Collectors.toSet());
     List<UkbEncounter> listVentilationEncounter =
         mapCurrentIcu.get(CoronaFixedValues.ICU_VENTILATION.getValue());
+    Set<UkbEncounter> ventFacilityContacts = mapCurrentIcu.get(
+            CoronaFixedValues.ICU_VENTILATION.getValue()).parallelStream()
+        .filter(EncounterFilter::isFacilityContact).collect(
+            Collectors.toSet());
     List<UkbEncounter> listEcmoEncounter = mapCurrentIcu.get(CoronaFixedValues.ICU_ECMO.getValue());
+    Set<UkbEncounter> ecmoFacilityContacts = mapCurrentIcu.get(
+            CoronaFixedValues.ICU_ECMO.getValue()).parallelStream()
+        .filter(EncounterFilter::isFacilityContact).collect(
+            Collectors.toSet());
 
     boolean isPositive;
     boolean isActive;
     try {
       switch (icuTreatmentLevel) {
-        case ICU:
-          for (UkbEncounter encounter : listIcuEncounter) {
+        case ICU -> {
+          for (UkbEncounter encounter : icuFacilityContacts) {
             isPositive = isCovidPositive(encounter);
             isActive = isActive(encounter);
 
@@ -139,9 +154,9 @@ public class CurrentTreatmentLevel {
               }
             }
           }
-          break;
-        case ICU_VENTILATION:
-          for (UkbEncounter encounter : listVentilationEncounter) {
+        }
+        case ICU_VENTILATION -> {
+          for (UkbEncounter encounter : ventFacilityContacts) {
             isPositive = isCovidPositive(encounter);
             isActive = isActive(encounter);
 
@@ -169,9 +184,9 @@ public class CurrentTreatmentLevel {
               }
             }
           }
-          break;
-        case ICU_ECMO:
-          for (UkbEncounter encounter : listEcmoEncounter) {
+        }
+        case ICU_ECMO -> {
+          for (UkbEncounter encounter : ecmoFacilityContacts) {
             isPositive = isCovidPositive(encounter);
             isActive = isActive(encounter);
 
@@ -188,10 +203,10 @@ public class CurrentTreatmentLevel {
               }
             }
           }
-          break;
+        }
       }
-    } catch (Exception e) {
-      e.printStackTrace();
+    } catch (Exception ex) {
+      log.error("Error in the retrieval of the current encounters by icu level.", ex);
     }
     return currentIcuList;
   }

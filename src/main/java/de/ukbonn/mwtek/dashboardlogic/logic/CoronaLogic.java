@@ -32,6 +32,7 @@ import de.ukbonn.mwtek.dashboardlogic.settings.InputCodeSettings;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbCondition;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbObservation;
+import de.ukbonn.mwtek.utilities.generic.time.TimerTools;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -73,9 +74,11 @@ public class CoronaLogic {
    *                              observation codes or procedure codes.
    * @return The origin encounter list, with flags about the corona status in the extension.
    */
-  public static List<UkbEncounter> flagCases(List<UkbEncounter> listEncounters,
+  public static List<UkbEncounter> flagEncounters(List<UkbEncounter> listEncounters,
       List<UkbCondition> listConditions, List<UkbObservation> listLaborObservations,
       InputCodeSettings inputCodeSettings) {
+    log.debug("started flagCases");
+    Instant startTimer = TimerTools.startTimer();
     Set<String> labSet = getCaseIdsWithPositiveLabObs(listLaborObservations, inputCodeSettings);
     // create maps <DiagnoseCodes, Set<CaseId>>
     HashMap<String, Set<String>> u071CaseId =
@@ -85,11 +88,12 @@ public class CoronaLogic {
 
     // Flag the encounters and store them in a map, separated according to their SARS-CoV-2 characteristics
     HashMap<String, Set<UkbEncounter>> flaggedEncounter =
-        flagEncounter(listEncounters, labSet, u071CaseId, u072CaseId);
+        addCovidFlagToEncounters(listEncounters, labSet, u071CaseId, u072CaseId);
 
     // 12-days-logic and flagging the encounter if the prerequisites are fulfilled
-    ambulantStationaryLogic(flaggedEncounter, listEncounters);
+    detectPositiveInpatientEncountersByPreviousEncounters(flaggedEncounter, listEncounters);
 
+    TimerTools.stopTimerAndLog(startTimer, "finished flagCases");
     return listEncounters;
   }
 
@@ -101,8 +105,11 @@ public class CoronaLogic {
    * @param listEncounterAll    List of all encounters (including the non flagged ones) that may now
    *                            be flagged due to the 12-day logic.
    */
-  public static void ambulantStationaryLogic(HashMap<String, Set<UkbEncounter>> mapFlaggedEncounter,
+  public static void detectPositiveInpatientEncountersByPreviousEncounters(
+      HashMap<String, Set<UkbEncounter>> mapFlaggedEncounter,
       List<UkbEncounter> listEncounterAll) {
+    log.debug("started detectPositiveInpatientEncountersByPreviousEncounters");
+    Instant startTimer = TimerTools.startTimer();
     List<UkbEncounter> listEncounterOutpatients = new ArrayList<>();
     Set<String> patientIds = new HashSet<>();
 
@@ -158,7 +165,7 @@ public class CoronaLogic {
                 if (!inpatientEncounter.hasExtension(
                     CoronaFixedValues.POSITIVE_RESULT.getValue())) {
                   log.debug(
-                      "Inpatient case " + inpatientEncounter.getCaseId()
+                      "The encounter with id " + inpatientEncounter.getId()
                           + " was marked as positive because a previous outpatient case not older than 12 days was positive.");
                   inpatientEncounter.addExtension(markPositive());
                 }
@@ -168,6 +175,9 @@ public class CoronaLogic {
         } // if outpatientStart and inpatientStart
       });
     } // for listEncounterOutpatients
+
+    TimerTools.stopTimerAndLog(startTimer,
+        "finished detectPositiveInpatientEncountersByPreviousEncounters");
   }
 
 
@@ -183,7 +193,8 @@ public class CoronaLogic {
    * @return Map that assigns a list of cases to a flag (positive/borderline/negative)
    */
   // String: positive, borderline, negative
-  public static HashMap<String, Set<UkbEncounter>> flagEncounter(List<UkbEncounter> listEncounters,
+  public static HashMap<String, Set<UkbEncounter>> addCovidFlagToEncounters(
+      List<UkbEncounter> listEncounters,
       Set<String> setPositiveLabResultCaseIds, HashMap<String, Set<String>> mapCaseIdsU071,
       HashMap<String, Set<String>> mapCaseIdsU072) {
 

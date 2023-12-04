@@ -1,10 +1,28 @@
+<!--
+  ~ /* Copyright (C) 2021 University Hospital Bonn - All Rights Reserved You may use, distribute and
+  ~  modify this code under the GPL 3 license. THERE IS NO WARRANTY FOR THE PROGRAM, TO THE EXTENT
+  ~  PERMITTED BY APPLICABLE LAW. EXCEPT WHEN OTHERWISE STATED IN WRITING THE COPYRIGHT HOLDERS AND/OR
+  ~  OTHER PARTIES PROVIDE THE PROGRAM “AS IS” WITHOUT WARRANTY OF ANY KIND, EITHER EXPRESSED OR
+  ~  IMPLIED, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+  ~  A PARTICULAR PURPOSE. THE ENTIRE RISK AS TO THE QUALITY AND PERFORMANCE OF THE PROGRAM IS WITH
+  ~  YOU. SHOULD THE PROGRAM PROVE DEFECTIVE, YOU ASSUME THE COST OF ALL NECESSARY SERVICING, REPAIR
+  ~  OR CORRECTION. IN NO EVENT UNLESS REQUIRED BY APPLICABLE LAW OR AGREED TO IN WRITING WILL ANY
+  ~  COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MODIFIES AND/OR CONVEYS THE PROGRAM AS PERMITTED ABOVE,
+  ~  BE LIABLE TO YOU FOR DAMAGES, INCLUDING ANY GENERAL, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES
+  ~  ARISING OUT OF THE USE OR INABILITY TO USE THE PROGRAM (INCLUDING BUT NOT LIMITED TO LOSS OF DATA
+  ~  OR DATA BEING RENDERED INACCURATE OR LOSSES SUSTAINED BY YOU OR THIRD PARTIES OR A FAILURE OF THE
+  ~  PROGRAM TO OPERATE WITH ANY OTHER PROGRAMS), EVEN IF SUCH HOLDER OR OTHER PARTY HAS BEEN ADVISED
+  ~  OF THE POSSIBILITY OF SUCH DAMAGES. You should have received a copy of the GPL 3 license with
+  ~  this file. If not, visit http://www.gnu.de/documents/gpl-3.0.en.html */
+  -->
+
 <project xmlns="http://maven.apache.org/POM/4.0.0"
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <groupId>de.ukbonn.mwtek</groupId>
   <artifactId>dashboardlogic</artifactId>
-  <version>0.3.0-alpha5</version>
+  <version>0.5.0-alpha1</version>
   <name>dashboard-logic</name>
   <description>Dashboard Logic</description>
   <properties>
@@ -16,19 +34,19 @@
       <groupId>org.projectlombok</groupId>
       <artifactId>lombok</artifactId>
       <scope>provided</scope>
-      <version>1.18.24</version>
+      <version>1.18.26</version>
     </dependency>
     <dependency>
       <groupId>de.ukbonn.mwtek</groupId>
       <artifactId>utilities</artifactId>
-      <version>0.3.0-alpha5</version>
+      <version>0.5.0-alpha1</version>
       <scope>compile</scope>
     </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-test</artifactId>
       <scope>test</scope>
-      <version>2.4.3</version>
+      <version>3.1.0</version>
     </dependency>
   </dependencies>
   <build>

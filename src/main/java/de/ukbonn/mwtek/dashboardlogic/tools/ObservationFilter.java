@@ -37,7 +37,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.hl7.fhir.r4.model.CodeableConcept;
 import org.hl7.fhir.r4.model.Observation;
-import org.jetbrains.annotations.NotNull;
 
 /**
  * Various auxiliary methods that affect the {@link UkbObservation} resources.
@@ -53,18 +52,36 @@ public class ObservationFilter {
    * @return A filtered collection containing only observations with covid pcr findings. If the
    * input list is <code>null</code> it will return an empty set.
    */
-  @NotNull
   public static Set<UkbObservation> getCovidObservations(
       Collection<UkbObservation> labObservations,
       InputCodeSettings inputCodeSettings) {
+    return getObservationsByLoincCode(labObservations,
+        inputCodeSettings.getObservationPcrLoincCodes());
+  }
+
+  public static Set<UkbObservation> getObservationsByLoincCode(
+      Collection<UkbObservation> labObservations,
+      Collection<String> loincCodes) {
     if (labObservations != null) {
       return labObservations.parallelStream()
           .filter(x -> x.hasCode() && x.getCode().hasCoding())
           .filter(x -> isCodeInCodesystem(x.getCode().getCoding(),
-              inputCodeSettings.getObservationPcrLoincCodes(), LOINC_SYSTEM))
+              loincCodes, LOINC_SYSTEM))
           .collect(Collectors.toSet());
     } else {
       return new HashSet<>();
+    }
+  }
+
+  public static boolean hasObservationLoincCode(
+      Observation labObservation,
+      Collection<String> loincCodes) {
+    if (labObservation != null) {
+      return labObservation.hasCode() && labObservation.getCode().hasCoding() && isCodeInCodesystem(
+          labObservation.getCode().getCoding(),
+          loincCodes, LOINC_SYSTEM);
+    } else {
+      return false;
     }
   }
 
@@ -80,7 +97,6 @@ public class ObservationFilter {
    * @return A filtered collection containing the resources that have the specified result type in
    * the {@link UkbObservation#getValue()} attribute.
    */
-  @NotNull
   public static Set<UkbObservation> getObservationsByValue(
       Collection<UkbObservation> covidObservations, CoronaFixedValues obsResultType) {
 
@@ -103,7 +119,6 @@ public class ObservationFilter {
    * @return A filtered collection containing the resources that have the specified result type in
    * the {@link UkbObservation#getInterpretation()} attribute.
    */
-  @NotNull
   public static Set<UkbObservation> getObservationsByInterpretation(
       Collection<UkbObservation> covidObservations, CoronaFixedValues obsResultType) {
 
@@ -124,7 +139,6 @@ public class ObservationFilter {
    *                          InputCodeSettings)}.
    * @param obsResultType     The value to filter on (e.g. {@link CoronaFixedValues#POSITIVE}).
    */
-  @NotNull
   public static Set<String> getCaseIdsByObsValue(
       Collection<UkbObservation> covidObservations, CoronaFixedValues obsResultType) {
     return getObservationsByValue(covidObservations, obsResultType).stream()
@@ -143,7 +157,6 @@ public class ObservationFilter {
    *                          InputCodeSettings)}.
    * @param obsResultType     The value to filter on (e.g. {@link CoronaFixedValues#POSITIVE}).
    */
-  @NotNull
   public static Set<String> getCaseIdsByObsInterpretation(
       Collection<UkbObservation> covidObservations, CoronaFixedValues obsResultType) {
     return getObservationsByInterpretation(covidObservations, obsResultType).stream()
@@ -161,7 +174,6 @@ public class ObservationFilter {
    *                          InputCodeSettings)}.
    * @param obsResultType     The value to filter on (e.g. {@link CoronaFixedValues#POSITIVE}).
    */
-  @NotNull
   public static Set<String> getPatientIdsByObsValue(
       Collection<UkbObservation> covidObservations, CoronaFixedValues obsResultType) {
     return getObservationsByValue(covidObservations, obsResultType).stream()
@@ -180,7 +192,6 @@ public class ObservationFilter {
    *                          InputCodeSettings)}.
    * @param obsResultType     The value to filter on (e.g. {@link CoronaFixedValues#POSITIVE}).
    */
-  @NotNull
   public static Set<String> getPatientIdsByObsInterpretation(
       Collection<UkbObservation> covidObservations, CoronaFixedValues obsResultType) {
     return getObservationsByInterpretation(covidObservations, obsResultType).stream()

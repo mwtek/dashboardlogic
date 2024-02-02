@@ -112,7 +112,7 @@ public class TimelineTests extends TimelineFunctionalities {
     log.debug("started createTimelineTestPositiveMap");
     Instant startTimer = TimerTools.startTimer();
     Map<Long, Long> valueDateMap = getDateMapWithoutValues();
-    List<Long> valueList = new ArrayList<>();
+    List<Long> valueList;
     long currentUnixTime = DateTools.getCurrentUnixTime();
     if (covidObservations == null) {
       covidObservations = ObservationFilter.getCovidObservations(listLabObservations,

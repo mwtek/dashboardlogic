@@ -44,7 +44,6 @@ import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
-import org.jetbrains.annotations.NotNull;
 
 @Slf4j
 public class TimeLineRenalReplacementRiskThread implements Runnable {
@@ -425,7 +424,6 @@ public class TimeLineRenalReplacementRiskThread implements Runnable {
     }
   }
 
-  @NotNull
   private static String logNoTimeStampFound(long periodTo, long periodFrom, String caseId) {
     return "No timestamp found to link the therapy counter for caseId " + caseId
         + ". periodFrom = " + periodFrom

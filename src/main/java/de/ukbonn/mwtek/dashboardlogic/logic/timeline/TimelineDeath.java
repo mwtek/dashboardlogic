@@ -32,7 +32,6 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -66,7 +65,7 @@ public class TimelineDeath extends TimelineFunctionalities {
     log.debug("started createTimelineDeathMap");
     Instant startTimer = TimerTools.startTimer();
     LinkedHashMap<Long, Long> dateResultMap = new LinkedHashMap<>();
-    List<Long> valueList = new ArrayList<>();
+    List<Long> valueList;
     ListNumberPair resultPair = new ListNumberPair();
 
     //current date

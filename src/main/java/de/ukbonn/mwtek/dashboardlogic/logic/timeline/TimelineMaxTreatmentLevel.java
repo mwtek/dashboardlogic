@@ -142,151 +142,156 @@ public class TimelineMaxTreatmentLevel extends TimelineFunctionalities {
 
       // filter the encounter to ones that can have intersection with the date that is current
       // checked
-      listPositiveEncounter.stream().filter(UkbEncounter::isPeriodStartExistent)
-          .filter(x -> DateTools.dateToUnixTime(x.getPeriod()
-              .getStart()) - CoronaDashboardConstants.dayInSeconds < checkDate)
-          .filter(x -> DateTools.dateToUnixTime(x.getPeriod().getEnd() == null ?
-              DateTools.getCurrentDateTime() :
-              x.getPeriod().getEnd()) + CoronaDashboardConstants.dayInSeconds >= checkDate)
-          .forEach(encounter -> {
-            String encounterId = encounter.getId();
-            String patientId = encounter.getPatientId();
+      try {
+        listPositiveEncounter.stream().filter(UkbEncounter::isPeriodStartExistent)
+            .filter(x -> DateTools.dateToUnixTime(x.getPeriod()
+                .getStart()) - CoronaDashboardConstants.dayInSeconds < checkDate)
+            .filter(x -> DateTools.dateToUnixTime(x.getPeriod().getEnd() == null ?
+                DateTools.getCurrentDateTime() :
+                x.getPeriod().getEnd()) + CoronaDashboardConstants.dayInSeconds >= checkDate)
+            .forEach(encounter -> {
+              String encounterId = encounter.getId();
+              String patientId = encounter.getPatientId();
 
-            // Prevent multiple cases of a patient from being processed at the same time
-            locks.putIfAbsent(patientId, new Object());
-            long caseStartUnix = DateTools.dateToUnixTime(encounter.getPeriod().getStart());
+              // Prevent multiple cases of a patient from being processed at the same time
+              locks.putIfAbsent(patientId, new Object());
+              long caseStartUnix = DateTools.dateToUnixTime(encounter.getPeriod().getStart());
 
-            synchronized (locks.get(patientId)) {
-              boolean isStationary =
-                  mapPrevMaxtreatmentlevel.get(CoronaFixedValues.NORMAL_WARD.getValue())
-                      .contains(patientId);
-              boolean isIcu = mapPrevMaxtreatmentlevel.get(CoronaFixedValues.ICU.getValue())
-                  .contains(patientId);
-              boolean isVent =
-                  mapPrevMaxtreatmentlevel.get(CoronaFixedValues.ICU_VENTILATION.getValue())
-                      .contains(patientId);
-              boolean isEcmo = mapPrevMaxtreatmentlevel.get(CoronaFixedValues.ICU_ECMO.getValue())
-                  .contains(patientId);
-              // if the case is ambulant, check the pids of the previous maxtreatmentlevels
-              // and if none are similar with the current case than note the case as ambulant
-              if (CoronaResultFunctionality.isCaseClassOutpatient(encounter)) {
+              synchronized (locks.get(patientId)) {
+                boolean isStationary =
+                    mapPrevMaxtreatmentlevel.get(CoronaFixedValues.NORMAL_WARD.getValue())
+                        .contains(patientId);
+                boolean isIcu = mapPrevMaxtreatmentlevel.get(CoronaFixedValues.ICU.getValue())
+                    .contains(patientId);
+                boolean isVent =
+                    mapPrevMaxtreatmentlevel.get(CoronaFixedValues.ICU_VENTILATION.getValue())
+                        .contains(patientId);
+                boolean isEcmo = mapPrevMaxtreatmentlevel.get(CoronaFixedValues.ICU_ECMO.getValue())
+                    .contains(patientId);
+                // if the case is ambulant, check the pids of the previous maxtreatmentlevels
+                // and if none are similar with the current case than note the case as ambulant
+                if (CoronaResultFunctionality.isCaseClassOutpatient(encounter)) {
 
-                List<String> listMaxStatPidCheck = new ArrayList<>();
-                List<String> listMaxIcuPidCheck = new ArrayList<>();
-                List<String> listMaxIcuVentPidCheck = new ArrayList<>();
-                List<String> listMaxIcuEcmoPidCheck = new ArrayList<>();
+                  List<String> listMaxStatPidCheck = new ArrayList<>();
+                  List<String> listMaxIcuPidCheck = new ArrayList<>();
+                  List<String> listMaxIcuVentPidCheck = new ArrayList<>();
+                  List<String> listMaxIcuEcmoPidCheck = new ArrayList<>();
 
-                // Normal ward
-                if (isStationary) {
-                  listMaxStatPidCheck.add(patientId);
-                }
-                // ICU
-                if (isIcu) {
-                  listMaxIcuPidCheck.add(patientId);
-                }
-                // Ventilation
-                if (isVent) {
-                  listMaxIcuVentPidCheck.add(patientId);
-                }
-                // ECMO
-                if (isEcmo) {
-                  listMaxIcuEcmoPidCheck.add(patientId);
-                }
+                  // Normal ward
+                  if (isStationary) {
+                    listMaxStatPidCheck.add(patientId);
+                  }
+                  // ICU
+                  if (isIcu) {
+                    listMaxIcuPidCheck.add(patientId);
+                  }
+                  // Ventilation
+                  if (isVent) {
+                    listMaxIcuVentPidCheck.add(patientId);
+                  }
+                  // ECMO
+                  if (isEcmo) {
+                    listMaxIcuEcmoPidCheck.add(patientId);
+                  }
 
-                // list containing every encounter with a currently higher treatmentlevel than 'outpatient'.
-                List<String> listHigherTreatment = new ArrayList<>();
-                listHigherTreatment.addAll(listMaxStatPidCheck);
-                listHigherTreatment.addAll(listMaxIcuPidCheck);
-                listHigherTreatment.addAll(listMaxIcuVentPidCheck);
-                listHigherTreatment.addAll(listMaxIcuEcmoPidCheck);
+                  // list containing every encounter with a currently higher treatmentlevel than 'outpatient'.
+                  List<String> listHigherTreatment = new ArrayList<>();
+                  listHigherTreatment.addAll(listMaxStatPidCheck);
+                  listHigherTreatment.addAll(listMaxIcuPidCheck);
+                  listHigherTreatment.addAll(listMaxIcuVentPidCheck);
+                  listHigherTreatment.addAll(listMaxIcuEcmoPidCheck);
 
-                if (listHigherTreatment.isEmpty()) {
-                  if (caseStartUnix >= checkDate && caseStartUnix <= (checkDate
-                      + CoronaDashboardConstants.dayInSeconds)) {
+                  if (listHigherTreatment.isEmpty()) {
+                    if (caseStartUnix >= checkDate && caseStartUnix <= (checkDate
+                        + CoronaDashboardConstants.dayInSeconds)) {
 
-                    mapAmbulantCaseNr.get(checkDate).add(encounterId);
-                    mapPrevMaxtreatmentlevel.get(CoronaFixedValues.OUTPATIENT_ITEM.getValue())
-                        .add(patientId);
+                      mapAmbulantCaseNr.get(checkDate).add(encounterId);
+                      mapPrevMaxtreatmentlevel.get(CoronaFixedValues.OUTPATIENT_ITEM.getValue())
+                          .add(patientId);
+                    }
                   }
                 }
-              }
-              // At this stage it is clear that it is a stationary encounter
-              else if (CoronaResultFunctionality.isCaseClassInpatient(encounter)) {
-                if (!encounter.getPeriod().hasEnd()) {
-                  encounter.getPeriod().setEnd(DateTools.getCurrentDateTime());
-                }
-                long caseEndUnix = DateTools.dateToUnixTime(encounter.getPeriod().getEnd());
-                // The admission date needs to be before the start date and the discharge date needs to be
-                // after the date that is going to be checked to get the whole time span
-                if (caseStartUnix < checkDate && caseEndUnix >= checkDate) {
-                  List<Encounter.EncounterLocationComponent> listEncounterHasIcuLocation =
-                      encounter.getLocation().stream()
-                          .filter(location -> listIcuWardsId.contains(
-                              CoronaResultFunctionality.extractIdFromReference(
-                                  location.getLocation()))).toList();
-                  // if there was no icu related treatmentlevel for this case before
-                  if (!isIcu && !isVent && !isEcmo) {
-                    // if the case contains no icu locations
-                    if (listEncounterHasIcuLocation.isEmpty()) {
-                      mapNormalWardCaseNrs.get(checkDate).add(encounterId);
-                      mapPrevMaxtreatmentlevel.get(CoronaFixedValues.NORMAL_WARD.getValue())
-                          .add(patientId);
-                    } else {
-                      // check if there are any icu procedures currently going on
+                // At this stage it is clear that it is a stationary encounter
+                else if (CoronaResultFunctionality.isCaseClassInpatient(encounter)) {
+                  if (!encounter.getPeriod().hasEnd()) {
+                    encounter.getPeriod().setEnd(DateTools.getCurrentDateTime());
+                  }
+                  long caseEndUnix = DateTools.dateToUnixTime(encounter.getPeriod().getEnd());
+                  // The admission date needs to be before the start date and the discharge date needs to be
+                  // after the date that is going to be checked to get the whole time span
+                  if (caseStartUnix < checkDate && caseEndUnix >= checkDate) {
+                    List<Encounter.EncounterLocationComponent> listEncounterHasIcuLocation =
+                        encounter.getLocation().stream()
+                            .filter(location -> listIcuWardsId.contains(
+                                CoronaResultFunctionality.extractIdFromReference(
+                                    location.getLocation()))).toList();
+                    // if there was no icu related treatmentlevel for this case before
+                    if (!isIcu && !isVent && !isEcmo) {
+                      // if the case contains no icu locations
+                      if (listEncounterHasIcuLocation.isEmpty()) {
+                        mapNormalWardCaseNrs.get(checkDate).add(encounterId);
+                        mapPrevMaxtreatmentlevel.get(CoronaFixedValues.NORMAL_WARD.getValue())
+                            .add(patientId);
+                      } else {
+                        // check if there are any icu procedures currently going on
+                        List<UkbProcedure> listEncounterIcuProcedure = listIcuProcedures.stream()
+                            .filter(icu -> encounterId.equals(icu.getCaseId()))
+                            .toList();
+                        // if there is no ICU Procedure, check if it is currently considered
+                        // as ICU or stationary
+                        if (listEncounterIcuProcedure.isEmpty()) {
+                          encounterStationTypeCheckProcess(listEncounterHasIcuLocation, checkDate,
+                              mapPrevMaxtreatmentlevel, mapNormalWardCaseNrs, mapIcuCaseNrs,
+                              encounterId, patientId);
+                        } else {
+                          // check and sort if it is a ventilation or ecmo case
+                          sortToVentOrEcmoTimeline(listEncounterIcuProcedure,
+                              listEncounterHasIcuLocation, encounterId, patientId, false, false,
+                              checkDate, mapNormalWardCaseNrs, mapIcuCaseNrs, mapIcuVentCaseNrs,
+                              mapIcuEcmoCaseNrs, mapPrevMaxtreatmentlevel, inputCodeSettings);
+                        }
+                      }
+                    }
+                    // if an ICU case was found
+                    else if (isIcu && !isVent && !isEcmo) {
                       List<UkbProcedure> listEncounterIcuProcedure = listIcuProcedures.stream()
                           .filter(icu -> encounterId.equals(icu.getCaseId()))
-                          .toList();
-                      // if there is no ICU Procedure, check if it is currently considered
-                      // as ICU or stationary
+                          .collect(Collectors.toList());
+
                       if (listEncounterIcuProcedure.isEmpty()) {
-                        encounterStationTypeCheckProcess(listEncounterHasIcuLocation, checkDate,
-                            mapPrevMaxtreatmentlevel, mapNormalWardCaseNrs, mapIcuCaseNrs,
-                            encounterId, patientId);
+                        mapIcuCaseNrs.get(checkDate).add(encounterId);
+                        mapPrevMaxtreatmentlevel.get(CoronaFixedValues.ICU.getValue())
+                            .add(patientId);
                       } else {
-                        // check and sort if it is a ventilation or ecmo case
                         sortToVentOrEcmoTimeline(listEncounterIcuProcedure,
                             listEncounterHasIcuLocation, encounterId, patientId, false, false,
                             checkDate, mapNormalWardCaseNrs, mapIcuCaseNrs, mapIcuVentCaseNrs,
                             mapIcuEcmoCaseNrs, mapPrevMaxtreatmentlevel, inputCodeSettings);
                       }
                     }
-                  }
-                  // if an ICU case was found
-                  else if (isIcu && !isVent && !isEcmo) {
-                    List<UkbProcedure> listEncounterIcuProcedure = listIcuProcedures.stream()
-                        .filter(icu -> encounterId.equals(icu.getCaseId()))
-                        .collect(Collectors.toList());
-
-                    if (listEncounterIcuProcedure.isEmpty()) {
-                      mapIcuCaseNrs.get(checkDate).add(encounterId);
-                      mapPrevMaxtreatmentlevel.get(CoronaFixedValues.ICU.getValue()).add(patientId);
-                    } else {
+                    // if a ventilation case was found
+                    else if (isVent && !isEcmo) {
+                      List<UkbProcedure> listEncounterIcuProcedure = listIcuProcedures.stream()
+                          .filter(icu -> encounterId.equals(icu.getCaseId()))
+                          .collect(Collectors.toList());
                       sortToVentOrEcmoTimeline(listEncounterIcuProcedure,
-                          listEncounterHasIcuLocation, encounterId, patientId, false, false,
+                          listEncounterHasIcuLocation, encounterId, patientId, true, false,
                           checkDate, mapNormalWardCaseNrs, mapIcuCaseNrs, mapIcuVentCaseNrs,
                           mapIcuEcmoCaseNrs, mapPrevMaxtreatmentlevel, inputCodeSettings);
                     }
-                  }
-                  // if a ventilation case was found
-                  else if (isVent && !isEcmo) {
-                    List<UkbProcedure> listEncounterIcuProcedure = listIcuProcedures.stream()
-                        .filter(icu -> encounterId.equals(icu.getCaseId()))
-                        .collect(Collectors.toList());
-                    sortToVentOrEcmoTimeline(listEncounterIcuProcedure,
-                        listEncounterHasIcuLocation, encounterId, patientId, true, false,
-                        checkDate, mapNormalWardCaseNrs, mapIcuCaseNrs, mapIcuVentCaseNrs,
-                        mapIcuEcmoCaseNrs, mapPrevMaxtreatmentlevel, inputCodeSettings);
-                  }
-                  // if an ecmo case was found
-                  else {
-                    mapIcuEcmoCaseNrs.get(checkDate).add(encounterId);
-                    mapPrevMaxtreatmentlevel.get(CoronaFixedValues.ICU_ECMO.getValue())
-                        .add(patientId);
-                  }
-                } // if date check
-              } // else if Stationary check
-            } // for loop of positive encounter
-          });
+                    // if an ecmo case was found
+                    else {
+                      mapIcuEcmoCaseNrs.get(checkDate).add(encounterId);
+                      mapPrevMaxtreatmentlevel.get(CoronaFixedValues.ICU_ECMO.getValue())
+                          .add(patientId);
+                    }
+                  } // if date check
+                } // else if Stationary check
+              } // for loop of positive encounter
+            });
+      } catch (Exception ex) {
+        log.error("Creation of the max treatmentlevel timeline failed.", ex);
+      }
       currentDate += CoronaDashboardConstants.dayInSeconds;
     } // while
     resultWithCaseNrsMap.put(CoronaFixedValues.OUTPATIENT_ITEM.getValue(), mapAmbulantCaseNr);
@@ -400,10 +405,13 @@ public class TimelineMaxTreatmentLevel extends TimelineFunctionalities {
     List<Encounter.EncounterLocationComponent> listCheckDateLocation = new ArrayList<>();
     // iterate through the icu locations
     for (Encounter.EncounterLocationComponent location : listEncounterHasIcuLocation) {
+      // If there is no start existent just skip the check
+      if (!location.getPeriod().hasStart()) {
+        return;
+      }
       if (!location.getPeriod().hasEnd()) {
         location.getPeriod().setEnd(DateTools.getCurrentDateTime());
       }
-
       long locationDateStartUnix = DateTools.dateToUnixTime(location.getPeriod().getStart());
       long locationDateEndUnix = DateTools.dateToUnixTime(location.getPeriod().getEnd());
       // check if checkedDate fits into the time span of the icu location

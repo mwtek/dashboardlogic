@@ -17,21 +17,24 @@
  */
 package de.ukbonn.mwtek.dashboardlogic.logic.cumulative.gender;
 
-import de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues;
-import de.ukbonn.mwtek.dashboardlogic.logic.CoronaResultFunctionality;
-import de.ukbonn.mwtek.dashboardlogic.models.CoronaDataItem;
+import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.INPATIENT;
+import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.OUTPATIENT;
+import static de.ukbonn.mwtek.dashboardlogic.tools.EncounterFilter.isCaseClassInpatient;
+import static de.ukbonn.mwtek.dashboardlogic.tools.EncounterFilter.isCaseClassOutpatient;
+
+import de.ukbonn.mwtek.dashboardlogic.enums.Gender;
+import de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels;
+import de.ukbonn.mwtek.dashboardlogic.models.DiseaseDataItem;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbPatient;
 import de.ukbonn.mwtek.utilities.generic.time.TimerTools;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * This class is used for generating the data items {@link CoronaDataItem
- * cumulative.inpatient.gender and cumulative.outpatient.gender}.
+ * This class is used for generating the data items
+ * {@link DiseaseDataItem cumulative.inpatient.gender and cumulative.outpatient.gender}.
  *
  * @author <a href="mailto:david.meyers@ukbonn.de">David Meyers</a>
  * @author <a href="mailto:berke_enes.dincel@ukbonn.de">Berke Enes Dincel</a>
@@ -40,53 +43,36 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class CumulativeGenderByClass extends CumulativeGender {
 
-  public List<UkbEncounter> listEncounters;
-  public List<UkbPatient> listPatients;
-
-  public CumulativeGenderByClass(List<UkbEncounter> listEncounters, List<UkbPatient> listPatients) {
-    super(listEncounters, listPatients);
-    this.listEncounters = listEncounters;
-    this.listPatients = listPatients;
-  }
-
   /**
-   * Determination of the number of patients per gender and case status (e.g. inpatient)
-   * <p>
-   * called by both data items
+   * Determination of the number of patients per gender and case status (e.g. inpatient). This
+   * method filters encounters based on the provided case class and counts the number of patients of
+   * a specific gender within those encounters.
    *
-   * @param gender    the gender type (e.g. male) to be counted
-   * @param caseClass the case class (e.g. inpatient) to be counted
-   * @return number of genders per gender and case status
+   * @param gender         The gender type (e.g. "male") to be counted.
+   * @param encounterClass The case class (e.g. {@link TreatmentLevels#INPATIENT}) to be counted.
+   * @return Number of patients per gender and case status.
    */
-  public Number getGenderCountByCaseClass(String gender, String caseClass) {
-    log.debug(
-        "started getGenderCountByCaseClass for class: " + caseClass + " and gender: " + gender);
+  public static Number getGenderCountByCaseClass(Gender gender, TreatmentLevels encounterClass) {
+    log.debug("Started getGenderCountByCaseClass for class: " + encounterClass + " and gender: "
+        + gender);
     Instant startTimer = TimerTools.startTimer();
-    List<UkbEncounter> filteredEncounterList = new ArrayList<>();
-    List<UkbEncounter> listEncounterByClass = new ArrayList<>();
 
-    boolean isAmbulant = caseClass.equals(CoronaFixedValues.OUTPATIENT_ITEM.getValue());
-    boolean isStationary = caseClass.equals(CoronaFixedValues.INPATIENT_ITEM.getValue());
+    // Filter encounters based on the provided case class
+    List<UkbEncounter> filteredEncounterList = getFacilityContactEncounters().parallelStream()
+        .filter(encounter -> {
+          if (encounterClass == OUTPATIENT) {
+            return isCaseClassOutpatient(encounter);
+          } else if (encounterClass == INPATIENT) {
+            return isCaseClassInpatient(encounter);
+          }
+          return false;
+        })
+        .collect(Collectors.toList());
 
-    if (isAmbulant) {
-      listEncounterByClass = listEncounters.parallelStream()
-          .filter(CoronaResultFunctionality::isCaseClassOutpatient)
-          .collect(Collectors.toList());
-    } else if (isStationary) {
-      listEncounterByClass = listEncounters.parallelStream()
-          .filter(CoronaResultFunctionality::isCaseClassInpatient).collect(Collectors.toList());
-    }
+    // Calculate the count of patients of the specified gender within the filtered encounters
+    Number genderCount = getGenderCount(filteredEncounterList, gender);
 
-    for (UkbEncounter encounter : listEncounterByClass) {
-      if (isAmbulant) {
-        filteredEncounterList.add(encounter);
-      } else {
-        filteredEncounterList.add(encounter);
-      }
-    }
-
-    TimerTools.stopTimerAndLog(startTimer, "finished getGenderCountByCaseClass");
-    return getGenderCount(filteredEncounterList, listPatients, gender);
+    TimerTools.stopTimerAndLog(startTimer, "Finished getGenderCountByCaseClass");
+    return genderCount;
   }
-
 }

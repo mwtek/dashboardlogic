@@ -21,20 +21,22 @@ package de.ukbonn.mwtek.dashboardlogic.enums;
 import com.google.common.collect.ImmutableList;
 import de.ukbonn.mwtek.utilities.fhir.misc.StaticValueProvider;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
+import lombok.Getter;
 
 /**
- * Class with all textual fixed values necessary for the creation of the Json class and data processing (e.g. DataItems
- * designations, formatting, flags).
+ * Class with all textual fixed values necessary for the creation of the Json class and data
+ * processing (e.g. DataItems designations, formatting, flags).
  *
  * @author <a href="mailto:david.meyers@ukbonn.de">David Meyers</a>
  * @author <a href="mailto:berke_enes.dincel@ukbonn.de">Berke Enes Dincel</a>
  */
-public enum CoronaFixedValues {
+@Getter
+public enum DashboardLogicFixedValues {
   // COVID-States
-  POSITIVE_RESULT(StaticValueProvider.SYSTEM + "/covidResultPositive"),
-  NEGATIVE_RESULT(StaticValueProvider.SYSTEM + "/covidResultNegative"),
-  BORDERLINE_RESULT(StaticValueProvider.SYSTEM + "/covidResultBorderLine"),
-  TWELVE_DAYS_LOGIC("12 Days Timespan"),
+  POSITIVE_RESULT(StaticValueProvider.SYSTEM + "/resultPositive"),
+  NEGATIVE_RESULT(StaticValueProvider.SYSTEM + "/resultNegative"),
+  BORDERLINE_RESULT(StaticValueProvider.SYSTEM + "/resultBorderLine"),
+  TWELVE_DAYS_LOGIC(StaticValueProvider.SYSTEM + "/12DaysTimespan"),
 
   // DateFormat
   DATE("date"),
@@ -47,20 +49,6 @@ public enum CoronaFixedValues {
   FEMALE_SPECIFICATION("Female"),
   DIVERSE_SPECIFICATION("Diverse"),
 
-  ICU("ICU"),
-  ICU_VENTILATION("ICU_with_ventilation"),
-  ICU_ECMO("ICU_with_ecmo"),
-  NORMAL_WARD("Normal_ward"),
-
-  // Internal usages for list management
-  INPATIENT_ITEM("Stationary"),
-  OUTPATIENT_ITEM("Outpatient"),
-
-  // Gender [FHIR Value Set]
-  GENDER_MALE("male"),
-  GENDER_FEMALE("female"),
-  GENDER_DIVERSE("diverse"),
-  GENDER_UNKNOWN("unknown"),
 
   // Administrative data patient
   /*
@@ -76,10 +64,6 @@ public enum CoronaFixedValues {
       "http://fhir.de/CodeSystem/dkgev/EntlassungsgrundErsteUndZweiteStelle"),
   DEATH_CODE("07"),
 
-  // VitalStatus
-  ALIVE("alive"),
-  DEAD("dead"),
-
   // Encounter.case.type.kontaktart (new fhir profile ->
   // https://simplifier.net/packages/de.basisprofil.r4/1.0.0/files/397801)
   CASETYPE_PRESTATIONARY("vorstationaer"),
@@ -87,12 +71,7 @@ public enum CoronaFixedValues {
   CASETYPE_PARTSTATIONARY("teilstationaer"),
   CASETYPE_NORMALSTATIONARY("normalstationaer"),
   CASETYPE_INTENSIVESTATIONARY("intensivstationaer"),
-  CASETYPE_KONTAKTART_SYSTEM("http://fhir.de/CodeSystem/kontaktart-de"),
-
-  // CaseStatus
-  CASESTATUS_ALL("all"),
-  CASESTATUS_INPATIENT("inpatient"),
-  CASESTATUS_OUTPATIENT("outpatient"),
+  CASETYPE_CONTACT_ART_SYSTEM("http://fhir.de/CodeSystem/kontaktart-de"),
 
   // PhysicalType(s)
   WARD("wa"),
@@ -104,7 +83,8 @@ public enum CoronaFixedValues {
   ICD_DIAG_RELIABILITY_CODING_SYSTEM(
       "https://fhir.kbv.de/CodeSystem/KBV_CS_SFHIR_ICD_DIAGNOSESICHERHEIT"),
 
-  // ICD code without exclamation mark, as it is used in an "observation contains" logic to make further processing more robust.
+  // ICD code without exclamation mark, as it is used in an "observation contains" logic to make
+  // further processing more robust.
   U071("U07.1"),
   U072("U07.2"),
 
@@ -123,15 +103,13 @@ public enum CoronaFixedValues {
 
   DIAG_RELIABILITY_Z("Z");
 
-  // Terminology systems
-  public static final String LOINC_SYSTEM = "http://loinc.org";
-  public static final String SNOMED_SYSTEM = "http://snomed.info/sct";
-
-  public static final String OBSERVATION_INTERPRETATION_SYSTEM = "http://terminology.hl7.org/CodeSystem/v3-ObservationInterpretation";
+  public static final String OBSERVATION_INTERPRETATION_SYSTEM = "http://terminology.hl7"
+      + ".org/CodeSystem/v3-ObservationInterpretation";
 
   // Encounter.type.coding.kontaktebene
   public static final String CONTACT_LEVEL_SYSTEM = "http://fhir.de/CodeSystem/Kontaktebene";
   public static final String CONTACT_LEVEL_FACILITY_CODE = "einrichtungskontakt";
+  public static final String CONTACT_LEVEL_SUPPLY_CODE = "versorgungsstellenkontakt";
 
 
   // Display forms of the covid variants to check against
@@ -145,7 +123,8 @@ public enum CoronaFixedValues {
   public static final String VARIANT_UNKNOWN = "Unknown";
 
   // Codes of the covid variants to check against
-  // For now the display values are checked since its more flexible if new variants appear or to generalize non-voc variants
+  // For now the display values are checked since its more flexible if new variants appear or to
+  // generalize non-voc variants
   public static final String VARIANT_ALPHA_LOINC = "LA31569-9";
   public static final String VARIANT_BETA_LOINC = "LA31570-7";
   public static final String VARIANT_GAMMA_LOINC = "LA31621-8";
@@ -162,7 +141,7 @@ public enum CoronaFixedValues {
   /**
    * ValueSet of diagnostic certainties for outpatient diagnoses for borderline COVID-19 findings
    */
-  public static final ImmutableList<CoronaFixedValues> DIAGNOSIS_SECURITY_BORDERLINE_ENUM =
+  public static final ImmutableList<DashboardLogicFixedValues> DIAGNOSIS_SECURITY_BORDERLINE_ENUM =
       ImmutableList.of(DIAG_RELIABILITY_V, DIAG_RELIABILITY_G, DIAG_RELIABILITY_Z);
 
   /**
@@ -174,32 +153,31 @@ public enum CoronaFixedValues {
   /**
    * ValueSet of diagnostic certainties for outpatient diagnoses for negative COVID-19 findings
    */
-  public static final ImmutableList<CoronaFixedValues> DIAGNOSIS_SECURITY_NEGATIVE_ENUM =
+  public static final ImmutableList<DashboardLogicFixedValues> DIAGNOSIS_SECURITY_NEGATIVE_ENUM =
       ImmutableList.of(DIAG_RELIABILITY_A);
 
   /**
-   * List of valid {@link UkbEncounter#getClass_() encounter.class.code} codes for inpatient encounters. Both the value
-   * set from the case module version 1.0 and 2.0 are checked. <a href="https://simplifier.net/packages/de.basisprofil.r4/1.0.0/files/397957">The
-   * value set of version 2.0 can be found here.</a>.
+   * List of valid {@link UkbEncounter#getClass_() encounter.class.code} codes for inpatient
+   * encounters. Both the value set from the case module version 1.0 and 2.0 are checked. <a
+   * href="https://simplifier.net/packages/de.basisprofil.r4/1.0.0/files/397957">The value set of
+   * version 2.0 can be found here.</a>.
    */
   public static final ImmutableList<String> ENCOUNTER_CLASS_INPATIENT_CODES =
       ImmutableList.of("IMP", "stationaer");
 
   /**
-   * List of valid {@link UkbEncounter#getClass_() encounter.class.code} codes for outpatient encounters. Both the value
-   * set from the case module version 1.0 and 2.0 are checked. <a href="https://simplifier.net/packages/de.basisprofil.r4/1.0.0/files/397957">The
-   * value set of version 2.0 can be found here.</a>.
+   * List of valid {@link UkbEncounter#getClass_() encounter.class.code} codes for outpatient
+   * encounters. Both the value set from the case module version 1.0 and 2.0 are checked. <a
+   * href="https://simplifier.net/packages/de.basisprofil.r4/1.0.0/files/397957">The value set of
+   * version 2.0 can be found here.</a>.
    */
   public static final ImmutableList<String> ENCOUNTER_CLASS_OUTPATIENT_CODES =
       ImmutableList.of("AMB", "ambulant");
 
   private final String value;
 
-  CoronaFixedValues(String value) {
+  DashboardLogicFixedValues(String value) {
     this.value = value;
   }
 
-  public String getValue() {
-    return value;
-  }
 }

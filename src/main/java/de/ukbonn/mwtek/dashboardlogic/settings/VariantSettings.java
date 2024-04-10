@@ -37,7 +37,7 @@ public class VariantSettings {
   /**
    * Variants of Concern (VOC) that are not yet supported by the Dashboard at release time because
    * they are not known and/or there is no LOINC code. Specification of the written Greek letter
-   * that is read from the display free text field.
+   * that is read from the display-free text field.
    */
   @Getter
   @Setter

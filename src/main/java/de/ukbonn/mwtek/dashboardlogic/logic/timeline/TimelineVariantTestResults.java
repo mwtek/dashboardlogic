@@ -17,13 +17,23 @@
  */
 package de.ukbonn.mwtek.dashboardlogic.logic.timeline;
 
+import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.DATE;
+import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.VARIANT_ALPHA;
+import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.VARIANT_BETA;
+import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.VARIANT_DELTA;
+import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.VARIANT_GAMMA;
+import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.VARIANT_NON_VOC;
+import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.VARIANT_OMICRON;
+import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.VARIANT_OTHER_VOC;
+import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.VARIANT_UNKNOWN;
 import static de.ukbonn.mwtek.dashboardlogic.logic.CoronaResultFunctionality.getDatesOutputList;
 import static de.ukbonn.mwtek.dashboardlogic.logic.CoronaResultFunctionality.isCodingValid;
 import static de.ukbonn.mwtek.dashboardlogic.tools.StringHelper.isAnyMatchSetWithString;
+import static de.ukbonn.mwtek.utilities.enums.TerminologySystems.LOINC;
 
 import de.ukbonn.mwtek.dashboardlogic.enums.CoronaDashboardConstants;
-import de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues;
-import de.ukbonn.mwtek.dashboardlogic.models.CoronaDataItem;
+import de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues;
+import de.ukbonn.mwtek.dashboardlogic.models.DiseaseDataItem;
 import de.ukbonn.mwtek.dashboardlogic.settings.InputCodeSettings;
 import de.ukbonn.mwtek.dashboardlogic.settings.VariantSettings;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbObservation;
@@ -38,7 +48,7 @@ import org.hl7.fhir.r4.model.Observation;
 
 /**
  * This class is used for generating the data item
- * {@link CoronaDataItem timeline.varianttestresults}.
+ * {@link DiseaseDataItem timeline.varianttestresults}.
  *
  * @author <a href="mailto:david.meyers@ukbonn.de">David Meyers</a>
  * @author <a href="mailto:berke_enes.dincel@ukbonn.de">Berke Enes Dincel</a>
@@ -55,20 +65,21 @@ public class TimelineVariantTestResults {
   public Map<String, List<Long>> createTimelineVariantsTests(VariantSettings variantSettings,
       InputCodeSettings inputCodeSettings) {
     Map<String, List<Long>> variantMap = new LinkedHashMap<>();
-    List<String> observationVariantLoincCodes = inputCodeSettings.getObservationVariantLoincCodes();
+    List<String> observationVariantLoincCodes =
+        inputCodeSettings.getCovidObservationVariantLoincCodes();
     // Initialization of a map with counts for each variant for each 24-h-period
-    variantMap.put(CoronaFixedValues.DATE.getValue(), new ArrayList<>());
-    variantMap.put(CoronaFixedValues.VARIANT_ALPHA, new ArrayList<>());
-    variantMap.put(CoronaFixedValues.VARIANT_BETA, new ArrayList<>());
-    variantMap.put(CoronaFixedValues.VARIANT_GAMMA, new ArrayList<>());
-    variantMap.put(CoronaFixedValues.VARIANT_DELTA, new ArrayList<>());
-    variantMap.put(CoronaFixedValues.VARIANT_OMICRON, new ArrayList<>());
-    variantMap.put(CoronaFixedValues.VARIANT_OTHER_VOC, new ArrayList<>());
-    variantMap.put(CoronaFixedValues.VARIANT_NON_VOC, new ArrayList<>());
-    variantMap.put(CoronaFixedValues.VARIANT_UNKNOWN, new ArrayList<>());
+    variantMap.put(DATE.getValue(), new ArrayList<>());
+    variantMap.put(VARIANT_ALPHA, new ArrayList<>());
+    variantMap.put(VARIANT_BETA, new ArrayList<>());
+    variantMap.put(VARIANT_GAMMA, new ArrayList<>());
+    variantMap.put(VARIANT_DELTA, new ArrayList<>());
+    variantMap.put(VARIANT_OMICRON, new ArrayList<>());
+    variantMap.put(VARIANT_OTHER_VOC, new ArrayList<>());
+    variantMap.put(VARIANT_NON_VOC, new ArrayList<>());
+    variantMap.put(VARIANT_UNKNOWN, new ArrayList<>());
 
     List<UkbObservation> listVariantObservation = listObservation.stream()
-        .filter(x -> isCodingValid(x.getCode(), CoronaFixedValues.LOINC_SYSTEM,
+        .filter(x -> isCodingValid(x.getCode(), LOINC,
             observationVariantLoincCodes))
         .filter(Observation::hasValueCodeableConcept).toList();
 
@@ -87,7 +98,7 @@ public class TimelineVariantTestResults {
       long unknownCount = 0;
 
       final long checkDateUnix = startDate;
-      final long nextDateUnix = startDate + CoronaDashboardConstants.dayInSeconds;
+      final long nextDateUnix = startDate + CoronaDashboardConstants.DAY_IN_SECONDS;
 
       // Retrieve all observations for the checked date
       List<UkbObservation> listFittingVariantObservation = listVariantObservation.stream()
@@ -102,21 +113,24 @@ public class TimelineVariantTestResults {
 //                .filter(x -> x.hasSystem()).anyMatch(
 //                    x -> x.getSystem().equals(CoronaFixedValues.LOINC_SYSTEM.getValue()));
 
-        // If a LOINC notation is found, only this is read. Otherwise, an attempt is made to determine the variant information via the free text.
+        // If a LOINC notation is found, only this is read. Otherwise, an attempt is made to
+        // determine the variant information via the free text.
         for (Coding variantCoding : variantObservation.getValueCodeableConcept().getCoding()) {
-          // For now the display values are checked since its more flexible if new variants appear or to generalize non-voc variants
+          // For now the display values are checked since its more flexible if new variants
+          // appear or to generalize non-voc variants
           if (variantCoding.hasSystem() && variantCoding.getSystem()
-              .equals(CoronaFixedValues.LOINC_SYSTEM)) {
+              .equals(LOINC)) {
             switch (variantCoding.getCode()) {
-              case CoronaFixedValues.VARIANT_ALPHA_LOINC -> alphaCount++;
-              case CoronaFixedValues.VARIANT_BETA_LOINC -> betaCount++;
-              case CoronaFixedValues.VARIANT_DELTA_LOINC -> deltaCount++;
-              case CoronaFixedValues.VARIANT_GAMMA_LOINC -> gammaCount++;
-              case CoronaFixedValues.VARIANT_OMICRON_LOINC -> omicronCount++;
+              case DashboardLogicFixedValues.VARIANT_ALPHA_LOINC -> alphaCount++;
+              case DashboardLogicFixedValues.VARIANT_BETA_LOINC -> betaCount++;
+              case DashboardLogicFixedValues.VARIANT_DELTA_LOINC -> deltaCount++;
+              case DashboardLogicFixedValues.VARIANT_GAMMA_LOINC -> gammaCount++;
+              case DashboardLogicFixedValues.VARIANT_OMICRON_LOINC -> omicronCount++;
 
               // If value is unhandled or not part of the loinc system -> count it as unknown
               default -> {
-                // Optional handling of Covid variants that have not yet been assigned a LOINC code -> Check display text for variants
+                // Optional handling of Covid variants that have not yet been assigned a LOINC
+                // code -> Check display text for variants
                 String codingDisplay = variantCoding.getDisplay();
                 if (isAnyMatchSetWithString(variantSettings.getOtherVoc(), codingDisplay)) {
                   otherVocCount++;
@@ -133,19 +147,19 @@ public class TimelineVariantTestResults {
           }
         }
       }
-      variantMap.get(CoronaFixedValues.VARIANT_ALPHA).add(alphaCount);
-      variantMap.get(CoronaFixedValues.VARIANT_BETA).add(betaCount);
-      variantMap.get(CoronaFixedValues.VARIANT_GAMMA).add(gammaCount);
-      variantMap.get(CoronaFixedValues.VARIANT_DELTA).add(deltaCount);
-      variantMap.get(CoronaFixedValues.VARIANT_OMICRON).add(omicronCount);
-      variantMap.get(CoronaFixedValues.VARIANT_OTHER_VOC).add(otherVocCount);
-      variantMap.get(CoronaFixedValues.VARIANT_NON_VOC).add(nonVocCount);
-      variantMap.get(CoronaFixedValues.VARIANT_UNKNOWN).add(unknownCount);
+      variantMap.get(VARIANT_ALPHA).add(alphaCount);
+      variantMap.get(VARIANT_BETA).add(betaCount);
+      variantMap.get(VARIANT_GAMMA).add(gammaCount);
+      variantMap.get(VARIANT_DELTA).add(deltaCount);
+      variantMap.get(VARIANT_OMICRON).add(omicronCount);
+      variantMap.get(VARIANT_OTHER_VOC).add(otherVocCount);
+      variantMap.get(VARIANT_NON_VOC).add(nonVocCount);
+      variantMap.get(VARIANT_UNKNOWN).add(unknownCount);
 
-      startDate += CoronaDashboardConstants.dayInSeconds;
+      startDate += CoronaDashboardConstants.DAY_IN_SECONDS;
     }
     variantMap
-        .put(CoronaFixedValues.DATE.getValue(), getDatesOutputList());
+        .put(DATE.getValue(), getDatesOutputList());
 
     return variantMap;
   }

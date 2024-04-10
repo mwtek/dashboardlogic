@@ -40,7 +40,7 @@ public class CoronaDashboardConstants {
   /**
    * The duration of a day in seconds
    */
-  public final static long dayInSeconds = 86400;
+  public final static long DAY_IN_SECONDS = 86400;
 
   /**
    * Parameters to configure how many days after an outpatient stay an inpatient stay must occur to

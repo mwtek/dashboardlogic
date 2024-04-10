@@ -29,26 +29,18 @@ import java.util.stream.Collectors;
  * @author <a href="mailto:david.meyers@ukbonn.de">David Meyers</a>
  * @author <a href="mailto:berke_enes.dincel@ukbonn.de">Berke Enes Dincel</a>
  */
-public class TimelineFunctionalities {
+public interface TimelineFunctionalities {
 
   /**
-   * Purpose of this auxiliary function is to divide the content of a map into two different lists
+   * The Purpose of this auxiliary function is to divide the content of a map into two different
+   * lists
    *
    * @param tempMap Map that maps a frequency value to a date (unixtime)
    */
-  public static List<Long> divideMapValuesToLists(Map<Long, Long> tempMap) {
+  public default List<Long> divideMapValuesToLists(Map<Long, Long> tempMap) {
 
     List<Long> listKeys = new ArrayList<>(tempMap.keySet());
     Collections.sort(listKeys);
     return listKeys.stream().map(tempMap::get).collect(Collectors.toList());
-//
-//    // get a list with the keys in ascending order (output requirement)
-//    List<Long> listKeys = new ArrayList<>(tempMap.keySet());
-//    Collections.sort(listKeys);
-//
-//    listKeys.forEach(key -> {
-//      Long value = tempMap.get(key);
-//      valueList.add(value);
-//    });
   }
 }

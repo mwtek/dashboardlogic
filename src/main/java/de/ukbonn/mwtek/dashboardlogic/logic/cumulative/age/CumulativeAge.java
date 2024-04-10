@@ -1,26 +1,32 @@
 /*
- *  Copyright (C) 2021 University Hospital Bonn - All Rights Reserved You may use, distribute and
- *  modify this code under the GPL 3 license. THERE IS NO WARRANTY FOR THE PROGRAM, TO THE EXTENT
- *  PERMITTED BY APPLICABLE LAW. EXCEPT WHEN OTHERWISE STATED IN WRITING THE COPYRIGHT HOLDERS AND/OR
- *  OTHER PARTIES PROVIDE THE PROGRAM “AS IS” WITHOUT WARRANTY OF ANY KIND, EITHER EXPRESSED OR
- *  IMPLIED, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
- *  A PARTICULAR PURPOSE. THE ENTIRE RISK AS TO THE QUALITY AND PERFORMANCE OF THE PROGRAM IS WITH
- *  YOU. SHOULD THE PROGRAM PROVE DEFECTIVE, YOU ASSUME THE COST OF ALL NECESSARY SERVICING, REPAIR
- *  OR CORRECTION. IN NO EVENT UNLESS REQUIRED BY APPLICABLE LAW OR AGREED TO IN WRITING WILL ANY
- *  COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MODIFIES AND/OR CONVEYS THE PROGRAM AS PERMITTED ABOVE,
- *  BE LIABLE TO YOU FOR DAMAGES, INCLUDING ANY GENERAL, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES
- *  ARISING OUT OF THE USE OR INABILITY TO USE THE PROGRAM (INCLUDING BUT NOT LIMITED TO LOSS OF DATA
- *  OR DATA BEING RENDERED INACCURATE OR LOSSES SUSTAINED BY YOU OR THIRD PARTIES OR A FAILURE OF THE
- *  PROGRAM TO OPERATE WITH ANY OTHER PROGRAMS), EVEN IF SUCH HOLDER OR OTHER PARTY HAS BEEN ADVISED
- *  OF THE POSSIBILITY OF SUCH DAMAGES. You should have received a copy of the GPL 3 license with
- *  this file. If not, visit http://www.gnu.de/documents/gpl-3.0.en.html
+ * Copyright (C) 2021 University Hospital Bonn - All Rights Reserved You may use, distribute and
+ * modify this code under the GPL 3 license. THERE IS NO WARRANTY FOR THE PROGRAM, TO THE EXTENT
+ * PERMITTED BY APPLICABLE LAW. EXCEPT WHEN OTHERWISE STATED IN WRITING THE COPYRIGHT HOLDERS AND/OR
+ * OTHER PARTIES PROVIDE THE PROGRAM “AS IS” WITHOUT WARRANTY OF ANY KIND, EITHER EXPRESSED OR
+ * IMPLIED, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE. THE ENTIRE RISK AS TO THE QUALITY AND PERFORMANCE OF THE PROGRAM IS WITH
+ * YOU. SHOULD THE PROGRAM PROVE DEFECTIVE, YOU ASSUME THE COST OF ALL NECESSARY SERVICING, REPAIR
+ * OR CORRECTION. IN NO EVENT UNLESS REQUIRED BY APPLICABLE LAW OR AGREED TO IN WRITING WILL ANY
+ * COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MODIFIES AND/OR CONVEYS THE PROGRAM AS PERMITTED ABOVE,
+ * BE LIABLE TO YOU FOR DAMAGES, INCLUDING ANY GENERAL, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES
+ * ARISING OUT OF THE USE OR INABILITY TO USE THE PROGRAM (INCLUDING BUT NOT LIMITED TO LOSS OF DATA
+ * OR DATA BEING RENDERED INACCURATE OR LOSSES SUSTAINED BY YOU OR THIRD PARTIES OR A FAILURE OF THE
+ * PROGRAM TO OPERATE WITH ANY OTHER PROGRAMS), EVEN IF SUCH HOLDER OR OTHER PARTY HAS BEEN ADVISED
+ * OF THE POSSIBILITY OF SUCH DAMAGES. You should have received a copy of the GPL 3 license with *
+ * this file. If not, visit http://www.gnu.de/documents/gpl-3.0.en.html
  */
 package de.ukbonn.mwtek.dashboardlogic.logic.cumulative.age;
 
-import de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues;
+import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.POSITIVE_RESULT;
+import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.TWELVE_DAYS_LOGIC;
+import static de.ukbonn.mwtek.dashboardlogic.logic.DiseaseResultFunctionality.calculateAge;
+import static de.ukbonn.mwtek.dashboardlogic.tools.EncounterFilter.isPatientDeceased;
+
+import de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels;
 import de.ukbonn.mwtek.dashboardlogic.enums.VitalStatus;
 import de.ukbonn.mwtek.dashboardlogic.logic.CoronaResultFunctionality;
-import de.ukbonn.mwtek.dashboardlogic.models.CoronaDataItem;
+import de.ukbonn.mwtek.dashboardlogic.models.DiseaseDataItem;
+import de.ukbonn.mwtek.dashboardlogic.tools.EncounterFilter;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbPatient;
 import de.ukbonn.mwtek.utilities.generic.time.TimerTools;
@@ -37,7 +43,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.hl7.fhir.r4.model.Coding;
 
 /**
- * This class is used for generating the data items {@link CoronaDataItem cumulative.age} including
+ * This class is used for generating the data items {@link DiseaseDataItem cumulative.age} including
  * the sub items (*.alive, *.dead).
  *
  * @author <a href="mailto:david.meyers@ukbonn.de">David Meyers</a>
@@ -56,15 +62,14 @@ public class CumulativeAge {
   }
 
   /**
-   * Get the ages of all c19 positive patients by a given class
+   * Get the ages of all disease-positive patients by a given class
    * <p>
    * Called by cumulative.age
    *
-   * @param caseClass the class of an encounter (e.g.
-   *                  {@link CoronaFixedValues#CASESTATUS_INPATIENT})
+   * @param encounterClass the class of an encounter (e.g. {@link TreatmentLevels#INPATIENT})
    * @return returns list of age of all positive patients, who fulfill the caseStatus criteria
    */
-  public List<Integer> getAgeDistributionsByCaseClass(String caseClass) {
+  public List<Integer> getAgeDistributionsByCaseClass(TreatmentLevels encounterClass) {
     log.debug("started getAgeDistributionsByCaseClass");
     Instant startTimer = TimerTools.startTimer();
     List<Integer> resultList = new ArrayList<>();
@@ -72,46 +77,38 @@ public class CumulativeAge {
     Set<String> stationaryPidSet = new HashSet<>();
     Set<String> ambulantPidSet = new HashSet<>();
 
-    // get the age of each patient at the admission date from the first c19-positive case
+    // get the age of each patient at the admission date from the first disease-positive case
     List<UkbEncounter> listEncounterPositive = listEncounters.parallelStream()
-        .filter(x -> x.hasExtension(CoronaFixedValues.POSITIVE_RESULT.getValue())).toList();
+        .filter(x -> x.hasExtension(POSITIVE_RESULT.getValue())).toList();
 
-    HashMap<String, List<UkbEncounter>> mapEncounterAll = new HashMap<>();
-    mapEncounterAll.put(CoronaFixedValues.CASESTATUS_ALL.getValue(), listEncounters);
+    Map<TreatmentLevels, List<UkbEncounter>> mapEncounterAll = new HashMap<>();
+    mapEncounterAll.put(TreatmentLevels.ALL, listEncounters);
     Map<String, Date> pidAgeMap = createPidAgeMap(VitalStatus.ALL, mapEncounterAll);
 
     for (UkbEncounter encounter : listEncounterPositive) {
 
-      if (CoronaResultFunctionality.isCaseClassInpatient(encounter)) {
+      if (EncounterFilter.isCaseClassInpatient(encounter)) {
         stationaryPidSet.add(encounter.getPatientId());
-      } else if (CoronaResultFunctionality.isCaseClassOutpatient(
-          encounter) && !encounter.hasExtension(
-          CoronaFixedValues.TWELVE_DAYS_LOGIC.getValue())) {
+      } else if (EncounterFilter.isCaseClassOutpatient(encounter) && !encounter.hasExtension(
+          TWELVE_DAYS_LOGIC.getValue())) {
         ambulantPidSet.add(encounter.getPatientId());
       }
     }
 
-    // age.Inpatient
-    if (caseClass.equalsIgnoreCase(CoronaFixedValues.CASESTATUS_INPATIENT.getValue())) {
-      pidSet.addAll(stationaryPidSet);
-    }
-
-    // outpatient.age
-    else if (caseClass.equalsIgnoreCase(CoronaFixedValues.CASESTATUS_OUTPATIENT.getValue())) {
-      pidSet.addAll(ambulantPidSet);
-    }
-
-    // age
-    else if (caseClass.equalsIgnoreCase(CoronaFixedValues.CASESTATUS_ALL.getValue())) {
-      pidSet.addAll(stationaryPidSet);
-      pidSet.addAll(ambulantPidSet);
+    switch (encounterClass) {
+      case INPATIENT -> pidSet.addAll(stationaryPidSet);
+      case OUTPATIENT -> pidSet.addAll(ambulantPidSet);
+      case ALL -> {
+        pidSet.addAll(stationaryPidSet);
+        pidSet.addAll(ambulantPidSet);
+      }
     }
 
     // calculates age
     for (UkbPatient patient : listPatients) {
       if (pidSet.contains(patient.getId())) {
         if (patient.hasBirthDate() && pidAgeMap.get(patient.getId()) != null) {
-          resultList.add(CoronaResultFunctionality.calculateAge(patient.getBirthDate(),
+          resultList.add(calculateAge(patient.getBirthDate(),
               pidAgeMap.get(patient.getId())));
         } else {
           log.warn("Could not find a birthday in the resource of patient " + patient.getId());
@@ -136,7 +133,7 @@ public class CumulativeAge {
    */
   @Deprecated
   public List<Integer> getAgeCountByVitalStatus(VitalStatus vitalStatus,
-      Map<String, List<UkbEncounter>> mapPositiveEncounterByClass) {
+      Map<TreatmentLevels, List<UkbEncounter>> mapPositiveEncounterByClass) {
     log.debug("started getAgeCountByVitalStatus [vitalStatus: " + vitalStatus + "]");
     Instant startTime = TimerTools.startTimer();
 
@@ -147,11 +144,12 @@ public class CumulativeAge {
     for (UkbPatient patient : listPatients) {
       if (pidAgeMap.containsKey(patient.getId())) {
         if (patient.hasBirthDate() && pidAgeMap.get(patient.getId()) != null) {
-          resultList.add(CoronaResultFunctionality.calculateAge(patient.getBirthDate(),
+          resultList.add(calculateAge(patient.getBirthDate(),
               pidAgeMap.get(patient.getId())));
         } else {
           log.warn(
-              "Could not find a birthday in the resource or the resource itself in the pidAgeMap for the patient "
+              "Could not find a birthday in the resource or the resource itself in the pidAgeMap "
+                  + "for the patient "
                   + patient.getId());
         }
       }
@@ -172,9 +170,10 @@ public class CumulativeAge {
    * @return Map that assigns the admission date of the patient's first c19 positive case to a pid
    */
   private Map<String, Date> createPidAgeMap(VitalStatus vitalStatus,
-      Map<String, List<UkbEncounter>> mapPositiveEncounterByClass) {
+      Map<TreatmentLevels, List<UkbEncounter>> mapPositiveEncounterByClass) {
     Map<String, Date> pidMap = new HashMap<>();
-    for (Map.Entry<String, List<UkbEncounter>> entry : mapPositiveEncounterByClass.entrySet()) {
+    for (Map.Entry<TreatmentLevels, List<UkbEncounter>> entry :
+        mapPositiveEncounterByClass.entrySet()) {
       List<UkbEncounter> tempEncounterListByClass = entry.getValue();
       for (UkbEncounter encounter : tempEncounterListByClass) {
         String currentPid = encounter.getPatientId();
@@ -187,14 +186,14 @@ public class CumulativeAge {
           case ALIVE -> {
             // Check dischargeCoding whether it is empty or does not have "07" as code
             // add pid to set and map id criteria are fulfilled
-            if (!CoronaResultFunctionality.isPatientDeceased(encounter)) {
+            if (!isPatientDeceased(encounter)) {
               pidMap.put(currentPid, checkIfEncounterHasEarlierCase(pidMap, encounter));
             }
           }
           case DEAD -> {
             // Same here just reversed
             if (!dischargeCoding.isEmpty()) {
-              if (CoronaResultFunctionality.isPatientDeceased(encounter)) {
+              if (isPatientDeceased(encounter)) {
                 pidMap.put(currentPid, checkIfEncounterHasEarlierCase(pidMap, encounter));
               }
             }

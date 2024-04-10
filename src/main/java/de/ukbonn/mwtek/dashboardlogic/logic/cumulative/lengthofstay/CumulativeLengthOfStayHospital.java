@@ -18,11 +18,15 @@
 
 package de.ukbonn.mwtek.dashboardlogic.logic.cumulative.lengthofstay;
 
-import de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues;
-import de.ukbonn.mwtek.dashboardlogic.logic.CoronaResultFunctionality;
-import de.ukbonn.mwtek.dashboardlogic.models.CoronaDataItem;
+import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.POSITIVE_RESULT;
+import static de.ukbonn.mwtek.dashboardlogic.enums.VitalStatus.ALIVE;
+import static de.ukbonn.mwtek.dashboardlogic.enums.VitalStatus.DEAD;
+
+import de.ukbonn.mwtek.dashboardlogic.enums.VitalStatus;
+import de.ukbonn.mwtek.dashboardlogic.logic.DashboardDataItemLogics;
+import de.ukbonn.mwtek.dashboardlogic.models.DiseaseDataItem;
+import de.ukbonn.mwtek.dashboardlogic.tools.EncounterFilter;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
-import de.ukbonn.mwtek.utilities.generic.time.DateTools;
 import de.ukbonn.mwtek.utilities.generic.time.TimerTools;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -37,141 +41,115 @@ import lombok.extern.slf4j.Slf4j;
 
 /**
  * This class is used for generating the data items
- * {@link CoronaDataItem cumulative.lengthofstay.hospital} and the sub items.
+ * {@link DiseaseDataItem cumulative.lengthofstay.hospital} and the subitems.
  *
  * @author <a href="mailto:david.meyers@ukbonn.de">David Meyers</a>
  * @author <a href="mailto:berke_enes.dincel@ukbonn.de">Berke Enes Dincel</a>
  */
 
 @Slf4j
-public class CumulativeLengthOfStayHospital {
-
-  List<UkbEncounter> listEncounters;
-
-  public CumulativeLengthOfStayHospital(List<UkbEncounter> listEncounter) {
-    this.listEncounters = listEncounter;
-  }
+public class CumulativeLengthOfStayHospital extends DashboardDataItemLogics {
 
   /**
-   * Creates a map with the time in days that patients have spent as inpatients in hospital
+   * Creates a map with the time in days that patients have spent as inpatients in the hospital
    * <p>
    * Used for cumulative.lengthofstay.hospital
    *
    * @return A map with the pid as key and the value is a map containing the information on how many
    * days a patient has spent in the hospital, and how often he was there, shown by the number of
-   * casesIds
+   * caseIds
    */
-  public Map<String, Map<Long, List<String>>> createMapDaysHospitalList() {
+  public static Map<String, Map<Long, List<String>>> createMapDaysHospitalList() {
     log.debug("started createMapDaysHospitalList");
     Instant startTimer = TimerTools.startTimer();
 
-    HashMap<String, Map<Long, List<String>>> mapResult = new HashMap<>();
-    for (UkbEncounter e : listEncounters) {
+    Map<String, Map<Long, List<String>>> mapResult = new HashMap<>();
+
+    List<UkbEncounter> positiveInpatientEncounters = getFacilityContactEncounters().stream()
+        .filter(EncounterFilter::isCaseClassInpatient)
+        .filter(EncounterFilter::isDiseasePositive).toList();
+
+    for (UkbEncounter e : positiveInpatientEncounters) {
       String pid = e.getPatientId();
-      if (CoronaResultFunctionality.isCaseClassInpatient(e) && e.hasExtension(
-          CoronaFixedValues.POSITIVE_RESULT.getValue())) {
-        if (e.isPeriodStartExistent()) {
-          LocalDate start =
-              e.getPeriod().getStart().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
 
-          LocalDate end;
-          if (e.getPeriod().hasEnd()) {
-            end = e.getPeriod().getEnd().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
-          } else {
-            end = DateTools.getCurrentDateTime().toInstant().atZone(ZoneId.systemDefault())
-                .toLocalDate();
-          }
+      if (e.isPeriodStartExistent()) {
+        Instant startInstant = e.getPeriod().getStart().toInstant();
+        Instant endInstant =
+            e.getPeriod().hasEnd() ? e.getPeriod().getEnd().toInstant() : Instant.now();
 
-          Long days = ChronoUnit.DAYS.between(start, end);
-          // check if there is already in entry for this patient
-          // If that is the case, remove the old values and replace them with the new ones
-          if (mapResult.containsKey(pid)) {
-            Map<Long, List<String>> mapDaysCase = mapResult.get(pid);
-            Long key = mapDaysCase.keySet().stream().findFirst().get();
-            Long keyNew = key + days;
-            List<String> listCases = mapDaysCase.get(key);
-            listCases.add(e.getId());
-            mapDaysCase.remove(key);
-            mapDaysCase.put(keyNew, listCases);
-            mapResult.replace(pid, mapDaysCase);
-          } else {
-            List<String> listCaseId = new ArrayList<>();
-            listCaseId.add(e.getId());
-            Map<Long, List<String>> mapTemp = new HashMap<>();
-            mapTemp.put(days, listCaseId);
-            mapResult.put(pid, mapTemp);
-          }
-        }
+        LocalDate startDate = startInstant.atZone(ZoneId.systemDefault()).toLocalDate();
+        LocalDate endDate = endInstant.atZone(ZoneId.systemDefault()).toLocalDate();
+
+        Long days = ChronoUnit.DAYS.between(startDate, endDate);
+
+        // Compute the result map
+        mapResult.computeIfAbsent(pid, k -> new HashMap<>())
+            .compute(days, (k, v) -> {
+              if (v == null) {
+                v = new ArrayList<>();
+              }
+              v.add(e.getId());
+              return v;
+            });
       }
     }
+
+    // Stop the timer and log the finish message
     TimerTools.stopTimerAndLog(startTimer, "finished createMapDaysHospitalList");
     return mapResult;
   }
 
   /**
-   * Calculates the amount of time in days, a patient stayed in the hospital
+   * Calculates the amount of time in days that a patient stayed in the hospital.
    * <p>
-   * Used for cumulative.lengthofstay.hospital.alive and cumulative.lengthofstay.hospital.dead
+   * Used for {@code cumulative.lengthofstay.hospital.alive} and
+   * {@code cumulative.lengthofstay.hospital.dead}.
    *
-   * @param listEncounters A list with {@link UkbEncounter} resources
-   * @param mapDays        An already created map that assigns a length of stay to patient Ids
-   * @param vitalStatus    Criteria whether it should be searched for details of deceased/alive
-   *                       patients
-   * @return A Map linking a patient id to a map that containing the length of stay in the hospital
-   * and all the case ids from which this total was calculated
+   * @param mapDays     An already created map that assigns a length of stay to patient ids.
+   * @param vitalStatus Criteria whether it should be searched for details of deceased/alive
+   *                    patients.
+   * @return A Map linking a patient id to a map containing the length of stay in the hospital and
+   * all the case ids from which this total was calculated.
    */
-  public Map<String, Map<Long, List<String>>> createLengthOfStayHospitalByVitalstatus(
-      List<UkbEncounter> listEncounters, Map<String, Map<Long, List<String>>> mapDays,
-      String vitalStatus) {
+  public static Map<String, Map<Long, List<String>>> createLengthOfStayHospitalByVitalstatus(
+      Map<String, Map<Long, List<String>>> mapDays,
+      VitalStatus vitalStatus) {
     log.debug("started createLengthOfStayHospitalByVitalstatus");
     Instant startTimer = TimerTools.startTimer();
 
-    // just the c19 positive stays needs to be checked
-    List<UkbEncounter> listEncountersPositive = listEncounters.parallelStream()
-        .filter(x -> x.hasExtension(CoronaFixedValues.POSITIVE_RESULT.getValue())).toList();
+    // Filter encounters based on disease-positive results
+    List<UkbEncounter> filteredEncounters = getFacilityContactEncounters().parallelStream()
+        .filter(x -> x.hasExtension(POSITIVE_RESULT.getValue())).toList();
 
-    HashMap<String, Map<Long, List<String>>> resultMap = new HashMap<>();
-    /* mapDays: Amount of days spent by all Patients, regardless of their condition */
+    Map<String, Map<Long, List<String>>> resultMap = new HashMap<>();
     for (Map.Entry<String, Map<Long, List<String>>> entry : mapDays.entrySet()) {
-      /* Map<Time, caseNrs> */
       Map<Long, List<String>> mapTimeAndCaseNrs = entry.getValue();
 
       for (Map.Entry<Long, List<String>> timeAndCaseNrs : mapTimeAndCaseNrs.entrySet()) {
         List<String> caseNrs = timeAndCaseNrs.getValue();
-        List<UkbEncounter> listFilteredEncounter;
 
-        if (vitalStatus.equals(CoronaFixedValues.ALIVE.getValue())) {
-          /* Get Encounter who got a discharged without being the reason "deceased" */
-          listFilteredEncounter = listEncountersPositive.stream()
+        List<UkbEncounter> listFilteredEncounter = new ArrayList<>();
+        if (vitalStatus == ALIVE) {
+          listFilteredEncounter = filteredEncounters.stream()
               .filter(encounter -> caseNrs.contains(encounter.getId()))
-              .filter(encounter -> !CoronaResultFunctionality.isPatientDeceased(encounter))
+              .filter(encounter -> !EncounterFilter.isPatientDeceased(encounter))
               .collect(Collectors.toList());
-
-          /* Encounter without discharge */
-          List<UkbEncounter> listNoDischargeEncounter = listEncountersPositive.stream()
+        } else if (vitalStatus == DEAD) {
+          listFilteredEncounter = filteredEncounters.stream()
               .filter(encounter -> caseNrs.contains(encounter.getId()))
-              .filter(encounter -> !encounter.getHospitalization().hasDischargeDisposition())
-              .toList();
-
-          listFilteredEncounter.addAll(listNoDischargeEncounter);
-          /* if there is no encounter with any discharge than just add Encounter in */
-          if (!listFilteredEncounter.isEmpty()) {
-            resultMap.put(entry.getKey(), mapTimeAndCaseNrs);
-          }
-        } else if (vitalStatus.equals(CoronaFixedValues.DEAD.getValue())) {
-          /* Check if encounter was discharged with the reason being "deceased" */
-          listFilteredEncounter = listEncountersPositive.stream()
-              .filter(encounter -> caseNrs.contains(encounter.getId()))
-              .filter(CoronaResultFunctionality::isPatientDeceased)
+              .filter(EncounterFilter::isPatientDeceased)
               .collect(Collectors.toList());
+        }
 
-          if (!listFilteredEncounter.isEmpty()) {
-            resultMap.put(entry.getKey(), mapTimeAndCaseNrs);
-          }
+        if (!listFilteredEncounter.isEmpty()) {
+          resultMap.put(entry.getKey(), mapTimeAndCaseNrs);
+          // Early termination if no encounters found for a vital status
+          break;
         }
       }
     }
-    TimerTools.stopTimerAndLog(startTimer, "finished createLengthOfStayHospitalByVitalstatus");
+    TimerTools.stopTimerAndLog(startTimer, "finished createLengthOfOfStayHospitalByVitalstatus");
     return resultMap;
   }
 }
+

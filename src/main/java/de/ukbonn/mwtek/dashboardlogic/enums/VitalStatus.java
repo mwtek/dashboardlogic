@@ -18,14 +18,22 @@
 
 package de.ukbonn.mwtek.dashboardlogic.enums;
 
+import lombok.Getter;
+
 /**
  * Enum class containing the different VitalStatus states
  *
  * @author <a href="mailto:david.meyers@ukbonn.de">David Meyers</a>
  */
+@Getter
 public enum VitalStatus {
-  // VitalStatus
-  ALIVE,
-  DEAD,
-  ALL;
+  ALIVE("alive"),
+  DEAD("dead"),
+  ALL("all");
+
+  private final String value;
+
+  VitalStatus(String value) {
+    this.value = value;
+  }
 }

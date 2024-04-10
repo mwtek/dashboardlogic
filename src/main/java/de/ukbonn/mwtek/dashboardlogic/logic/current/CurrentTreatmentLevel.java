@@ -1,109 +1,57 @@
 /*
- *  Copyright (C) 2021 University Hospital Bonn - All Rights Reserved You may use, distribute and
- *  modify this code under the GPL 3 license. THERE IS NO WARRANTY FOR THE PROGRAM, TO THE EXTENT
- *  PERMITTED BY APPLICABLE LAW. EXCEPT WHEN OTHERWISE STATED IN WRITING THE COPYRIGHT HOLDERS AND/OR
- *  OTHER PARTIES PROVIDE THE PROGRAM “AS IS” WITHOUT WARRANTY OF ANY KIND, EITHER EXPRESSED OR
- *  IMPLIED, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
- *  A PARTICULAR PURPOSE. THE ENTIRE RISK AS TO THE QUALITY AND PERFORMANCE OF THE PROGRAM IS WITH
- *  YOU. SHOULD THE PROGRAM PROVE DEFECTIVE, YOU ASSUME THE COST OF ALL NECESSARY SERVICING, REPAIR
- *  OR CORRECTION. IN NO EVENT UNLESS REQUIRED BY APPLICABLE LAW OR AGREED TO IN WRITING WILL ANY
- *  COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MODIFIES AND/OR CONVEYS THE PROGRAM AS PERMITTED ABOVE,
- *  BE LIABLE TO YOU FOR DAMAGES, INCLUDING ANY GENERAL, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES
- *  ARISING OUT OF THE USE OR INABILITY TO USE THE PROGRAM (INCLUDING BUT NOT LIMITED TO LOSS OF DATA
- *  OR DATA BEING RENDERED INACCURATE OR LOSSES SUSTAINED BY YOU OR THIRD PARTIES OR A FAILURE OF THE
- *  PROGRAM TO OPERATE WITH ANY OTHER PROGRAMS), EVEN IF SUCH HOLDER OR OTHER PARTY HAS BEEN ADVISED
- *  OF THE POSSIBILITY OF SUCH DAMAGES. You should have received a copy of the GPL 3 license with
- *  this file. If not, visit http://www.gnu.de/documents/gpl-3.0.en.html
+ * Copyright (C) 2021 University Hospital Bonn - All Rights Reserved You may use, distribute and
+ * modify this code under the GPL 3 license. THERE IS NO WARRANTY FOR THE PROGRAM, TO THE EXTENT
+ * PERMITTED BY APPLICABLE LAW. EXCEPT WHEN OTHERWISE STATED IN WRITING THE COPYRIGHT HOLDERS AND/OR
+ * OTHER PARTIES PROVIDE THE PROGRAM “AS IS” WITHOUT WARRANTY OF ANY KIND, EITHER EXPRESSED OR
+ * IMPLIED, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE. THE ENTIRE RISK AS TO THE QUALITY AND PERFORMANCE OF THE PROGRAM IS WITH
+ * YOU. SHOULD THE PROGRAM PROVE DEFECTIVE, YOU ASSUME THE COST OF ALL NECESSARY SERVICING, REPAIR
+ * OR CORRECTION. IN NO EVENT UNLESS REQUIRED BY APPLICABLE LAW OR AGREED TO IN WRITING WILL ANY
+ * COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MODIFIES AND/OR CONVEYS THE PROGRAM AS PERMITTED ABOVE,
+ * BE LIABLE TO YOU FOR DAMAGES, INCLUDING ANY GENERAL, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES
+ * ARISING OUT OF THE USE OR INABILITY TO USE THE PROGRAM (INCLUDING BUT NOT LIMITED TO LOSS OF DATA
+ * OR DATA BEING RENDERED INACCURATE OR LOSSES SUSTAINED BY YOU OR THIRD PARTIES OR A FAILURE OF THE
+ * PROGRAM TO OPERATE WITH ANY OTHER PROGRAMS), EVEN IF SUCH HOLDER OR OTHER PARTY HAS BEEN ADVISED
+ * OF THE POSSIBILITY OF SUCH DAMAGES. You should have received a copy of the GPL 3 license with *
+ * this file. If not, visit http://www.gnu.de/documents/gpl-3.0.en.html
  */
 package de.ukbonn.mwtek.dashboardlogic.logic.current;
 
-import static de.ukbonn.mwtek.dashboardlogic.tools.EncounterFilter.isActive;
-import static de.ukbonn.mwtek.dashboardlogic.tools.EncounterFilter.isCovidPositive;
+import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.ICU;
+import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.ICU_ECMO;
+import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.ICU_VENTILATION;
+import static de.ukbonn.mwtek.dashboardlogic.tools.EncounterFilter.getPositiveCurrentlyOnIcuWardEncounters;
 import static de.ukbonn.mwtek.utilities.fhir.misc.FhirCodingTools.getCodeOfFirstCoding;
 
-import de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues;
-import de.ukbonn.mwtek.dashboardlogic.logic.CoronaResultFunctionality;
-import de.ukbonn.mwtek.dashboardlogic.models.CoronaDataItem;
-import de.ukbonn.mwtek.dashboardlogic.settings.InputCodeSettings;
+import de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels;
+import de.ukbonn.mwtek.dashboardlogic.logic.DashboardDataItemLogics;
+import de.ukbonn.mwtek.dashboardlogic.models.DiseaseDataItem;
 import de.ukbonn.mwtek.dashboardlogic.tools.EncounterFilter;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbProcedure;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
-import org.hl7.fhir.r4.model.Procedure;
+import org.hl7.fhir.r4.model.Procedure.ProcedureStatus;
 
 /**
- * This class is used for generating the data item {@link CoronaDataItem current.treatmentlevel}.
+ * This class is used for generating the data item {@link DiseaseDataItem current.treatmentlevel}.
  *
  * @author <a href="mailto:david.meyers@ukbonn.de">David Meyers</a>
  * @author <a href="mailto:berke_enes.dincel@ukbonn.de">Berke Enes Dincel</a>
  */
 @Slf4j
-public class CurrentTreatmentLevel {
+public class CurrentTreatmentLevel extends DashboardDataItemLogics {
 
-  private final List<UkbEncounter> listEncounters;
-  private final List<UkbProcedure> listIcuProcedures;
+  private final List<UkbEncounter> encounters;
+  private final List<UkbProcedure> icuProcedures;
 
-  public CurrentTreatmentLevel(List<UkbEncounter> listEncounter,
-      List<UkbProcedure> listIcuProcedure) {
-    this.listEncounters = listEncounter;
-    this.listIcuProcedures = listIcuProcedure;
-  }
-
-  /**
-   * Creation of a list with the current inpatient c19-positive encounters that are currently on a
-   * standard ward [needed for the data item current.treatmentlevel]
-   *
-   * @param mapCurrentIcu A list of all current inpatient c19-positive cases separated by treatment
-   *                      level
-   * @return List with ongoing inpatient encounter that are currently on a standard ward
-   */
-  public List<UkbEncounter> getCurrentStandardWardEncounter(
-      Map<String, List<UkbEncounter>> mapCurrentIcu, InputCodeSettings inputCodeSettings) {
-    List<UkbEncounter> resultList = new ArrayList<>();
-    List<UkbEncounter> listIcuEncounter = mapCurrentIcu.get(CoronaFixedValues.ICU.getValue());
-    List<UkbEncounter> listVentilationEncounter =
-        mapCurrentIcu.get(CoronaFixedValues.ICU_VENTILATION.getValue());
-    List<UkbEncounter> listEcmoEncounter = mapCurrentIcu.get(CoronaFixedValues.ICU_ECMO.getValue());
-
-    // just a check of the inpatient encounters is needed here.
-    List<UkbEncounter> listEncounterWithoutOutpatients =
-        listEncounters.parallelStream().filter(CoronaResultFunctionality::isCaseClassInpatient)
-            .toList();
-
-    // check inpatient
-    try {
-      listEncounterWithoutOutpatients.forEach(enc -> {
-        AtomicBoolean stationary = new AtomicBoolean(false);
-        // Check if encounter is active and has positive covid flagging
-        if (isActive(enc) && isCovidPositive(enc)) {
-          // Checking if encounter has a higher treatment-level
-          if (!listIcuEncounter.contains(enc)) {
-            if (!listVentilationEncounter.contains(enc) && !listEcmoEncounter.contains(enc)) {
-              stationary.set(true);
-            } else {
-              if (!hasActiveIcuProcedure(listIcuProcedures, enc,
-                  inputCodeSettings.getProcedureVentilationCodes()) && !hasActiveIcuProcedure(
-                  listIcuProcedures, enc, inputCodeSettings.getProcedureEcmoCodes())) {
-                stationary.set(true);
-              }
-            }
-          }
-        }
-        // Since
-        if (stationary.get()) {
-          resultList.add(enc);
-        }
-      });
-    } catch (Exception ex) {
-      log.error("Error in the retrieval of the current standard ward encounter", ex);
-    }
-    return resultList;
+  public CurrentTreatmentLevel(List<UkbEncounter> encounters,
+      List<UkbProcedure> icuProcedures) {
+    this.encounters = encounters;
+    this.icuProcedures = icuProcedures;
   }
 
   /**
@@ -112,105 +60,113 @@ public class CurrentTreatmentLevel {
    *
    * @param mapCurrentIcu     A list of all current inpatient c19-positive cases separated by
    *                          treatment level.
-   * @param icuTreatmentLevel The icu treatment level for which the encounter are to be retrieved
-   *                          (e.g. {@link CoronaFixedValues#ICU}).
+   * @param icuTreatmentLevel The icu treatment level for which the encounter is to be retrieved
+   *                          (e.g. {@link TreatmentLevels#ICU}).
    * @return Returns a list of ongoing icu encounter.
    */
-  @SuppressWarnings("incomplete-switch")
   public List<UkbEncounter> getCurrentEncounterByIcuLevel(
-      Map<String, List<UkbEncounter>> mapCurrentIcu, CoronaFixedValues icuTreatmentLevel,
-      InputCodeSettings inputCodeSettings) {
-    List<UkbEncounter> currentIcuList = new ArrayList<>();
+      Map<TreatmentLevels, List<UkbEncounter>> mapCurrentIcu,
+      TreatmentLevels icuTreatmentLevel, List<UkbEncounter> icuSupplyContactEncounters) {
 
-    Set<UkbEncounter> icuFacilityContacts = mapCurrentIcu.get(CoronaFixedValues.ICU.getValue())
-        .parallelStream().filter(EncounterFilter::isFacilityContact).collect(
+    List<UkbEncounter> currentIcuEncounters = mapCurrentIcu.get(ICU);
+    List<UkbEncounter> currentVentEncounters = mapCurrentIcu.get(ICU_VENTILATION);
+    List<UkbEncounter> currentEcmoEncounters = mapCurrentIcu.get(ICU_ECMO);
+
+    // Figuring out the current status of all treatment levels (an encounter can appear in all of
+    // these at the same time!)
+    // Figure out if there is an ACTIVE ICU ward admission ongoing
+    List<UkbEncounter> positiveCurrentlyOnIcuWardSupplyContacts =
+        getPositiveCurrentlyOnIcuWardEncounters(icuSupplyContactEncounters, getLocations());
+    List<String> positiveCurrentlyOnIcuWardFacilityContactIds =
+        positiveCurrentlyOnIcuWardSupplyContacts.stream()
+            .map(UkbEncounter::getFacilityContactId).toList();
+    // Find the corresponding facility encounter resource to keep the output
+    List<UkbEncounter> currentPositiveIcuFacilityContactEncounter = currentIcuEncounters.stream()
+        .filter(x -> positiveCurrentlyOnIcuWardFacilityContactIds.contains(x.getId())).toList();
+
+    List<UkbProcedure> currentActiveIcuVentProcedures = icuProcedures.stream()
+        .filter(
+            x -> x.isCodeExistingInFirstCoding(
+                getInputCodeSettings().getProcedureVentilationCodes()))
+        .filter(UkbProcedure::isInProgress).toList();
+    Set<String> currentActiveVentFacilityContactIds = currentActiveIcuVentProcedures.stream()
+        .map(UkbProcedure::getCaseId).collect(
             Collectors.toSet());
-    List<UkbEncounter> listVentilationEncounter =
-        mapCurrentIcu.get(CoronaFixedValues.ICU_VENTILATION.getValue());
-    Set<UkbEncounter> ventFacilityContacts = mapCurrentIcu.get(
-            CoronaFixedValues.ICU_VENTILATION.getValue()).parallelStream()
-        .filter(EncounterFilter::isFacilityContact).collect(
+    List<UkbEncounter> currentEncountersWithActiveVent = currentVentEncounters.stream()
+        .filter(x -> currentActiveVentFacilityContactIds.contains(x.getId())).toList();
+
+    List<UkbProcedure> currentActiveIcuEcmoProcedures = icuProcedures.stream()
+        .filter(
+            x -> x.isCodeExistingInFirstCoding(getInputCodeSettings().getProcedureEcmoCodes()))
+        .filter(UkbProcedure::isInProgress).toList();
+    Set<String> currentActiveEcmoFacilityContactIds = currentActiveIcuEcmoProcedures.stream()
+        .map(UkbProcedure::getCaseId).collect(
             Collectors.toSet());
-    List<UkbEncounter> listEcmoEncounter = mapCurrentIcu.get(CoronaFixedValues.ICU_ECMO.getValue());
-    Set<UkbEncounter> ecmoFacilityContacts = mapCurrentIcu.get(
-            CoronaFixedValues.ICU_ECMO.getValue()).parallelStream()
-        .filter(EncounterFilter::isFacilityContact).collect(
-            Collectors.toSet());
+    List<UkbEncounter> currentEncountersWithActiveEcmo = currentEcmoEncounters.stream()
+        .filter(x -> currentActiveEcmoFacilityContactIds.contains(x.getId())).toList();
 
-    boolean isPositive;
-    boolean isActive;
-    try {
-      switch (icuTreatmentLevel) {
-        case ICU -> {
-          for (UkbEncounter encounter : icuFacilityContacts) {
-            isPositive = isCovidPositive(encounter);
-            isActive = isActive(encounter);
-
-            // check End, flag and appearance in higher treatmentlevel
-            if (isActive && isPositive) {
-              if (!listVentilationEncounter.contains(encounter) && !listEcmoEncounter.contains(
-                  encounter)) {
-                currentIcuList.add(encounter);
-              }
-            }
-          }
-        }
-        case ICU_VENTILATION -> {
-          for (UkbEncounter encounter : ventFacilityContacts) {
-            isPositive = isCovidPositive(encounter);
-            isActive = isActive(encounter);
-
-            // check End, flag, procedure status and appearance in higher treatmentlevel
-            if (isActive && isPositive) {
-              for (UkbProcedure ventilation : listIcuProcedures) {
-                if (ventilation.getCaseId().equals(encounter.getId())) {
-                  if (!listEcmoEncounter.contains(encounter)) {
-                    if (hasActiveIcuProcedure(listIcuProcedures, encounter,
-                        inputCodeSettings.getProcedureVentilationCodes())) {
-                      currentIcuList.add(encounter);
-                      break;
-                    }
-                  } else {
-                    // check if higher treatmentlevel is finished and lower is ongoing
-                    if (!hasActiveIcuProcedure(listIcuProcedures, encounter,
-                        inputCodeSettings.getProcedureEcmoCodes()) && hasActiveIcuProcedure(
-                        listIcuProcedures, encounter,
-                        inputCodeSettings.getProcedureVentilationCodes())) {
-                      currentIcuList.add(encounter);
-                      break;
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-        case ICU_ECMO -> {
-          for (UkbEncounter encounter : ecmoFacilityContacts) {
-            isPositive = isCovidPositive(encounter);
-            isActive = isActive(encounter);
-
-            // check end, flag and procedure status
-            if (isActive && isPositive) {
-              for (UkbProcedure ecmo : listIcuProcedures) {
-                if (ecmo.getCaseId().equals(encounter.getId())) {
-                  if (hasActiveIcuProcedure(listIcuProcedures, encounter,
-                      inputCodeSettings.getProcedureEcmoCodes())) {
-                    currentIcuList.add(encounter);
-                    break;
-                  }
-                }
-              }
-            }
-          }
-        }
+    // Assigning regarding the icu level hierarchy
+    switch (icuTreatmentLevel) {
+      case NORMAL_WARD -> {
+        // The inpatient filter filters pre-stationary cases
+        // If it's not on one of the upper level it must be a normal ward.
+        return encounters.parallelStream()
+            .filter(EncounterFilter::isFacilityContact).filter(EncounterFilter::isDiseasePositive)
+            .filter(EncounterFilter::isCaseClassInpatient).filter(EncounterFilter::isActive)
+            .filter(x -> !positiveCurrentlyOnIcuWardFacilityContactIds.contains(x.getId()))
+            .filter(x -> !currentActiveVentFacilityContactIds.contains(x.getId()))
+            .filter(x -> !currentActiveEcmoFacilityContactIds.contains(x.getId())).toList();
       }
-    } catch (Exception ex) {
-      log.error("Error in the retrieval of the current encounters by icu level.", ex);
+      case ICU -> {
+        // Just treat it as ICU if there is no active VENT or ECMO
+        return currentPositiveIcuFacilityContactEncounter.stream()
+            .filter(x -> !currentActiveVentFacilityContactIds.contains(x.getId()))
+            .filter(x -> !currentActiveEcmoFacilityContactIds.contains(x.getId())).toList();
+      }
+      case ICU_VENTILATION -> {
+        // Just treat it as VENT if there is no active ECMO
+        return currentEncountersWithActiveVent.stream()
+            .filter(x -> !currentActiveEcmoFacilityContactIds.contains(x.getId())).toList();
+      }
+      case ICU_ECMO -> {
+        return currentEncountersWithActiveEcmo;
+      }
     }
-    return currentIcuList;
+    return null;
   }
 
+  /**
+   * Filters encounters from a given level that are not present in provided higher level encounter
+   * lists.
+   *
+   * @param encounters   The set of encounters to filter.
+   * @param higherLevel1 The list of encounters from the first higher treatment level.
+   * @param higherLevel2 The list of encounters from the second higher treatment level.
+   * @return A list of encounters that are not present in the higher level encounter lists.
+   */
+  private List<UkbEncounter> filterEncountersNotInHigherLevels(Set<UkbEncounter> encounters,
+      List<UkbEncounter> higherLevel1, List<UkbEncounter> higherLevel2) {
+    return encounters.stream()
+        .filter(encounter -> !higherLevel1.contains(encounter) && (higherLevel2.isEmpty()
+            || !higherLevel2.contains(encounter)))
+        .collect(Collectors.toList());
+  }
+
+  /**
+   * Filters encounters from a given level that are actively receiving a specific procedure based on
+   * provided codes.
+   *
+   * @param encounters     The set of encounters to filter.
+   * @param procedureCodes A list of procedure codes to identify active procedures.
+   * @return A list of encounters with active procedures (based on codes) that are not present in
+   * the higher level list.
+   */
+  private Set<UkbEncounter> filterActiveEncountersWithProcedure(Set<UkbEncounter> encounters,
+      List<String> procedureCodes) {
+    return encounters.stream()
+        .filter(encounter -> hasActiveIcuProcedure(icuProcedures, encounter, procedureCodes))
+        .collect(Collectors.toSet());
+  }
 
   /**
    * Simple check whether the icu procedure is ongoing or already finished
@@ -225,9 +181,10 @@ public class CurrentTreatmentLevel {
       List<String> procedureCodes) {
     List<UkbProcedure> proceduresCurrentEncounter = listIcu.stream()
         .filter(x -> x.getCaseId().equals(encounter.getId()))
+        .filter(x -> x.hasStatus() && x.getStatus().equals(ProcedureStatus.INPROGRESS))
         .filter(x -> x.hasCode() && x.getCode().hasCoding())
         .filter(x -> procedureCodes.contains(getCodeOfFirstCoding(x.getCode().getCoding())))
-        .filter(x -> x.getStatus().equals(Procedure.ProcedureStatus.INPROGRESS)).toList();
-    return proceduresCurrentEncounter.size() > 0;
+        .toList();
+    return !proceduresCurrentEncounter.isEmpty();
   }
 }

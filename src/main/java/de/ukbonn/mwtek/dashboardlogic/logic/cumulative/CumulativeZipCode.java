@@ -17,8 +17,8 @@
  */
 package de.ukbonn.mwtek.dashboardlogic.logic.cumulative;
 
-import de.ukbonn.mwtek.dashboardlogic.enums.CoronaFixedValues;
-import de.ukbonn.mwtek.dashboardlogic.models.CoronaDataItem;
+import de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues;
+import de.ukbonn.mwtek.dashboardlogic.models.DiseaseDataItem;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbPatient;
 import de.ukbonn.mwtek.utilities.generic.time.TimerTools;
@@ -32,7 +32,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.hl7.fhir.r4.model.Address;
 
 /**
- * This class is used for generating the data item {@link CoronaDataItem cumulative.zipcode}.
+ * This class is used for generating the data item {@link DiseaseDataItem cumulative.zipcode}.
  *
  * @author <a href="mailto:david.meyers@ukbonn.de">David Meyers</a>
  * @author <a href="mailto:berke_enes.dincel@ukbonn.de">Berke Enes Dincel</a>
@@ -60,7 +60,7 @@ public class CumulativeZipCode {
     List<String> listResult = new ArrayList<>();
     // get pids from all positive cases
     tempPidSet = listEncounters.parallelStream()
-        .filter(x -> x.hasExtension(CoronaFixedValues.POSITIVE_RESULT.getValue()))
+        .filter(x -> x.hasExtension(DashboardLogicFixedValues.POSITIVE_RESULT.getValue()))
         .map(UkbEncounter::getPatientId).collect(
             Collectors.toSet());
 
@@ -68,17 +68,19 @@ public class CumulativeZipCode {
     for (UkbPatient patient : listPatients) {
       if (tempPidSet.contains(patient.getId())) {
         if (patient.hasAddress()) {
-          // Since 'Strassenanschrift' and 'Postfach' got the same type in the kds profile it should be fine to take the first entry.
+          // Since 'Strassenanschrift' and 'Postfach' got the same type in the kds profile it
+          // should be fine to take the first entry.
           Address firstAddress = patient.getAddressFirstRep();
           if (firstAddress.hasPostalCode() && firstAddress.hasCountry()
               && firstAddress.getCountry()
-              .equals(CoronaFixedValues.COUNTRY_CODE.getValue())) {
+              .equals(DashboardLogicFixedValues.COUNTRY_CODE.getValue())) {
             listResult.add(firstAddress.getPostalCode());
           } else {
             listResult.add("null");
           }
         } else {
-          // Usually we never should end here since it's a non-valid person resource then. (address is 1..*)
+          // Usually we never should end here since it's a non-valid person resource then.
+          // (address is 1..*)
           log.warn("Patient resource with id " + patient.getId()
               + " got no address, but its a mandatory field! ");
           listResult.add("null");

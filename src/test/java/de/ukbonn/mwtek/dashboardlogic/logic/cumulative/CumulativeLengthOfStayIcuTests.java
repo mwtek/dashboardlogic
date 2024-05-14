@@ -18,7 +18,15 @@
 
 package de.ukbonn.mwtek.dashboardlogic.logic.cumulative;
 
-import de.ukbonn.mwtek.dashboardlogic.logic.cumulative.lengthofstay.CumulativeLengthOfStayIcu;
+import static de.ukbonn.mwtek.dashboardlogic.logic.cumulative.lengthofstay.CumulativeLengthOfStayIcu.createIcuLengthOfStayList;
+
+import de.ukbonn.mwtek.dashboardlogic.enums.DataItemContext;
+import de.ukbonn.mwtek.dashboardlogic.examples.EncounterExampleData;
+import de.ukbonn.mwtek.dashboardlogic.examples.InputCodeSettingsExampleData;
+import de.ukbonn.mwtek.dashboardlogic.examples.LocationExampleData;
+import de.ukbonn.mwtek.dashboardlogic.logic.DashboardDataItemLogics;
+import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -27,23 +35,25 @@ public class CumulativeLengthOfStayIcuTests {
   @Test
   @DisplayName("Ensuring that the cumulative.lengthofstay.icu data item is able to handle empty "
       + "fields in the location resource.")
-  void testCreateList() {
-
-    CumulativeLengthOfStayIcu cumulativeLengthOfStayIcu =
-        new CumulativeLengthOfStayIcu();
-//
-//    FacilityEncounterToIcuSupplyContactsMap facilityEncounterIdToIcuSupplyContactsMap =
-//        assignSupplyEncountersToFacilityEncounter(
-//            EncounterExampleData.getExampleList(), EncounterExampleData.getExampleList());
-//
-//    Map<DashboardLogicFixedValues, List<UkbEncounter>> mapIcu =
-//        CoronaResultFunctionality.createIcuMap(EncounterExampleData.getExampleList(),
-//            facilityEncounterIdToIcuSupplyContactsMap,
-//            LocationExampleData.getExampleList(),
-//            ProcedureExampleData.getExampleList(),
-//            InputCodeSettingsExampleData.getExampleData());
-//
-//    Map<String, Map<Long, Set<String>>> mapIcuLengthList =
-//        cumulativeLengthOfStayIcu.createIcuLengthOfStayList(mapIcu);
+  void testCreateListWithoutLocations() {
+    DashboardDataItemLogics.initializeData(InputCodeSettingsExampleData.getExampleData(),
+        EncounterExampleData.getExampleList(), null, null, null, null, DataItemContext.COVID);
+    Map<String, Map<Long, Set<String>>> mapIcuLengthList =
+        createIcuLengthOfStayList(
+            DashboardDataItemLogics.getSupplyContactEncounters());
   }
+
+  @Test
+  @DisplayName("Ensuring that the cumulative.lengthofstay.icu data item is able to handle even "
+      + "non-valid-locations.")
+  void testCreateListWithLocations() {
+    DashboardDataItemLogics.initializeData(InputCodeSettingsExampleData.getExampleData(),
+        EncounterExampleData.getExampleList(), null, null, LocationExampleData.getExampleList(),
+        null,
+        DataItemContext.COVID);
+    Map<String, Map<Long, Set<String>>> mapIcuLengthList =
+        createIcuLengthOfStayList(
+            DashboardDataItemLogics.getSupplyContactEncounters());
+  }
+
 }

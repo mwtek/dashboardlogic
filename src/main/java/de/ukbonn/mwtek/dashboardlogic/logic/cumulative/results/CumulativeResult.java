@@ -30,7 +30,6 @@ import de.ukbonn.mwtek.dashboardlogic.logic.DashboardDataItemLogics;
 import de.ukbonn.mwtek.dashboardlogic.models.DiseaseDataItem;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbObservation;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
 
@@ -43,13 +42,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class CumulativeResult extends DashboardDataItemLogics {
 
-  List<UkbObservation> listObservations;
-
-  public CumulativeResult(List<UkbObservation> listObservation) {
-    this.listObservations = listObservation;
-  }
-
-  private Set<UkbObservation> observations;
+  private Set<UkbObservation> observationsByContext;
 
   /**
    * Determination of the laboratory tests of all patients for whom there is an outpatient,
@@ -66,25 +59,25 @@ public class CumulativeResult extends DashboardDataItemLogics {
     Set<UkbObservation> listObs = new HashSet<>();
 
     // Initial filtering of the needed observations
-    if (observations == null) {
-      observations = getObservationsByContext(listObservations,
+    if (observationsByContext == null) {
+      observationsByContext = getObservationsByContext(getObservations(),
           getInputCodeSettings(), dataItemContext);
     }
 
     // Check Observation.value if present, otherwise Observation.interpretation
-    if (observations != null) {
+    if (observationsByContext != null) {
       switch (labResult) {
         case POSITIVE -> {
-          listObs = getObservationsByValue(observations, POSITIVE);
-          listObs.addAll(getObservationsByInterpretation(observations, POSITIVE));
+          listObs = getObservationsByValue(observationsByContext, POSITIVE);
+          listObs.addAll(getObservationsByInterpretation(observationsByContext, POSITIVE));
         } // case
         case BORDERLINE -> {
-          listObs = getObservationsByValue(observations, BORDERLINE);
-          listObs.addAll(getObservationsByInterpretation(observations, BORDERLINE));
+          listObs = getObservationsByValue(observationsByContext, BORDERLINE);
+          listObs.addAll(getObservationsByInterpretation(observationsByContext, BORDERLINE));
         } // case
         case NEGATIVE -> {
-          listObs = getObservationsByValue(observations, NEGATIVE);
-          listObs.addAll(getObservationsByInterpretation(observations, NEGATIVE));
+          listObs = getObservationsByValue(observationsByContext, NEGATIVE);
+          listObs.addAll(getObservationsByInterpretation(observationsByContext, NEGATIVE));
         } // case
         default -> {
           // do nothing

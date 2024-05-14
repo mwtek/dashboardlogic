@@ -15,36 +15,25 @@
  * OF THE POSSIBILITY OF SUCH DAMAGES. You should have received a copy of the GPL 3 license with *
  * this file. If not, visit http://www.gnu.de/documents/gpl-3.0.en.html
  */
+package de.ukbonn.mwtek.dashboardlogic.tools;
 
-package de.ukbonn.mwtek.dashboardlogic.enums;
+import java.util.List;
+import java.util.OptionalInt;
+import java.util.stream.IntStream;
 
-/**
- * Class with all numeric, parameterizable constants that can have an influence on the dashboard
- * logic
- *
- * @author <a href="mailto:david.meyers@ukbonn.de">David Meyers</a>
- */
-public class CoronaDashboardConstants {
+public class TimelineTools {
 
   /**
-   * Effective date from which medical cases are subject to the Corona logic workflow
+   * Retrieves the index corresponding to the given timestamp.
+   *
+   * @param timestamp The timestamp to search for
+   * @param dates     The list with all the midnight timestamps used in the timeline.
+   * @return The index corresponding to the given timestamp, or -1 if not found
    */
-  public final static long QUALIFYING_DATE = 1580083200; // 27.01.2020
-
-  /**
-   * Calendar year from which medical cases are subject to the corona logic workflow. Used in
-   * parallelization of the data requests.
-   */
-  public final static int QUALIFYING_YEAR = 2020; // 27.01.
-
-  /**
-   * The duration of a day in seconds
-   */
-  public final static long DAY_IN_SECONDS = 86400;
-
-  /**
-   * Parameters to configure how many days after an outpatient stay an inpatient stay must occur to
-   * be marked as c19 positive
-   */
-  public final static int DAYS_AFTER_OUTPATIENT_STAY = 12;
+  public static int getIndexByTimestamp(long timestamp, List<? extends Number> dates) {
+    OptionalInt indexOptional = IntStream.range(0, dates.size())
+        .filter(i -> dates.get(i).equals(timestamp))
+        .findFirst();
+    return indexOptional.orElse(-1);
+  }
 }

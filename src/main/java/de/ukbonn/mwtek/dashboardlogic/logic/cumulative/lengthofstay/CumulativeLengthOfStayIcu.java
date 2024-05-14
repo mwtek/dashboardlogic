@@ -17,12 +17,8 @@
  */
 package de.ukbonn.mwtek.dashboardlogic.logic.cumulative.lengthofstay;
 
-import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.ICU;
-import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.ICU_ECMO;
-import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.ICU_VENTILATION;
 import static de.ukbonn.mwtek.dashboardlogic.logic.CoronaResultFunctionality.calculateDaysInBetweenInHours;
 import static de.ukbonn.mwtek.dashboardlogic.logic.DiseaseResultFunctionality.extractIdFromReference;
-import static de.ukbonn.mwtek.dashboardlogic.tools.EncounterFilter.isPatientDeceased;
 
 import de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels;
 import de.ukbonn.mwtek.dashboardlogic.enums.VitalStatus;
@@ -71,7 +67,11 @@ public class CumulativeLengthOfStayIcu extends DashboardDataItemLogics {
 
     log.debug("started createIcuLengthOfStayList");
     Instant startTimer = TimerTools.startTimer();
-    HashMap<String, Map<Long, Set<String>>> mapResult = new HashMap<>();
+    Map<String, Map<Long, Set<String>>> mapResult = new HashMap<>();
+    // If there are no location resources existing, its impossible to calculate icu stay lengths
+    if (getLocations() == null) {
+      return null;
+    }
 
     // Determination of the location IDs of all intensive care units. Only the wards are considered,
     // since in the location components within an Encounter resource, at best ward/room and bed are
@@ -176,7 +176,7 @@ public class CumulativeLengthOfStayIcu extends DashboardDataItemLogics {
    * @param mapIcuLengthList Map with the number of ICU stay hours per patientId
    * @param mapIcu           Map that assigns a list of case numbers to an ICU treatment level
    *                         class
-   * @return Map with the number of ICU stay hours of all non-deceased patients per PatientId
+   * @return A map containing filtered ICU length lists based on the given vital status.
    */
   public static Map<String, Map<Long, Set<String>>> createIcuLengthListByVitalstatus(
       VitalStatus vitalStatus, Map<String, Map<Long, Set<String>>> mapIcuLengthList,
@@ -187,20 +187,20 @@ public class CumulativeLengthOfStayIcu extends DashboardDataItemLogics {
 
     Map<String, Map<Long, Set<String>>> mapResult = new HashMap<>();
 
+    // Merge ICU encounters from different treatment levels into a single set
     Set<UkbEncounter> icuEncounters = new HashSet<>();
-    icuEncounters.addAll(mapIcu.get(ICU));
-    icuEncounters.addAll(mapIcu.get(ICU_VENTILATION));
-    icuEncounters.addAll(mapIcu.get(ICU_ECMO));
+    mapIcu.values().forEach(icuEncounters::addAll);
 
+    // Iterate through each ICU supply contact encounter
     for (UkbEncounter encounter : icuEncounters) {
       String pid = encounter.getPatientId();
+      // Check if the encounter should be included based on the given vital status
       boolean shouldInclude = shouldIncludeEncounter(vitalStatus, encounter);
-
-      if (shouldInclude) {
-        mapResult.put(pid, mapIcuLengthList.get(pid));
+      if (shouldInclude && mapIcuLengthList.containsKey(pid)) {
+        // Add or update the filtered ICU length list for the patient in the result map
+        mapResult.computeIfAbsent(pid, k -> new HashMap<>(mapIcuLengthList.get(k)));
       }
     }
-
     TimerTools.stopTimerAndLog(startTime, "finished createIcuLengthListByVitalstatus");
     return mapResult;
   }
@@ -215,11 +215,11 @@ public class CumulativeLengthOfStayIcu extends DashboardDataItemLogics {
   private static boolean shouldIncludeEncounter(VitalStatus vitalStatus, UkbEncounter encounter) {
     switch (vitalStatus) {
       case DEAD -> {
-        return isPatientDeceased(encounter);
+        return encounter.isPatientDeceased();
       }
       case ALIVE -> {
-        return !encounter.getHospitalization().hasDischargeDisposition() || !isPatientDeceased(
-            encounter);
+        return !encounter.getHospitalization().hasDischargeDisposition()
+            || !encounter.isPatientDeceased();
       }
     }
     return false; // Do not include encounter if vital status is null

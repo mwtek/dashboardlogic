@@ -23,12 +23,12 @@ import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.ICU_ECMO;
 import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.ICU_VENTILATION;
 import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.INPATIENT;
 import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.OUTPATIENT;
-import static de.ukbonn.mwtek.dashboardlogic.tools.EncounterFilter.isCaseClassInpatient;
-import static de.ukbonn.mwtek.dashboardlogic.tools.EncounterFilter.isCaseClassOutpatient;
 import static de.ukbonn.mwtek.dashboardlogic.tools.LocationFilter.getIcuLocationIds;
 import static de.ukbonn.mwtek.dashboardlogic.tools.ObservationFilter.getObservationsByContext;
 import static de.ukbonn.mwtek.dashboardlogic.tools.ObservationFilter.getPatientIdsByObsInterpretation;
 import static de.ukbonn.mwtek.dashboardlogic.tools.ObservationFilter.getPatientIdsByObsValue;
+import static de.ukbonn.mwtek.utilities.enums.TerminologySystems.SNOMED;
+import static de.ukbonn.mwtek.utilities.fhir.mapping.kdscase.valuesets.KdsEncounterFixedValues.IDENTIFIER_TYPE_VISIT_NUMBER_CC;
 
 import de.ukbonn.mwtek.dashboardlogic.enums.CoronaDashboardConstants;
 import de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues;
@@ -63,6 +63,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.hl7.fhir.r4.model.CodeableConcept;
+import org.hl7.fhir.r4.model.Identifier;
 import org.hl7.fhir.r4.model.Reference;
 
 /**
@@ -94,7 +95,7 @@ public class DiseaseResultFunctionality {
     // List of stationary Cases
     List<UkbEncounter> inpatientPositiveEncounters =
         encounters.parallelStream().filter(EncounterFilter::isDiseasePositive)
-            .filter(EncounterFilter::isCaseClassInpatient)
+            .filter(UkbEncounter::isCaseClassInpatient)
             .toList();
 
     List<UkbEncounter> supplyContactEncountersPositive = supplyContactEncounters.stream()
@@ -118,8 +119,8 @@ public class DiseaseResultFunctionality {
 
     Set<String> facilityContactsWithVent = icuProceduresWithEncRef.stream()
         .filter(
-            x -> x.isCodeExistingInFirstCoding(inputCodeSettings.getProcedureVentilationCodes()))
-        .map(
+            x -> x.isCodeExistingInValueSet(inputCodeSettings.getProcedureVentilationCodes(),
+                SNOMED, false)).map(
             UkbProcedure::getCaseId).collect(
             Collectors.toSet());
 
@@ -127,8 +128,8 @@ public class DiseaseResultFunctionality {
         .filter(x -> facilityContactsWithVent.contains(x.getId())).toList();
 
     Set<String> facilityContactsWithEcmo = icuProceduresWithEncRef.stream()
-        .filter(x -> x.isCodeExistingInFirstCoding(inputCodeSettings.getProcedureEcmoCodes())).map(
-            UkbProcedure::getCaseId).collect(
+        .filter(x -> x.isCodeExistingInValueSet(inputCodeSettings.getProcedureEcmoCodes(), SNOMED,
+            false)).map(UkbProcedure::getCaseId).collect(
             Collectors.toSet());
 
     List<UkbEncounter> ecmoEncounters = inpatientPositiveEncounters.stream()
@@ -154,7 +155,7 @@ public class DiseaseResultFunctionality {
         .collect(Collectors.groupingBy(UkbEncounter::getVisitNumberIdentifierValue));
 
     List<UkbEncounter> facilityContacts = inpatientEncounters.parallelStream()
-        .filter(EncounterFilter::isFacilityContact).toList();
+        .filter(UkbEncounter::isFacilityContact).toList();
 
     // Iterate over facility contacts and map supply contacts
     for (UkbEncounter facilityContact : facilityContacts) {
@@ -179,37 +180,33 @@ public class DiseaseResultFunctionality {
    * lists of UkbEncounter objects.
    *
    * @param supplyContactEncounters The list of supply contacts.
+   * @param departmentEncounters    The list of department contacts.
    * @param facilityEncounters      The list of facility contacts.
+   * @param usePartOf               Use {@link UkbEncounter#getPartOf()} attribute instead the visit
+   *                                number in {@link UkbEncounter#getIdentifier()}
    * @return A mapping from supply contacts to facility contacts.
+   * @throws RuntimeException if no encounter with an identifier.slice 'Aufnahmenummer' was found.
    */
   public static Map<String, String> generateSupplyContactToFacilityContactMap(
-      List<UkbEncounter> supplyContactEncounters, List<UkbEncounter> facilityEncounters) {
+      List<UkbEncounter> supplyContactEncounters, List<UkbEncounter> departmentEncounters,
+      List<UkbEncounter> facilityEncounters, boolean usePartOf) {
 
     // Initialize output map
     Map<String, String> output = new ConcurrentHashMap<>();
 
-    // Index facility encounters by officialIdentifierValue
+    // Index facility encounters by visit number
     Map<String, UkbEncounter> facilityEncounterMap = new ConcurrentHashMap<>();
-    facilityEncounters.parallelStream().forEach(facilityEncounter ->
-    {
+    facilityEncounters.forEach(facilityEncounter -> {
       String visitNumber = facilityEncounter.getVisitNumberIdentifierValue();
       if (visitNumber != null) {
-        facilityEncounterMap.put(facilityEncounter.getVisitNumberIdentifierValue(),
-            facilityEncounter);
+        facilityEncounterMap.put(visitNumber, facilityEncounter);
       } else {
         log.warn("No identifier with slice 'Aufnahmenummer' was found for encounter with id "
             + facilityEncounter.getId());
       }
     });
-// TODO Implement a feature that checks .partOf recursively if Encounter.identifier is null
-    if (facilityEncounterMap.isEmpty()) {
-      String logMessage =
-          "Not a single encounter with an identifier.slice 'Aufnahmenummer' was found. Thus, no "
-              + "hierarchical determination of supply contact -> facility contact is possible!";
-      throw new RuntimeException(logMessage);
-    }
 
-    // Map supply contacts to facility contacts and add a references to the supply contact resource
+    // Process supply contacts and map them to facility contacts
     supplyContactEncounters.parallelStream().forEach(supplyContactEncounter -> {
       try {
         String visitNumber = supplyContactEncounter.getVisitNumberIdentifierValue();
@@ -219,14 +216,65 @@ public class DiseaseResultFunctionality {
             supplyContactEncounter.setFacilityContactId(facilityEncounter.getId());
             output.put(supplyContactEncounter.getId(), facilityEncounter.getId());
           }
+        } else {
+          log.warn("No visit number identifier found for supply contact encounter with id "
+              + supplyContactEncounter.getId());
         }
       } catch (Exception ex) {
-        // Log statement can be inserted here if necessary
-        log.error("");
+        log.error("Error processing supply contact: " + ex.getMessage());
       }
     });
 
+    // If no facility encounters were found, try hierarchical determination via Encounter.partOf
+    if (usePartOf) {
+      log.info(
+          "No usable Encounter.identifier references found -> trying to get these info via "
+              + "Encounter.partOf additionally");
+      supplyContactEncounters.forEach(supplyContact -> {
+        String supplyContactPartOf = extractIdFromReference(supplyContact.getPartOf());
+        if (supplyContactPartOf != null) {
+          UkbEncounter departmentContact = departmentEncounters.stream()
+              .filter(x -> x.getId().equals(supplyContactPartOf)).findFirst().orElse(null);
+          if (departmentContact != null) {
+            String departmentContactPartOf = extractIdFromReference(departmentContact.getPartOf());
+            if (departmentContactPartOf != null) {
+              UkbEncounter facilityContact = facilityEncounters.stream()
+                  .filter(x -> x.getId().equals(departmentContactPartOf)).findFirst().orElse(null);
+              if (facilityContact != null) {
+                supplyContact.setFacilityContactId(facilityContact.getId());
+                output.put(supplyContact.getId(), facilityContact.getId());
+                // Using the facility contact id as Encounter.identifier for easier usage in the
+                // further workflow
+                supplyContact.addIdentifier(createIdentifierVisitNumber(facilityContact));
+                facilityContact.addIdentifier(createIdentifierVisitNumber(facilityContact));
+              }
+            } else {
+              log.warn("No partOf identifier found for 'Encounter.abteilungskontakt' with id "
+                  + departmentContact.getId());
+            }
+          } else {
+            log.warn(
+                "No department reference found for 'Encounter.versorgungsstellenkontakt' with id "
+                    + supplyContact.getId());
+          }
+        } else {
+          log.warn("No partOf identifier found for 'Encounter.versorgungsstellenkontakt' with id "
+              + supplyContact.getId());
+        }
+      });
+    }
+
+    if (output.isEmpty()) {
+      throw new RuntimeException(
+          "No encounter with an identifier.slice 'Aufnahmenummer' was found.");
+    }
     return output;
+  }
+
+
+  private static Identifier createIdentifierVisitNumber(UkbEncounter facilityContact) {
+    return new Identifier().setType(IDENTIFIER_TYPE_VISIT_NUMBER_CC)
+        .setValue(facilityContact.getId());
   }
 
   /**
@@ -256,11 +304,11 @@ public class DiseaseResultFunctionality {
       // retrieve the contact type (Encounter.type.kontaktart) which is needed to figure out if the
       // inpatient case is a prestationary or normalstationary one
       // check if encounter is stationary (without the prestationary ones!)
-      if (isCaseClassInpatient(e)) {
+      if (e.isCaseClassInpatient()) {
         encounterMap.get(INPATIENT).add(e);
       }
       // check if encounter is ambulant
-      else if (isCaseClassOutpatient(e)) {
+      else if (e.isCaseClassOutpatient()) {
         encounterMap.get(OUTPATIENT).add(e);
       }
     });
@@ -287,13 +335,13 @@ public class DiseaseResultFunctionality {
     // Pre-filtering: Figure out if the facility contact encounter is in-progress (NOT the
     // procedure/icu situation!)
     List<UkbEncounter> currentActiveIcuEncounters = mapIcuOverall.get(ICU).stream()
-        .filter(EncounterFilter::isActive).filter(EncounterFilter::isDiseasePositive).toList();
+        .filter(UkbEncounter::isActive).filter(EncounterFilter::isDiseasePositive).toList();
 
     List<UkbEncounter> currentActiveIcuVentEncounters = mapIcuOverall.get(ICU_VENTILATION).stream()
-        .filter(EncounterFilter::isActive).filter(EncounterFilter::isDiseasePositive).toList();
+        .filter(UkbEncounter::isActive).filter(EncounterFilter::isDiseasePositive).toList();
 
     List<UkbEncounter> currentActiveIcuEcmoEncounters = mapIcuOverall.get(ICU_ECMO).stream()
-        .filter(EncounterFilter::isActive).filter(EncounterFilter::isDiseasePositive).toList();
+        .filter(UkbEncounter::isActive).filter(EncounterFilter::isDiseasePositive).toList();
 
     Map<TreatmentLevels, List<UkbEncounter>> resultMap = new ConcurrentHashMap<>();
     resultMap.put(ICU, currentActiveIcuEncounters);
@@ -398,7 +446,7 @@ public class DiseaseResultFunctionality {
   private static List<Long> createDateList() {
     // Initialization of the output list
     datesOutput = new ArrayList<>();
-    long currentDate = CoronaDashboardConstants.qualifyingDate;
+    long currentDate = CoronaDashboardConstants.QUALIFYING_DATE;
     long currentDayUnix = DateTools.getCurrentUnixTime();
 
     while (currentDate <= currentDayUnix) {

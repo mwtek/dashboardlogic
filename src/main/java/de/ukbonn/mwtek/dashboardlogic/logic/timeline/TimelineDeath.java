@@ -18,13 +18,13 @@
 package de.ukbonn.mwtek.dashboardlogic.logic.timeline;
 
 import static de.ukbonn.mwtek.dashboardlogic.enums.CoronaDashboardConstants.DAY_IN_SECONDS;
+import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.POSITIVE_RESULT;
 import static de.ukbonn.mwtek.dashboardlogic.logic.CoronaResultFunctionality.getDatesOutputList;
 
 import de.ukbonn.mwtek.dashboardlogic.enums.CoronaDashboardConstants;
-import de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues;
+import de.ukbonn.mwtek.dashboardlogic.logic.DashboardDataItemLogics;
 import de.ukbonn.mwtek.dashboardlogic.models.DiseaseDataItem;
-import de.ukbonn.mwtek.dashboardlogic.tools.EncounterFilter;
-import de.ukbonn.mwtek.dashboardlogic.tools.ListNumberPair;
+import de.ukbonn.mwtek.dashboardlogic.models.TimestampedListPair;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
 import de.ukbonn.mwtek.utilities.generic.time.DateTools;
 import de.ukbonn.mwtek.utilities.generic.time.TimerTools;
@@ -46,14 +46,7 @@ import lombok.extern.slf4j.Slf4j;
  */
 
 @Slf4j
-public class TimelineDeath implements TimelineFunctionalities {
-
-  public List<UkbEncounter> listEncounters;
-
-  public TimelineDeath(List<UkbEncounter> listEncounters) {
-    super();
-    this.listEncounters = listEncounters;
-  }
+public class TimelineDeath extends DashboardDataItemLogics implements TimelineFunctionalities {
 
   /**
    * Creates a ListNumberPair that contains the number of deceased patients for each day since
@@ -61,27 +54,27 @@ public class TimelineDeath implements TimelineFunctionalities {
    *
    * @return ListNumberPair Containing dates and number of deceased people
    */
-  public ListNumberPair createTimelineDeathMap() {
+  public TimestampedListPair createTimelineDeathMap() {
     log.debug("started createTimelineDeathMap");
     Instant startTimer = TimerTools.startTimer();
     LinkedHashMap<Long, Long> dateResultMap = new LinkedHashMap<>();
     List<Long> valueList;
-    ListNumberPair resultPair = new ListNumberPair();
+    TimestampedListPair resultPair = new TimestampedListPair();
 
     //current date
     long currentUnixTime = DateTools.getCurrentUnixTime();
     //start date
-    long tempDateUnix = CoronaDashboardConstants.qualifyingDate;
+    long tempDateUnix = CoronaDashboardConstants.QUALIFYING_DATE;
 
     try {
       // subset with positive and completed encounters needed with discharge disposition: dead
       // (07 on pos 1 and 2 in the Encounter.dischargeDisposition)
-      List<UkbEncounter> listPositiveDeceasedCases = listEncounters.parallelStream()
-          .filter(x -> x.hasExtension(DashboardLogicFixedValues.POSITIVE_RESULT.getValue()))
+      List<UkbEncounter> listPositiveDeceasedCases = getFacilityContactEncounters().parallelStream()
+          .filter(x -> x.hasExtension(POSITIVE_RESULT.getValue()))
           // just finished non-outpatient cases can hold a discharge disposition
           .filter(x -> x.getPeriod()
-              .hasEnd() && !EncounterFilter.isCaseClassOutpatient(x))
-          .filter(EncounterFilter::isPatientDeceased).toList();
+              .hasEnd() && !x.isCaseClassOutpatient())
+          .filter(UkbEncounter::isPatientDeceased).toList();
       // Loop through each day
       while (tempDateUnix <= currentUnixTime) {
 
@@ -95,7 +88,7 @@ public class TimelineDeath implements TimelineFunctionalities {
         tempDateUnix += DAY_IN_SECONDS; // add one day
       }
       valueList = divideMapValuesToLists(dateResultMap);
-      resultPair = new ListNumberPair(getDatesOutputList(), valueList);
+      resultPair = new TimestampedListPair(getDatesOutputList(), valueList);
     } catch (Exception e) {
       log.debug("Error is calculating the timeline death: " + e.getMessage());
     }

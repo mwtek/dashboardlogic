@@ -17,10 +17,12 @@
  */
 package de.ukbonn.mwtek.dashboardlogic.logic.cumulative;
 
-import de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues;
+import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.COUNTRY_CODE;
+
+import de.ukbonn.mwtek.dashboardlogic.logic.DashboardDataItemLogics;
 import de.ukbonn.mwtek.dashboardlogic.models.DiseaseDataItem;
+import de.ukbonn.mwtek.dashboardlogic.tools.EncounterFilter;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbPatient;
 import de.ukbonn.mwtek.utilities.generic.time.TimerTools;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -38,57 +40,60 @@ import org.hl7.fhir.r4.model.Address;
  * @author <a href="mailto:berke_enes.dincel@ukbonn.de">Berke Enes Dincel</a>
  */
 @Slf4j
-public class CumulativeZipCode {
-
-  List<UkbEncounter> listEncounters;
-  List<UkbPatient> listPatients;
-
-  public CumulativeZipCode(List<UkbEncounter> listEncounters, List<UkbPatient> listPatients) {
-    this.listEncounters = listEncounters;
-    this.listPatients = listPatients;
-  }
+public class CumulativeZipCode extends DashboardDataItemLogics {
 
   /**
-   * Returns a list containing the zip code of each patient from germany.
-   *
-   * @return List with all zip codes of the given c19-positive patients.
+   * Method to create a list containing the zip code of each patient from Germany who has tested
+   * positive for the given disease.
    */
   public List<String> createZipCodeList() {
+    // Log the start of the method
     log.debug("started createZipCodeList");
+    // Start a timer to measure the method's execution time
     Instant startTime = TimerTools.startTimer();
-    Set<String> tempPidSet;
-    List<String> listResult = new ArrayList<>();
-    // get pids from all positive cases
-    tempPidSet = listEncounters.parallelStream()
-        .filter(x -> x.hasExtension(DashboardLogicFixedValues.POSITIVE_RESULT.getValue()))
-        .map(UkbEncounter::getPatientId).collect(
-            Collectors.toSet());
 
-    // Store zip codes from all positive cases
-    for (UkbPatient patient : listPatients) {
+    // Initialize the list to store zip codes
+    List<String> results = new ArrayList<>();
+
+    // Collect patient IDs of disease-positive cases
+    Set<String> tempPidSet = getFacilityContactEncounters()
+        .parallelStream()
+        .filter(EncounterFilter::isDiseasePositive)
+        .map(UkbEncounter::getPatientId)
+        .collect(Collectors.toSet());
+
+    // Iterate over patients to retrieve their addresses
+    getPatients().forEach(patient -> {
+      // Check if the patient has tested positive for the given disease
       if (tempPidSet.contains(patient.getId())) {
+        // Check if the patient has an address
         if (patient.hasAddress()) {
-          // Since 'Strassenanschrift' and 'Postfach' got the same type in the kds profile it
-          // should be fine to take the first entry.
+          // Retrieve the first address of the patient
           Address firstAddress = patient.getAddressFirstRep();
-          if (firstAddress.hasPostalCode() && firstAddress.hasCountry()
-              && firstAddress.getCountry()
-              .equals(DashboardLogicFixedValues.COUNTRY_CODE.getValue())) {
-            listResult.add(firstAddress.getPostalCode());
+          // Check if the address is from Germany and has a postal code
+          if (firstAddress != null && firstAddress.hasPostalCode() && firstAddress.hasCountry()
+              && firstAddress.getCountry().equals(COUNTRY_CODE.getValue())) {
+            // Add the postal code to the result list
+            results.add(firstAddress.getPostalCode());
           } else {
-            listResult.add("null");
+            // Add "null" if the address is missing or not from Germany
+            results.add("null");
           }
         } else {
-          // Usually we never should end here since it's a non-valid person resource then.
-          // (address is 1..*)
+          // Log a warning if the patient's address is missing
           log.warn("Patient resource with id " + patient.getId()
-              + " got no address, but its a mandatory field! ");
-          listResult.add("null");
+              + " has no address, but it's a mandatory field!");
+          // Add "null" to the result list
+          results.add("null");
         }
       }
-    }
-    Collections.sort(listResult);
+    });
+
+    // Sort the list of zip codes
+    Collections.sort(results);
+    // Stop the timer and log the end of the method
     TimerTools.stopTimerAndLog(startTime, "finished createZipCodeList");
-    return listResult;
+    // Return the list of zip codes
+    return results;
   }
 }

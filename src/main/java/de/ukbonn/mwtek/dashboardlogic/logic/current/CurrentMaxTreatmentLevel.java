@@ -20,12 +20,11 @@ package de.ukbonn.mwtek.dashboardlogic.logic.current;
 import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.ICU;
 import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.ICU_ECMO;
 import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.ICU_VENTILATION;
-import static de.ukbonn.mwtek.dashboardlogic.tools.EncounterFilter.isActive;
 import static de.ukbonn.mwtek.dashboardlogic.tools.EncounterFilter.isDiseasePositive;
 
 import de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels;
+import de.ukbonn.mwtek.dashboardlogic.logic.DashboardDataItemLogics;
 import de.ukbonn.mwtek.dashboardlogic.models.DiseaseDataItem;
-import de.ukbonn.mwtek.dashboardlogic.tools.EncounterFilter;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
 import de.ukbonn.mwtek.utilities.generic.time.TimerTools;
 import java.time.Instant;
@@ -43,14 +42,9 @@ import lombok.extern.slf4j.Slf4j;
  */
 
 @Slf4j
-public class CurrentMaxTreatmentLevel {
+public class CurrentMaxTreatmentLevel extends DashboardDataItemLogics {
 
-  public List<UkbEncounter> listEncounters;
   private List<UkbEncounter> facilityContactsInpatients;
-
-  public CurrentMaxTreatmentLevel(List<UkbEncounter> listEncounter) {
-    this.listEncounters = listEncounter;
-  }
 
   /**
    * Search for the maximum treatment level of the current ongoing encounter, for the
@@ -69,8 +63,8 @@ public class CurrentMaxTreatmentLevel {
     Instant startTimer = TimerTools.startTimer();
 
     if (facilityContactsInpatients == null) {
-      facilityContactsInpatients = listEncounters.parallelStream()
-          .filter(EncounterFilter::isCaseClassInpatient)
+      facilityContactsInpatients = getFacilityContactEncounters().parallelStream()
+          .filter(UkbEncounter::isCaseClassInpatient)
           .toList();
     }
 
@@ -78,17 +72,16 @@ public class CurrentMaxTreatmentLevel {
     List<UkbEncounter> icuEncounters = mapIcu.get(ICU);
     List<UkbEncounter> icuVentEncounters = mapIcu.get(ICU_VENTILATION);
     List<UkbEncounter> ecmoEncounters = mapIcu.get(ICU_ECMO);
-    boolean isPositive, isActive;
+    boolean isPositive;
 
     try {
       switch (treatmentLevel) {
         case INPATIENT:
           for (UkbEncounter currentEncounter : facilityContactsInpatients) {
             isPositive = isDiseasePositive(currentEncounter);
-            isActive = isActive(currentEncounter);
 
-            if (isActive && isPositive && !icuEncounters.contains(currentEncounter)
-                && !icuVentEncounters.contains(currentEncounter)
+            if (currentEncounter.isActive() && isPositive && !icuEncounters.contains(
+                currentEncounter) && !icuVentEncounters.contains(currentEncounter)
                 && !ecmoEncounters.contains(currentEncounter)) {
               results.add(currentEncounter);
             }
@@ -98,11 +91,10 @@ public class CurrentMaxTreatmentLevel {
         case ICU:
           for (UkbEncounter currentEncounter : facilityContactsInpatients) {
             isPositive = isDiseasePositive(currentEncounter);
-            isActive = isActive(currentEncounter);
 
             if (!icuVentEncounters.contains(currentEncounter) && !ecmoEncounters.contains(
-                currentEncounter)
-                && icuEncounters.contains(currentEncounter) && isActive && isPositive) {
+                currentEncounter) && icuEncounters.contains(currentEncounter)
+                && currentEncounter.isActive() && isPositive) {
               results.add(currentEncounter);
             }
           }
@@ -111,9 +103,9 @@ public class CurrentMaxTreatmentLevel {
         case ICU_VENTILATION:
           for (UkbEncounter currentEncounter : facilityContactsInpatients) {
             isPositive = isDiseasePositive(currentEncounter);
-            isActive = isActive(currentEncounter);
 
-            if (isActive && isPositive && !ecmoEncounters.contains(currentEncounter)
+            if (currentEncounter.isActive() && isPositive && !ecmoEncounters.contains(
+                currentEncounter)
                 && icuVentEncounters.contains(currentEncounter)) {
               results.add(currentEncounter);
             }
@@ -123,9 +115,9 @@ public class CurrentMaxTreatmentLevel {
         case ICU_ECMO:
           for (UkbEncounter currentEncounter : facilityContactsInpatients) {
             isPositive = isDiseasePositive(currentEncounter);
-            isActive = isActive(currentEncounter);
 
-            if (isActive && isPositive && ecmoEncounters.contains(currentEncounter)) {
+            if (currentEncounter.isActive() && isPositive && ecmoEncounters.contains(
+                currentEncounter)) {
               results.add(currentEncounter);
             }
           }

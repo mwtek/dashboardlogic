@@ -20,13 +20,12 @@ package de.ukbonn.mwtek.dashboardlogic.logic.cumulative.age;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.POSITIVE_RESULT;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.TWELVE_DAYS_LOGIC;
 import static de.ukbonn.mwtek.dashboardlogic.logic.DiseaseResultFunctionality.calculateAge;
-import static de.ukbonn.mwtek.dashboardlogic.tools.EncounterFilter.isPatientDeceased;
 
 import de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels;
 import de.ukbonn.mwtek.dashboardlogic.enums.VitalStatus;
 import de.ukbonn.mwtek.dashboardlogic.logic.CoronaResultFunctionality;
+import de.ukbonn.mwtek.dashboardlogic.logic.DashboardDataItemLogics;
 import de.ukbonn.mwtek.dashboardlogic.models.DiseaseDataItem;
-import de.ukbonn.mwtek.dashboardlogic.tools.EncounterFilter;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbPatient;
 import de.ukbonn.mwtek.utilities.generic.time.TimerTools;
@@ -51,15 +50,7 @@ import org.hl7.fhir.r4.model.Coding;
  */
 
 @Slf4j
-public class CumulativeAge {
-
-  List<UkbEncounter> listEncounters;
-  List<UkbPatient> listPatients;
-
-  public CumulativeAge(List<UkbEncounter> listEncounters, List<UkbPatient> listPatients) {
-    this.listEncounters = listEncounters;
-    this.listPatients = listPatients;
-  }
+public class CumulativeAge extends DashboardDataItemLogics {
 
   /**
    * Get the ages of all disease-positive patients by a given class
@@ -69,7 +60,7 @@ public class CumulativeAge {
    * @param encounterClass the class of an encounter (e.g. {@link TreatmentLevels#INPATIENT})
    * @return returns list of age of all positive patients, who fulfill the caseStatus criteria
    */
-  public List<Integer> getAgeDistributionsByCaseClass(TreatmentLevels encounterClass) {
+  public static List<Integer> getAgeDistributionsByCaseClass(TreatmentLevels encounterClass) {
     log.debug("started getAgeDistributionsByCaseClass");
     Instant startTimer = TimerTools.startTimer();
     List<Integer> resultList = new ArrayList<>();
@@ -78,18 +69,17 @@ public class CumulativeAge {
     Set<String> ambulantPidSet = new HashSet<>();
 
     // get the age of each patient at the admission date from the first disease-positive case
-    List<UkbEncounter> listEncounterPositive = listEncounters.parallelStream()
+    List<UkbEncounter> listEncounterPositive = getFacilityContactEncounters().parallelStream()
         .filter(x -> x.hasExtension(POSITIVE_RESULT.getValue())).toList();
 
     Map<TreatmentLevels, List<UkbEncounter>> mapEncounterAll = new HashMap<>();
-    mapEncounterAll.put(TreatmentLevels.ALL, listEncounters);
+    mapEncounterAll.put(TreatmentLevels.ALL, getFacilityContactEncounters());
     Map<String, Date> pidAgeMap = createPidAgeMap(VitalStatus.ALL, mapEncounterAll);
 
     for (UkbEncounter encounter : listEncounterPositive) {
-
-      if (EncounterFilter.isCaseClassInpatient(encounter)) {
+      if (encounter.isCaseClassInpatient()) {
         stationaryPidSet.add(encounter.getPatientId());
-      } else if (EncounterFilter.isCaseClassOutpatient(encounter) && !encounter.hasExtension(
+      } else if (encounter.isCaseClassOutpatient() && !encounter.hasExtension(
           TWELVE_DAYS_LOGIC.getValue())) {
         ambulantPidSet.add(encounter.getPatientId());
       }
@@ -105,7 +95,7 @@ public class CumulativeAge {
     }
 
     // calculates age
-    for (UkbPatient patient : listPatients) {
+    for (UkbPatient patient : getPatients()) {
       if (pidSet.contains(patient.getId())) {
         if (patient.hasBirthDate() && pidAgeMap.get(patient.getId()) != null) {
           resultList.add(calculateAge(patient.getBirthDate(),
@@ -141,7 +131,7 @@ public class CumulativeAge {
 
     Map<String, Date> pidAgeMap = createPidAgeMap(vitalStatus, mapPositiveEncounterByClass);
     // calculate age
-    for (UkbPatient patient : listPatients) {
+    for (UkbPatient patient : getPatients()) {
       if (pidAgeMap.containsKey(patient.getId())) {
         if (patient.hasBirthDate() && pidAgeMap.get(patient.getId()) != null) {
           resultList.add(calculateAge(patient.getBirthDate(),
@@ -169,7 +159,7 @@ public class CumulativeAge {
    * @param mapPositiveEncounterByClass Map with all positive encounters, grouped by case class
    * @return Map that assigns the admission date of the patient's first c19 positive case to a pid
    */
-  private Map<String, Date> createPidAgeMap(VitalStatus vitalStatus,
+  private static Map<String, Date> createPidAgeMap(VitalStatus vitalStatus,
       Map<TreatmentLevels, List<UkbEncounter>> mapPositiveEncounterByClass) {
     Map<String, Date> pidMap = new HashMap<>();
     for (Map.Entry<TreatmentLevels, List<UkbEncounter>> entry :
@@ -186,14 +176,14 @@ public class CumulativeAge {
           case ALIVE -> {
             // Check dischargeCoding whether it is empty or does not have "07" as code
             // add pid to set and map id criteria are fulfilled
-            if (!isPatientDeceased(encounter)) {
+            if (!encounter.isPatientDeceased()) {
               pidMap.put(currentPid, checkIfEncounterHasEarlierCase(pidMap, encounter));
             }
           }
           case DEAD -> {
             // Same here just reversed
             if (!dischargeCoding.isEmpty()) {
-              if (isPatientDeceased(encounter)) {
+              if (encounter.isPatientDeceased()) {
                 pidMap.put(currentPid, checkIfEncounterHasEarlierCase(pidMap, encounter));
               }
             }
@@ -214,7 +204,8 @@ public class CumulativeAge {
    * @param encounter Encounter against which the previous admission date is checked
    * @return Admission date of the oldest of the two encounter examined
    */
-  private Date checkIfEncounterHasEarlierCase(Map<String, Date> pidMap, UkbEncounter encounter) {
+  private static Date checkIfEncounterHasEarlierCase(Map<String, Date> pidMap,
+      UkbEncounter encounter) {
     String pid = encounter.getPatientId();
     if (encounter.isPeriodStartExistent()) {
       Date admissionDateEncounter = encounter.getPeriod().getStart();
@@ -242,7 +233,7 @@ public class CumulativeAge {
     }
   }
 
-  private List<Integer> createCohortAgeList(List<Integer> resultList) {
+  private static List<Integer> createCohortAgeList(List<Integer> resultList) {
     List<Integer> cohortAgeList = new ArrayList<>();
     for (int age : resultList) {
       int cohortAge = CoronaResultFunctionality.checkAgeGroup(age);

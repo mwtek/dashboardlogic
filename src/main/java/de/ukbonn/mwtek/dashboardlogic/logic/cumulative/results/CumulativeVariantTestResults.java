@@ -23,10 +23,10 @@ import static de.ukbonn.mwtek.dashboardlogic.tools.StringHelper.isAnyMatchSetWit
 import static de.ukbonn.mwtek.utilities.enums.TerminologySystems.LOINC;
 
 import de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues;
+import de.ukbonn.mwtek.dashboardlogic.logic.DashboardDataItemLogics;
 import de.ukbonn.mwtek.dashboardlogic.models.DiseaseDataItem;
 import de.ukbonn.mwtek.dashboardlogic.settings.InputCodeSettings;
 import de.ukbonn.mwtek.dashboardlogic.settings.VariantSettings;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbObservation;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -43,23 +43,17 @@ import org.hl7.fhir.r4.model.Observation;
  * @author <a href="mailto:berke_enes.dincel@ukbonn.de">Berke Enes Dincel</a>
  */
 @Slf4j
-public class CumulativeVariantTestResults {
-
-  List<UkbObservation> listObservation;
-
-  public CumulativeVariantTestResults(List<UkbObservation> listObservation) {
-    this.listObservation = listObservation;
-  }
+public class CumulativeVariantTestResults extends DashboardDataItemLogics {
 
   List<Coding> variantCodings;
   VariantSettings variantSettings;
 
   /**
-   * Creation of a map that assigns the supported Covid variants the frequency of their occurrence
-   * at the site. Currently, only LOINC encodings are supported.
+   * Creation of a map that assigns the supported Covid-19 variants the frequency of their
+   * occurrence at the site. Currently, only LOINC encodings are supported.
    *
    * @param variantSettings   The local configuration to extend the query logic with additional
-   *                          covid variants that are not yet known at the time of release.
+   *                          covid-19 variants that are not yet known at the time of release.
    * @param inputCodeSettings The configuration of the parameterizable codes such as the observation
    *                          codes or procedure codes.
    * @return Map with frequencies per covid variant.
@@ -74,7 +68,7 @@ public class CumulativeVariantTestResults {
 
     // Get all the coding-entries that contain loinc information
     try {
-      variantCodings = listObservation.parallelStream()
+      variantCodings = getVariantObservations().parallelStream()
           .filter(x -> isCodingValid(x.getCode(), LOINC,
               observationVariantLoincCodes))
           .map(Observation::getValueCodeableConcept).filter(CodeableConcept::hasCoding).flatMap(
@@ -146,9 +140,9 @@ public class CumulativeVariantTestResults {
         } else {
           incrementVariantCount(variantMap, DashboardLogicFixedValues.VARIANT_UNKNOWN);
           // The log message got commented out since it could contain patient data and fills the
-          // logs heavily. If there is urgent need comment it in again.
+          // logs heavily. If there is an urgent need comment it in again.
 //          log.debug(
-//              "No support for covid variant with loinc code: " + variantCoding.getCode()
+//              "No support for covid-19 variant with loinc code: " + variantCoding.getCode()
 //                  + " and display: " + variantCoding.getDisplay());
         }
       }

@@ -19,11 +19,16 @@ package de.ukbonn.mwtek.dashboardlogic.logic.timeline;
 
 import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.DATE;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.VARIANT_ALPHA;
+import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.VARIANT_ALPHA_LOINC;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.VARIANT_BETA;
+import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.VARIANT_BETA_LOINC;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.VARIANT_DELTA;
+import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.VARIANT_DELTA_LOINC;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.VARIANT_GAMMA;
+import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.VARIANT_GAMMA_LOINC;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.VARIANT_NON_VOC;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.VARIANT_OMICRON;
+import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.VARIANT_OMICRON_LOINC;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.VARIANT_OTHER_VOC;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.VARIANT_UNKNOWN;
 import static de.ukbonn.mwtek.dashboardlogic.logic.CoronaResultFunctionality.getDatesOutputList;
@@ -32,7 +37,7 @@ import static de.ukbonn.mwtek.dashboardlogic.tools.StringHelper.isAnyMatchSetWit
 import static de.ukbonn.mwtek.utilities.enums.TerminologySystems.LOINC;
 
 import de.ukbonn.mwtek.dashboardlogic.enums.CoronaDashboardConstants;
-import de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues;
+import de.ukbonn.mwtek.dashboardlogic.logic.DashboardDataItemLogics;
 import de.ukbonn.mwtek.dashboardlogic.models.DiseaseDataItem;
 import de.ukbonn.mwtek.dashboardlogic.settings.InputCodeSettings;
 import de.ukbonn.mwtek.dashboardlogic.settings.VariantSettings;
@@ -54,13 +59,7 @@ import org.hl7.fhir.r4.model.Observation;
  * @author <a href="mailto:berke_enes.dincel@ukbonn.de">Berke Enes Dincel</a>
  */
 @Slf4j
-public class TimelineVariantTestResults {
-
-  List<UkbObservation> listObservation;
-
-  public TimelineVariantTestResults(List<UkbObservation> listObservation) {
-    this.listObservation = listObservation;
-  }
+public class TimelineVariantTestResults extends DashboardDataItemLogics {
 
   public Map<String, List<Long>> createTimelineVariantsTests(VariantSettings variantSettings,
       InputCodeSettings inputCodeSettings) {
@@ -78,7 +77,7 @@ public class TimelineVariantTestResults {
     variantMap.put(VARIANT_NON_VOC, new ArrayList<>());
     variantMap.put(VARIANT_UNKNOWN, new ArrayList<>());
 
-    List<UkbObservation> listVariantObservation = listObservation.stream()
+    List<UkbObservation> variantObservations = getVariantObservations().stream()
         .filter(x -> isCodingValid(x.getCode(), LOINC,
             observationVariantLoincCodes))
         .filter(Observation::hasValueCodeableConcept).toList();
@@ -86,7 +85,7 @@ public class TimelineVariantTestResults {
     long currentUnixTime = DateTools.getCurrentUnixTime();
 
     // initialization of the map with the date entries to keep the order ascending
-    long startDate = CoronaDashboardConstants.qualifyingDate;
+    long startDate = CoronaDashboardConstants.QUALIFYING_DATE;
     while (startDate <= currentUnixTime) {
       long alphaCount = 0;
       long betaCount = 0;
@@ -101,13 +100,13 @@ public class TimelineVariantTestResults {
       final long nextDateUnix = startDate + CoronaDashboardConstants.DAY_IN_SECONDS;
 
       // Retrieve all observations for the checked date
-      List<UkbObservation> listFittingVariantObservation = listVariantObservation.stream()
+      List<UkbObservation> validVariantObservations = variantObservations.stream()
           .filter(x -> checkDateUnix <= DateTools.dateToUnixTime(
               x.getEffectiveDateTimeType().getValue()))
           .filter(x -> nextDateUnix > DateTools.dateToUnixTime(
               x.getEffectiveDateTimeType().getValue())).toList();
 
-      for (UkbObservation variantObservation : listFittingVariantObservation) {
+      for (UkbObservation variantObservation : validVariantObservations) {
 //        boolean observationContainsLoinc =
 //            variantObservation.getValueCodeableConcept().getCoding().stream()
 //                .filter(x -> x.hasSystem()).anyMatch(
@@ -121,11 +120,11 @@ public class TimelineVariantTestResults {
           if (variantCoding.hasSystem() && variantCoding.getSystem()
               .equals(LOINC)) {
             switch (variantCoding.getCode()) {
-              case DashboardLogicFixedValues.VARIANT_ALPHA_LOINC -> alphaCount++;
-              case DashboardLogicFixedValues.VARIANT_BETA_LOINC -> betaCount++;
-              case DashboardLogicFixedValues.VARIANT_DELTA_LOINC -> deltaCount++;
-              case DashboardLogicFixedValues.VARIANT_GAMMA_LOINC -> gammaCount++;
-              case DashboardLogicFixedValues.VARIANT_OMICRON_LOINC -> omicronCount++;
+              case VARIANT_ALPHA_LOINC -> alphaCount++;
+              case VARIANT_BETA_LOINC -> betaCount++;
+              case VARIANT_DELTA_LOINC -> deltaCount++;
+              case VARIANT_GAMMA_LOINC -> gammaCount++;
+              case VARIANT_OMICRON_LOINC -> omicronCount++;
 
               // If value is unhandled or not part of the loinc system -> count it as unknown
               default -> {

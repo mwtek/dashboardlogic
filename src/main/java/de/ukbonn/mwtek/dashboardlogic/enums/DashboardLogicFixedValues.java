@@ -20,7 +20,6 @@ package de.ukbonn.mwtek.dashboardlogic.enums;
 
 import com.google.common.collect.ImmutableList;
 import de.ukbonn.mwtek.utilities.fhir.misc.StaticValueProvider;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
 import lombok.Getter;
 
 /**
@@ -57,25 +56,6 @@ public enum DashboardLogicFixedValues {
   COUNTRY_CODE("DE"),
   CITY_BONN("Bonn"),
 
-  // dischargeCoding [FHIR Value Set]
-  DISCHARGE_DISPOSITION_EXT_URL("http://fhir.de/StructureDefinition/Entlassungsgrund"),
-  DISCHARGE_DISPOSITION_FIRST_AND_SECOND_POS_EXT_URL("ErsteUndZweiteStelle"),
-  DISCHARGE_DISPOSITION_FIRST_AND_SECOND_POS_SYSTEM(
-      "http://fhir.de/CodeSystem/dkgev/EntlassungsgrundErsteUndZweiteStelle"),
-  DEATH_CODE("07"),
-
-  // Encounter.case.type.kontaktart (new fhir profile ->
-  // https://simplifier.net/packages/de.basisprofil.r4/1.0.0/files/397801)
-  CASETYPE_PRESTATIONARY("vorstationaer"),
-  CASETYPE_POSTSTATIONARY("nachstationaer"),
-  CASETYPE_PARTSTATIONARY("teilstationaer"),
-  CASETYPE_NORMALSTATIONARY("normalstationaer"),
-  CASETYPE_INTENSIVESTATIONARY("intensivstationaer"),
-  CASETYPE_CONTACT_ART_SYSTEM("http://fhir.de/CodeSystem/kontaktart-de"),
-
-  // PhysicalType(s)
-  WARD("wa"),
-
   // DiagnosticCodes
   ICD("http://fhir.de/StructureDefinition/icd-10-gm-ausrufezeichen"),
   ICD_SYSTEM("http://fhir.de/CodeSystem/bfarm/icd-10-gm"),
@@ -106,13 +86,7 @@ public enum DashboardLogicFixedValues {
   public static final String OBSERVATION_INTERPRETATION_SYSTEM = "http://terminology.hl7"
       + ".org/CodeSystem/v3-ObservationInterpretation";
 
-  // Encounter.type.coding.kontaktebene
-  public static final String CONTACT_LEVEL_SYSTEM = "http://fhir.de/CodeSystem/Kontaktebene";
-  public static final String CONTACT_LEVEL_FACILITY_CODE = "einrichtungskontakt";
-  public static final String CONTACT_LEVEL_SUPPLY_CODE = "versorgungsstellenkontakt";
-
-
-  // Display forms of the covid variants to check against
+  // Display forms of the covid-19 variants to check against
   public static final String VARIANT_ALPHA = "Alpha";
   public static final String VARIANT_BETA = "Beta";
   public static final String VARIANT_GAMMA = "Gamma";
@@ -122,7 +96,7 @@ public enum DashboardLogicFixedValues {
   public static final String VARIANT_NON_VOC = "NonVOC";
   public static final String VARIANT_UNKNOWN = "Unknown";
 
-  // Codes of the covid variants to check against
+  // Codes of the covid-19 variants to check against
   // For now the display values are checked since its more flexible if new variants appear or to
   // generalize non-voc variants
   public static final String VARIANT_ALPHA_LOINC = "LA31569-9";
@@ -155,24 +129,6 @@ public enum DashboardLogicFixedValues {
    */
   public static final ImmutableList<DashboardLogicFixedValues> DIAGNOSIS_SECURITY_NEGATIVE_ENUM =
       ImmutableList.of(DIAG_RELIABILITY_A);
-
-  /**
-   * List of valid {@link UkbEncounter#getClass_() encounter.class.code} codes for inpatient
-   * encounters. Both the value set from the case module version 1.0 and 2.0 are checked. <a
-   * href="https://simplifier.net/packages/de.basisprofil.r4/1.0.0/files/397957">The value set of
-   * version 2.0 can be found here.</a>.
-   */
-  public static final ImmutableList<String> ENCOUNTER_CLASS_INPATIENT_CODES =
-      ImmutableList.of("IMP", "stationaer");
-
-  /**
-   * List of valid {@link UkbEncounter#getClass_() encounter.class.code} codes for outpatient
-   * encounters. Both the value set from the case module version 1.0 and 2.0 are checked. <a
-   * href="https://simplifier.net/packages/de.basisprofil.r4/1.0.0/files/397957">The value set of
-   * version 2.0 can be found here.</a>.
-   */
-  public static final ImmutableList<String> ENCOUNTER_CLASS_OUTPATIENT_CODES =
-      ImmutableList.of("AMB", "ambulant");
 
   private final String value;
 

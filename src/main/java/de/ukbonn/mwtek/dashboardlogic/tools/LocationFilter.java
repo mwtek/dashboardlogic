@@ -17,11 +17,6 @@
  */
 package de.ukbonn.mwtek.dashboardlogic.tools;
 
-import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.ICU;
-import static de.ukbonn.mwtek.utilities.fhir.misc.FhirCodingTools.getCodeOfFirstCodeableConcept;
-import static de.ukbonn.mwtek.utilities.fhir.misc.FhirCodingTools.getCodeOfFirstCoding;
-
-import de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbLocation;
 import java.util.List;
 import java.util.Set;
@@ -32,44 +27,11 @@ import java.util.stream.Collectors;
  */
 public class LocationFilter {
 
-  /**
-   * Is the given {@link UkbLocation location} of ICU type ?
-   *
-   * @param loc Any {@link UkbLocation location} resource
-   * @return <code>True</code> if the given location describes an intensive care unit.
-   */
-  public static boolean isLocationIcu(UkbLocation loc) {
-    if (loc.hasType()) {
-      String codeLocationType = getCodeOfFirstCodeableConcept(loc.getType());
-      return codeLocationType != null && codeLocationType.equals(ICU.getValue());
-    } else {
-      return false;
-    }
-  }
-
-  /**
-   * Does the passed  {@link UkbLocation location} resource describe a ward/station?
-   *
-   * @param loc Any {@link UkbLocation location} resource
-   * @return <code>True</code> if the given location describes a ward.
-   */
-  public static boolean isLocationWard(UkbLocation loc) {
-    if (loc.hasPhysicalType()) {
-      String codePhysicalType = getCodeOfFirstCoding(loc.getPhysicalType().getCoding());
-      return codePhysicalType != null && codePhysicalType.equals(
-          DashboardLogicFixedValues.WARD.getValue());
-    } else {
-      return false;
-    }
-  }
-
-
   public static List<UkbLocation> getIcuLocations(List<UkbLocation> locations) {
     return locations.stream().filter(x -> !x.getType().isEmpty())
-        .filter(LocationFilter::isLocationWard).filter(LocationFilter::isLocationIcu)
+        .filter(UkbLocation::isLocationWard).filter(UkbLocation::isLocationIcu)
         .toList();
   }
-
 
   public static Set<String> getIcuLocationIds(List<UkbLocation> locations) {
     return getIcuLocations(locations).stream().map(UkbLocation::getId).collect(Collectors.toSet());

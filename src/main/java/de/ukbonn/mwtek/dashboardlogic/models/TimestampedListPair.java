@@ -15,36 +15,50 @@
  * OF THE POSSIBILITY OF SUCH DAMAGES. You should have received a copy of the GPL 3 license with *
  * this file. If not, visit http://www.gnu.de/documents/gpl-3.0.en.html
  */
+package de.ukbonn.mwtek.dashboardlogic.models;
 
-package de.ukbonn.mwtek.dashboardlogic.enums;
+import de.ukbonn.mwtek.dashboardlogic.tools.TimelineTools;
+import java.util.List;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 
 /**
- * Class with all numeric, parameterizable constants that can have an influence on the dashboard
- * logic
+ * A map that connects two lists with a derivation of type {@link Number}.
  *
  * @author <a href="mailto:david.meyers@ukbonn.de">David Meyers</a>
  */
-public class CoronaDashboardConstants {
+@Getter
+@Setter
+@AllArgsConstructor
+@NoArgsConstructor
+public class TimestampedListPair {
+
+  private List<? extends Number> date = null;
+  private List<? extends Number> value = null;
 
   /**
-   * Effective date from which medical cases are subject to the Corona logic workflow
+   * Retrieves a pair of values at the specified index.
+   *
+   * @param index the index of the pair to retrieve
+   * @return a pair of values at the specified index
+   * @throws IndexOutOfBoundsException if the index is out of range
    */
-  public final static long QUALIFYING_DATE = 1580083200; // 27.01.2020
+  public Pair<? extends Number, ? extends Number> getPair(int index) {
+    return new ImmutablePair<>(date.get(index), value.get(index));
+  }
 
   /**
-   * Calendar year from which medical cases are subject to the corona logic workflow. Used in
-   * parallelization of the data requests.
+   * Retrieves the index corresponding to the given timestamp.
+   *
+   * @param timestamp the timestamp to search for
+   * @return the index corresponding to the given timestamp, or -1 if not found
    */
-  public final static int QUALIFYING_YEAR = 2020; // 27.01.
+  public int getIndexByTimestamp(long timestamp) {
+    return TimelineTools.getIndexByTimestamp(timestamp, date);
+  }
 
-  /**
-   * The duration of a day in seconds
-   */
-  public final static long DAY_IN_SECONDS = 86400;
-
-  /**
-   * Parameters to configure how many days after an outpatient stay an inpatient stay must occur to
-   * be marked as c19 positive
-   */
-  public final static int DAYS_AFTER_OUTPATIENT_STAY = 12;
 }

@@ -43,7 +43,7 @@ public class CumulativeResultTests {
     List<UkbObservation> observations = new ArrayList<>();
 
     DashboardDataItemLogics.initializeData(InputCodeSettingsExampleData.getExampleData(), null,
-        null, null);
+        null, observations, null, null, DataItemContext.COVID);
 
     // Add an observation without a value, since this field is not mandatory
     Enumeration<ObservationStatus> observationStatus = new Enumeration<>(
@@ -53,7 +53,7 @@ public class CumulativeResultTests {
         observationStatus, null);
     observations.add(observationWithoutValue);
 
-    CumulativeResult cr = new CumulativeResult(observations);
-    cr.getObservationsByResult(DashboardLogicFixedValues.POSITIVE, DataItemContext.COVID);
+    new CumulativeResult().getObservationsByResult(DashboardLogicFixedValues.POSITIVE,
+        DataItemContext.COVID);
   }
 }

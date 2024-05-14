@@ -19,8 +19,6 @@ package de.ukbonn.mwtek.dashboardlogic.logic.cumulative.gender;
 
 import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.INPATIENT;
 import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.OUTPATIENT;
-import static de.ukbonn.mwtek.dashboardlogic.tools.EncounterFilter.isCaseClassInpatient;
-import static de.ukbonn.mwtek.dashboardlogic.tools.EncounterFilter.isCaseClassOutpatient;
 
 import de.ukbonn.mwtek.dashboardlogic.enums.Gender;
 import de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels;
@@ -61,9 +59,9 @@ public class CumulativeGenderByClass extends CumulativeGender {
     List<UkbEncounter> filteredEncounterList = getFacilityContactEncounters().parallelStream()
         .filter(encounter -> {
           if (encounterClass == OUTPATIENT) {
-            return isCaseClassOutpatient(encounter);
+            return encounter.isCaseClassOutpatient();
           } else if (encounterClass == INPATIENT) {
-            return isCaseClassInpatient(encounter);
+            return encounter.isCaseClassInpatient();
           }
           return false;
         })

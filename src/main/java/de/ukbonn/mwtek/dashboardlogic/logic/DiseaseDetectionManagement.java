@@ -34,7 +34,6 @@ import de.ukbonn.mwtek.dashboardlogic.enums.CoronaDashboardConstants;
 import de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues;
 import de.ukbonn.mwtek.dashboardlogic.enums.DataItemContext;
 import de.ukbonn.mwtek.dashboardlogic.settings.InputCodeSettings;
-import de.ukbonn.mwtek.dashboardlogic.tools.EncounterFilter;
 import de.ukbonn.mwtek.utilities.fhir.misc.FhirConditionTools;
 import de.ukbonn.mwtek.utilities.fhir.misc.FhirTools;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbCondition;
@@ -42,11 +41,8 @@ import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbObservation;
 import de.ukbonn.mwtek.utilities.generic.time.TimerTools;
 import java.time.Instant;
-import java.time.LocalDate;
 import java.time.ZoneId;
-import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -133,71 +129,79 @@ public class DiseaseDetectionManagement {
   public static void detectPositiveInpatientEncountersByPreviousEncounters(
       Set<UkbEncounter> flaggedEncounter,
       List<UkbEncounter> encountersAll) {
+
+    // Start logging
     log.debug("started detectPositiveInpatientEncountersByPreviousEncounters");
     Instant startTimer = TimerTools.startTimer();
-    List<UkbEncounter> encounterOutpatients = new ArrayList<>();
-    Set<String> patientIds = new HashSet<>();
 
-    // Retrieval of the positive outpatient cases
-    Set<UkbEncounter> setPositiveOutpatientEncounter =
-        flaggedEncounter.parallelStream()
-            .filter(EncounterFilter::isCaseClassOutpatient)
-            .collect(Collectors.toSet());
-    // Storing the pids and cases in separate collections
-    for (UkbEncounter encounter : setPositiveOutpatientEncounter) {
-      patientIds.add(encounter.getPatientId());
-      encounterOutpatients.add(encounter);
-    }
+    Set<UkbEncounter> positiveOutpatientEncounter = flaggedEncounter.parallelStream()
+        .filter(UkbEncounter::isCaseClassOutpatient)
+        .collect(Collectors.toSet());
 
-    // Search for stationary Cases
-    List<UkbEncounter> listEncounterInpatients = encountersAll.stream()
-        .filter(encounter -> patientIds.contains(encounter.getPatientId()))
-        .filter(EncounterFilter::isCaseClassInpatient).toList();
+    // Extract patient IDs from flagged encounters marked as outpatient
+    Set<String> positiveOutpatientPatientIds = positiveOutpatientEncounter.stream()
+        .map(UkbEncounter::getPatientId)
+        .collect(Collectors.toSet());
 
-    for (UkbEncounter encounterOutpatient : encounterOutpatients) {
+    // Filter encounters for inpatients using positive outpatient patient IDs
+    Map<String, List<UkbEncounter>> inpatientEncountersByPatientId = encountersAll.stream()
+        .filter(encounter -> positiveOutpatientPatientIds.contains(encounter.getPatientId()))
+        .filter(UkbEncounter::isCaseClassInpatient)
+        .collect(Collectors.groupingBy(UkbEncounter::getPatientId));
 
-      // Filter the stationary cases who have the same pid as the positive ambulant cases
-      List<UkbEncounter> listInpatientEncounter = listEncounterInpatients.stream()
-          .filter(x -> x.getPatientId().equals(encounterOutpatient.getPatientId())).toList();
+    // Loop through flagged encounters
+    for (UkbEncounter outpatientEncounter : positiveOutpatientEncounter) {
+      // Skip encounters without start dates
+      if (!outpatientEncounter.isPeriodStartExistent()) {
+        continue;
+      }
+      // Get start date of outpatient encounter
+      Date outpatientStart = outpatientEncounter.getPeriod().getStart();
 
-      // Checking 12-days-logic for every stationary encounter
-      listInpatientEncounter.forEach(inpatientEncounter -> {
-        if (encounterOutpatient.isPeriodStartExistent()
-            && inpatientEncounter.isPeriodStartExistent()) {
-          Date outpatientStart = encounterOutpatient.getPeriod().getStart();
-          Date inpatientStart = inpatientEncounter.getPeriod().getStart();
+      // Get inpatient encounters for the same patient ID
+      List<UkbEncounter> inpatientEncounters = inpatientEncountersByPatientId.get(
+          outpatientEncounter.getPatientId());
+      if (inpatientEncounters == null) {
+        continue; // No inpatient encounters for this patient
+      }
 
-          // 12-days-logic
-          if (outpatientStart != null && inpatientStart != null) {
-            if (outpatientStart.before(inpatientStart)) {
-              Instant ambuInstant = outpatientStart.toInstant();
-              Instant stationInstant = inpatientStart.toInstant();
-              ZonedDateTime ambuZone = ambuInstant.atZone(ZoneId.systemDefault());
-              ZonedDateTime stationZone = stationInstant.atZone(ZoneId.systemDefault());
-              LocalDate begin = ambuZone.toLocalDate();
-              LocalDate end = stationZone.toLocalDate();
+      // Iterate through inpatient encounters for the same patient ID
+      for (UkbEncounter inpatientEncounter : inpatientEncounters) {
+        // Skip encounters without start dates
+        if (!inpatientEncounter.isPeriodStartExistent()) {
+          continue;
+        }
 
-              long days = ChronoUnit.DAYS.between(begin, end);
+        // Get start date of inpatient encounter
+        Date inpatientStart = inpatientEncounter.getPeriod().getStart();
 
-              if (days <= CoronaDashboardConstants.daysAfterOutpatientStay) {
-                inpatientEncounter.addExtension(TWELVE_DAYS_EXTENSION);
+        // Check if outpatient encounter is before inpatient encounter
+        if (outpatientStart.before(inpatientStart)) {
+          // Calculate the number of days between outpatient and inpatient encounters
+          long days = ChronoUnit.DAYS.between(
+              outpatientStart.toInstant().atZone(ZoneId.systemDefault()).toLocalDate(),
+              inpatientStart.toInstant().atZone(ZoneId.systemDefault()).toLocalDate()
+          );
 
-                // to prevent two possible positive flagging
-                if (!inpatientEncounter.hasExtension(POSITIVE_RESULT.getValue())) {
-                  log.debug(
-                      "The encounter with id " + inpatientEncounter.getId()
-                          + " was marked as positive because a previous outpatient case not older"
-                          + " than 12 days was positive.");
-                }
-              }
-            } // if days
+          // Check if days fall within the defined period
+          if (days <= CoronaDashboardConstants.DAYS_AFTER_OUTPATIENT_STAY) {
+            // Add an extension to inpatient encounter
+            inpatientEncounter.addExtension(TWELVE_DAYS_EXTENSION);
+            // Log if inpatient encounter is marked as positive
+            if (!inpatientEncounter.hasExtension(POSITIVE_RESULT.getValue())) {
+              log.debug("The encounter with id " + inpatientEncounter.getId()
+                  + " was marked as positive because a previous outpatient case not older"
+                  + " than 12 days was positive.");
+            }
           }
-        } // if outpatientStart and inpatientStart
-      });
-    } // for encounterOutpatients
+        }
+      }
+    }
+    // Stop timer and log
     TimerTools.stopTimerAndLog(startTimer,
         "finished detectPositiveInpatientEncountersByPreviousEncounters");
   }
+
 
   /**
    * Creation of a map that assigns the respective case numbers for a given ICD code to a diagnosis

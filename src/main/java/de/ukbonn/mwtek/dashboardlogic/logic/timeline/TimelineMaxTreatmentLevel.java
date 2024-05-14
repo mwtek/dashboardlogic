@@ -23,7 +23,6 @@ import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.ICU_ECMO;
 import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.ICU_VENTILATION;
 import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.NORMAL_WARD;
 import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.OUTPATIENT;
-import static de.ukbonn.mwtek.dashboardlogic.tools.EncounterFilter.isCaseClassOutpatient;
 import static de.ukbonn.mwtek.utilities.fhir.misc.FhirCodingTools.getCodeOfFirstCoding;
 
 import de.ukbonn.mwtek.dashboardlogic.enums.CoronaDashboardConstants;
@@ -64,17 +63,6 @@ import org.hl7.fhir.r4.model.Period;
 public class TimelineMaxTreatmentLevel extends DashboardDataItemLogics implements
     TimelineFunctionalities {
 
-  public List<UkbEncounter> supplyContactEncounters;
-  public List<UkbProcedure> icuProcedures;
-
-  public TimelineMaxTreatmentLevel(
-      List<UkbEncounter> supplyContactEncounters, List<UkbProcedure> icuProcedures) {
-    super();
-
-    this.supplyContactEncounters = supplyContactEncounters;
-    this.icuProcedures = icuProcedures;
-  }
-
   /**
    * Creates a map containing all maximal treatment of cases for each day, since the qualifying
    * date
@@ -82,7 +70,7 @@ public class TimelineMaxTreatmentLevel extends DashboardDataItemLogics implement
    * @return Map that assigns the cases per day to a treatment level and also contains a map with
    * the case ids per date
    */
-  public Map<TreatmentLevels, Map<Long, Set<String>>> createMaxTreatmentTimeline() {
+  public static Map<TreatmentLevels, Map<Long, Set<String>>> createMaxTreatmentTimeline() {
     log.debug("started createMaxTreatmentTimeline");
     Instant startTimer = TimerTools.startTimer();
 
@@ -109,15 +97,23 @@ public class TimelineMaxTreatmentLevel extends DashboardDataItemLogics implement
     // considered, since in the location components within an Encounter resource, at best
     // ward/room and bed are listed with identical time periods, and the stay should only be
     // evaluated once. The highest of these hierarchy levels should be sufficient.
-    Set<String> listIcuIds = LocationFilter.getIcuLocationIds(getLocations());
+    Set<String> icuLocationIds = LocationFilter.getIcuLocationIds(getLocations());
 
-    // Since post-stationary supply contacts usually don't have a usable period.end and act like
-    // outpatient visits, we will filter them
-    List<UkbEncounter> positiveSupplyContactEncounters = supplyContactEncounters.parallelStream()
-        .filter(EncounterFilter::isDiseasePositive)
-        .filter(x -> !EncounterFilter.isCaseTypePostStationary(x)).toList();
+    // Since kds case module profile 2024 the pre-stationary and post-stationary will now be
+    // handled as outpatient cases with Encounter.class = AMB
+    Set<UkbEncounter> positiveSupplyContactEncounters =
+        getSupplyContactEncounters().parallelStream()
+            .filter(EncounterFilter::isDiseasePositive).filter(
+                UkbEncounter::isCaseClassInpatient).collect(Collectors.toSet());
 
-    long currentDate = CoronaDashboardConstants.qualifyingDate;
+    List<UkbEncounter> positiveOutpatientEncounters =
+        getFacilityContactEncounters().parallelStream()
+            .filter(UkbEncounter::isCaseClassOutpatient)
+            .filter(EncounterFilter::isDiseasePositive).toList();
+
+    positiveSupplyContactEncounters.addAll(positiveOutpatientEncounters);
+
+    long currentDate = CoronaDashboardConstants.QUALIFYING_DATE;
     long currentDayUnix = DateTools.getCurrentUnixTime();
 
     while (currentDate <= currentDayUnix) {
@@ -129,11 +125,11 @@ public class TimelineMaxTreatmentLevel extends DashboardDataItemLogics implement
       mapIcuEcmoCaseNrs.put(checkDate, new HashSet<>());
 
       Map<String, Object> locks = new ConcurrentHashMap<>();
-
       // Pre-filtering the encounters to ones that can have intersection with the date that is
       // currently checked
       try {
-        positiveSupplyContactEncounters.stream().filter(x -> DateTools.dateToUnixTime(x.getPeriod()
+        positiveSupplyContactEncounters.parallelStream()
+            .filter(x -> DateTools.dateToUnixTime(x.getPeriod()
                 .getStart()) - DAY_IN_SECONDS < checkDate)
             .filter(x -> DateTools.dateToUnixTime(x.getPeriod().getEnd() == null ?
                 DateTools.getCurrentDateTime() : x.getPeriod().getEnd()) + DAY_IN_SECONDS
@@ -158,7 +154,7 @@ public class TimelineMaxTreatmentLevel extends DashboardDataItemLogics implement
                 boolean isEcmo = mapPrevMaxtreatmentlevel.get(ICU_ECMO).contains(patientId);
                 // if the case is ambulant, check the pids of the previous maxtreatmentlevels
                 // and if none are similar with the current case than note the case as ambulant
-                if (isCaseClassOutpatient(encounter)) {
+                if (encounter.isCaseClassOutpatient()) {
 
                   List<String> listMaxStatPidCheck = new ArrayList<>();
                   List<String> listMaxIcuPidCheck = new ArrayList<>();
@@ -200,18 +196,18 @@ public class TimelineMaxTreatmentLevel extends DashboardDataItemLogics implement
                   }
                 }
                 // At this stage it is clear that it is a stationary encounter
-                else if (EncounterFilter.isCaseClassInpatient(encounter)) {
+                else if (encounter.isCaseClassInpatient()) {
                   if (!encounter.getPeriod().hasEnd()) {
                     encounter.getPeriod().setEnd(DateTools.getCurrentDateTime());
                   }
                   long caseEndUnix = DateTools.dateToUnixTime(encounter.getPeriod().getEnd());
                   // The admission date needs to be before the start date and the discharge date
-                  // needs to be
-                  // after the date that is going to be checked to get the whole time span
+                  // needs to be after the date that is going to be checked to get the whole time
+                  // span
                   if (caseStartUnix < checkDate && caseEndUnix >= checkDate) {
                     List<Encounter.EncounterLocationComponent> listEncounterHasIcuLocation =
                         encounter.getLocation().stream()
-                            .filter(location -> listIcuIds.contains(
+                            .filter(location -> icuLocationIds.contains(
                                 CoronaResultFunctionality.extractIdFromReference(
                                     location.getLocation()))).toList();
                     // if there was no icu related treatmentlevel for this case before
@@ -222,7 +218,7 @@ public class TimelineMaxTreatmentLevel extends DashboardDataItemLogics implement
                         mapPrevMaxtreatmentlevel.get(NORMAL_WARD).add(patientId);
                       } else {
                         // check if there are any icu procedures currently going on
-                        List<UkbProcedure> listEncounterIcuProcedure = icuProcedures.stream()
+                        List<UkbProcedure> listEncounterIcuProcedure = getIcuProcedures().stream()
                             .filter(icu -> facilityContactId.equals(icu.getCaseId()))
                             .toList();
                         // if there is no ICU Procedure, check if it is currently considered
@@ -243,7 +239,7 @@ public class TimelineMaxTreatmentLevel extends DashboardDataItemLogics implement
                     }
                     // if an ICU case was found
                     else if (isIcu && !isVent && !isEcmo) {
-                      List<UkbProcedure> listEncounterIcuProcedure = icuProcedures.stream()
+                      List<UkbProcedure> listEncounterIcuProcedure = getIcuProcedures().stream()
                           .filter(icu -> facilityContactId.equals(icu.getCaseId()))
                           .collect(Collectors.toList());
 
@@ -260,7 +256,7 @@ public class TimelineMaxTreatmentLevel extends DashboardDataItemLogics implement
                     }
                     // if a ventilation case was found
                     else if (isVent && !isEcmo) {
-                      List<UkbProcedure> listEncounterIcuProcedure = icuProcedures.stream()
+                      List<UkbProcedure> listEncounterIcuProcedure = getIcuProcedures().stream()
                           .filter(icu -> facilityContactId.equals(icu.getCaseId())).toList();
                       sortToVentOrEcmoTimeline(listEncounterIcuProcedure,
                           listEncounterHasIcuLocation, facilityContactId, patientId, true, false,

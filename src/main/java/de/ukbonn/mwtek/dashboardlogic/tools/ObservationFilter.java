@@ -36,12 +36,14 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+import lombok.extern.slf4j.Slf4j;
 import org.hl7.fhir.r4.model.CodeableConcept;
 import org.hl7.fhir.r4.model.Observation;
 
 /**
  * Various auxiliary methods that affect the {@link UkbObservation} resources.
  */
+@Slf4j
 public class ObservationFilter {
 
   /**
@@ -65,6 +67,37 @@ public class ObservationFilter {
       case INFLUENZA -> {
         return getObservationsByLoincCode(labObservations,
             inputCodeSettings.getInfluenzaObservationPcrLoincCodes());
+      }
+      default -> {
+        log.error(
+            "Method getObservationsByContext is invoked with an unknown context [" + dataItemContext
+                + "].");
+        return null;
+      }
+    }
+  }
+
+  /**
+   * Filter a list of {@link UkbObservation} resources to those describing a disease-positive PCR
+   * finding.
+   *
+   * @param labObservations   A list with {@link UkbObservation observation resources}.
+   * @param inputCodeSettings An {@link InputCodeSettings} instance that contains the valid
+   *                          disease-context-related pcr loinc codes.
+   * @return A filtered collection containing only observations with disease-context-related pcr
+   * findings. If the input list is <code>null</code> it will return an empty set.
+   */
+  public static Set<UkbObservation> getVariantObservationsByContext(
+      Collection<UkbObservation> labObservations,
+      InputCodeSettings inputCodeSettings, DataItemContext dataItemContext) {
+    switch (dataItemContext) {
+      case COVID -> {
+        return getObservationsByLoincCode(labObservations,
+            inputCodeSettings.getCovidObservationVariantLoincCodes());
+      }
+      case INFLUENZA -> {
+        // Not implemented yet
+        return null;
       }
       default -> {
         return null;

@@ -21,6 +21,7 @@ import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.ICU;
 import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.ICU_ECMO;
 import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.ICU_VENTILATION;
 import static de.ukbonn.mwtek.dashboardlogic.tools.EncounterFilter.getPositiveCurrentlyOnIcuWardEncounters;
+import static de.ukbonn.mwtek.utilities.enums.TerminologySystems.SNOMED;
 import static de.ukbonn.mwtek.utilities.fhir.misc.FhirCodingTools.getCodeOfFirstCoding;
 
 import de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels;
@@ -29,6 +30,7 @@ import de.ukbonn.mwtek.dashboardlogic.models.DiseaseDataItem;
 import de.ukbonn.mwtek.dashboardlogic.tools.EncounterFilter;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbProcedure;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -45,15 +47,6 @@ import org.hl7.fhir.r4.model.Procedure.ProcedureStatus;
 @Slf4j
 public class CurrentTreatmentLevel extends DashboardDataItemLogics {
 
-  private final List<UkbEncounter> encounters;
-  private final List<UkbProcedure> icuProcedures;
-
-  public CurrentTreatmentLevel(List<UkbEncounter> encounters,
-      List<UkbProcedure> icuProcedures) {
-    this.encounters = encounters;
-    this.icuProcedures = icuProcedures;
-  }
-
   /**
    * This method is used to calculate the current treatment level for the icu encounters, used in
    * the data item 'current.treatmentlevel'.
@@ -64,7 +57,7 @@ public class CurrentTreatmentLevel extends DashboardDataItemLogics {
    *                          (e.g. {@link TreatmentLevels#ICU}).
    * @return Returns a list of ongoing icu encounter.
    */
-  public List<UkbEncounter> getCurrentEncounterByIcuLevel(
+  public static List<UkbEncounter> getCurrentEncounterByIcuLevel(
       Map<TreatmentLevels, List<UkbEncounter>> mapCurrentIcu,
       TreatmentLevels icuTreatmentLevel, List<UkbEncounter> icuSupplyContactEncounters) {
 
@@ -84,10 +77,10 @@ public class CurrentTreatmentLevel extends DashboardDataItemLogics {
     List<UkbEncounter> currentPositiveIcuFacilityContactEncounter = currentIcuEncounters.stream()
         .filter(x -> positiveCurrentlyOnIcuWardFacilityContactIds.contains(x.getId())).toList();
 
-    List<UkbProcedure> currentActiveIcuVentProcedures = icuProcedures.stream()
+    List<UkbProcedure> currentActiveIcuVentProcedures = getIcuProcedures().stream()
         .filter(
-            x -> x.isCodeExistingInFirstCoding(
-                getInputCodeSettings().getProcedureVentilationCodes()))
+            x -> x.isCodeExistingInValueSet(getInputCodeSettings().getProcedureVentilationCodes(),
+                SNOMED, false))
         .filter(UkbProcedure::isInProgress).toList();
     Set<String> currentActiveVentFacilityContactIds = currentActiveIcuVentProcedures.stream()
         .map(UkbProcedure::getCaseId).collect(
@@ -95,9 +88,10 @@ public class CurrentTreatmentLevel extends DashboardDataItemLogics {
     List<UkbEncounter> currentEncountersWithActiveVent = currentVentEncounters.stream()
         .filter(x -> currentActiveVentFacilityContactIds.contains(x.getId())).toList();
 
-    List<UkbProcedure> currentActiveIcuEcmoProcedures = icuProcedures.stream()
+    List<UkbProcedure> currentActiveIcuEcmoProcedures = getIcuProcedures().stream()
         .filter(
-            x -> x.isCodeExistingInFirstCoding(getInputCodeSettings().getProcedureEcmoCodes()))
+            x -> x.isCodeExistingInValueSet(getInputCodeSettings().getProcedureEcmoCodes(), SNOMED,
+                false))
         .filter(UkbProcedure::isInProgress).toList();
     Set<String> currentActiveEcmoFacilityContactIds = currentActiveIcuEcmoProcedures.stream()
         .map(UkbProcedure::getCaseId).collect(
@@ -110,9 +104,9 @@ public class CurrentTreatmentLevel extends DashboardDataItemLogics {
       case NORMAL_WARD -> {
         // The inpatient filter filters pre-stationary cases
         // If it's not on one of the upper level it must be a normal ward.
-        return encounters.parallelStream()
-            .filter(EncounterFilter::isFacilityContact).filter(EncounterFilter::isDiseasePositive)
-            .filter(EncounterFilter::isCaseClassInpatient).filter(EncounterFilter::isActive)
+        return getFacilityContactEncounters().parallelStream()
+            .filter(EncounterFilter::isDiseasePositive)
+            .filter(UkbEncounter::isCaseClassInpatient).filter(UkbEncounter::isActive)
             .filter(x -> !positiveCurrentlyOnIcuWardFacilityContactIds.contains(x.getId()))
             .filter(x -> !currentActiveVentFacilityContactIds.contains(x.getId()))
             .filter(x -> !currentActiveEcmoFacilityContactIds.contains(x.getId())).toList();
@@ -131,8 +125,12 @@ public class CurrentTreatmentLevel extends DashboardDataItemLogics {
       case ICU_ECMO -> {
         return currentEncountersWithActiveEcmo;
       }
+      default -> {
+        log.error("Invalid treatment level ({}) used in getCurrentEncounterByIcuLevel.",
+            icuTreatmentLevel);
+        return new ArrayList<>();
+      }
     }
-    return null;
   }
 
   /**
@@ -164,7 +162,7 @@ public class CurrentTreatmentLevel extends DashboardDataItemLogics {
   private Set<UkbEncounter> filterActiveEncountersWithProcedure(Set<UkbEncounter> encounters,
       List<String> procedureCodes) {
     return encounters.stream()
-        .filter(encounter -> hasActiveIcuProcedure(icuProcedures, encounter, procedureCodes))
+        .filter(encounter -> hasActiveIcuProcedure(getIcuProcedures(), encounter, procedureCodes))
         .collect(Collectors.toSet());
   }
 

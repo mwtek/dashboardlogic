@@ -19,7 +19,11 @@
 package de.ukbonn.mwtek.dashboardlogic.examples;
 
 import static de.ukbonn.mwtek.dashboardlogic.enums.FlaggingExtension.POSITIVE_EXTENSION;
+import static de.ukbonn.mwtek.utilities.enums.EncounterContactLevel.DEPARTMENT_CONTACT;
+import static de.ukbonn.mwtek.utilities.enums.EncounterContactLevel.FACILITY_CONTACT;
+import static de.ukbonn.mwtek.utilities.enums.EncounterContactLevel.SUPPLY_CONTACT;
 
+import de.ukbonn.mwtek.utilities.enums.EncounterContactLevel;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
 import java.util.ArrayList;
 import java.util.List;
@@ -34,25 +38,41 @@ import org.hl7.fhir.r4.model.StringType;
 
 public class EncounterExampleData {
 
-  public static String ENCOUNTER_ID_INPATIENT = "1234";
-  public static String ENCOUNTER_ID_MISSING_ATTRIBUTES = "1235";
+  public static String ENCOUNTER_ID_INPATIENT = "ENCOUNTER-ID-INPATIENT";
+  public static String ENCOUNTER_ID_MISSING_ATTRIBUTES = "ENCOUNTER-ID-MISSING-ATTRIBUTES";
+  public static String ENCOUNTER_ID_MISSING_IDENTIFIER = "MISSING-IDENTIFIER";
 
   public static List<UkbEncounter> getExampleList() {
 
     List<UkbEncounter> encounterExamples = new ArrayList<>();
 
-    // Adding an encounter resource that is in-progress and got a valid icu transfer.
-    UkbEncounter encounterInpatientInProgress = new UkbEncounter(ENCOUNTER_ID_INPATIENT,
+    // Adding an encounter resource in-progress and got a valid icu transfer.
+    UkbEncounter encounterInpatientInProgressFacilityContact = new UkbEncounter(
+        ENCOUNTER_ID_INPATIENT,
         new Encounter.EncounterStatusEnumFactory().fromType(
             new StringType(EncounterStatus.INPROGRESS.toCode())),
         new Coding("http://fhir.de/ValueSet/EncounterClassDE", "IMP", null));
-    //TODO remove?
-    encounterInpatientInProgress.addIdentifier(new Identifier());
-    encounterInpatientInProgress.addLocation(
+    encounterInpatientInProgressFacilityContact.addIdentifier(
+        createIdentifier(ENCOUNTER_ID_INPATIENT));
+    encounterInpatientInProgressFacilityContact.addExtension(POSITIVE_EXTENSION);
+    encounterInpatientInProgressFacilityContact.setType(
+        List.of(getEncounterType(FACILITY_CONTACT)));
+    encounterExamples.add(encounterInpatientInProgressFacilityContact);
+
+    // A corresponding supply contact
+    UkbEncounter encounterInpatientInProgressSupplyContact = new UkbEncounter(
+        ENCOUNTER_ID_INPATIENT,
+        new Encounter.EncounterStatusEnumFactory().fromType(
+            new StringType(EncounterStatus.INPROGRESS.toCode())),
+        new Coding("http://fhir.de/ValueSet/EncounterClassDE", "IMP", null));
+    encounterInpatientInProgressSupplyContact.addIdentifier(
+        createIdentifier(ENCOUNTER_ID_INPATIENT));
+    encounterInpatientInProgressSupplyContact.addLocation(
         new EncounterLocationComponent(
             new Reference("Location/" + LocationExampleData.ICU_LOCATION_ID)));
-    encounterInpatientInProgress.addExtension(POSITIVE_EXTENSION);
-    encounterExamples.add(encounterInpatientInProgress);
+    encounterInpatientInProgressSupplyContact.addExtension(POSITIVE_EXTENSION);
+    encounterInpatientInProgressSupplyContact.setType(List.of(getEncounterType(SUPPLY_CONTACT)));
+    encounterExamples.add(encounterInpatientInProgressSupplyContact);
 
     // Missing code system in codings should all be handled and not throw any exception.
     UkbEncounter encounterWithMissingCodeSystems = new UkbEncounter(ENCOUNTER_ID_MISSING_ATTRIBUTES,
@@ -64,13 +84,51 @@ public class EncounterExampleData {
     encounterWithMissingCodeSystems.addType(
         new CodeableConcept().addCoding(new Coding(null, "vorstationaer", "vorstationaer")));
     encounterWithMissingCodeSystems.addExtension(POSITIVE_EXTENSION);
-    encounterInpatientInProgress.addLocation(
+    encounterWithMissingCodeSystems.addLocation(
         new EncounterLocationComponent(
             new Reference("Location/" + LocationExampleData.NON_VALID_LOCATION_ID)));
-
     encounterExamples.add(encounterWithMissingCodeSystems);
 
+    // Missing code system in codings should all be handled and not throw any exception.
+    UkbEncounter encounterWithMissingIdentifier = new UkbEncounter(ENCOUNTER_ID_MISSING_IDENTIFIER,
+        new Encounter.EncounterStatusEnumFactory().fromType(
+            new StringType(EncounterStatus.INPROGRESS.toCode())),
+        new Coding(null, "IMP", null));
+    // Usually the encounter.type.kontaktart.system = "http://fhir.de/CodeSystem/kontaktart-de"
+    encounterWithMissingIdentifier.addType(
+        new CodeableConcept().addCoding(new Coding(null, "vorstationaer", "vorstationaer")));
+    encounterWithMissingIdentifier.addExtension(POSITIVE_EXTENSION);
+    encounterWithMissingIdentifier.setType(List.of(getEncounterType(FACILITY_CONTACT)));
+    encounterExamples.add(encounterWithMissingIdentifier);
+
     return encounterExamples;
+  }
+
+  private static Identifier createIdentifier(String encounterIdInpatient) {
+    return new Identifier().setValue(encounterIdInpatient);
+  }
+
+  private static CodeableConcept getEncounterType(
+      EncounterContactLevel encounterContactLevel) {
+    CodeableConcept ccContactLevel = new CodeableConcept();
+    Coding codingContactLevel = new Coding();
+    ccContactLevel.addCoding(codingContactLevel);
+    codingContactLevel.setSystem(EncounterContactLevel.SYSTEM);
+    switch (encounterContactLevel) {
+      case FACILITY_CONTACT -> {
+        codingContactLevel.setCode(FACILITY_CONTACT.getCode());
+        codingContactLevel.setDisplay(FACILITY_CONTACT.getDisplay());
+      }
+      case DEPARTMENT_CONTACT -> {
+        codingContactLevel.setCode(DEPARTMENT_CONTACT.getCode());
+        codingContactLevel.setDisplay(DEPARTMENT_CONTACT.getDisplay());
+      }
+      case SUPPLY_CONTACT -> {
+        codingContactLevel.setCode(SUPPLY_CONTACT.getCode());
+        codingContactLevel.setDisplay(SUPPLY_CONTACT.getDisplay());
+      }
+    }
+    return ccContactLevel;
   }
 
 }

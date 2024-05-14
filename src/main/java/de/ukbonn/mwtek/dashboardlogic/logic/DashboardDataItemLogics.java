@@ -17,12 +17,19 @@
  */
 package de.ukbonn.mwtek.dashboardlogic.logic;
 
+import static de.ukbonn.mwtek.dashboardlogic.tools.ObservationFilter.getObservationsByContext;
+import static de.ukbonn.mwtek.dashboardlogic.tools.ObservationFilter.getVariantObservationsByContext;
+
+import de.ukbonn.mwtek.dashboardlogic.enums.DataItemContext;
 import de.ukbonn.mwtek.dashboardlogic.settings.InputCodeSettings;
-import de.ukbonn.mwtek.dashboardlogic.tools.EncounterFilter;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbLocation;
+import de.ukbonn.mwtek.utilities.fhir.resources.UkbObservation;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbPatient;
+import de.ukbonn.mwtek.utilities.fhir.resources.UkbProcedure;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
@@ -34,6 +41,12 @@ public class DashboardDataItemLogics {
   private static List<UkbEncounter> encounters;
   @Getter
   private static List<UkbPatient> patients;
+  @Getter
+  private static List<UkbObservation> observations;
+  @Getter
+  private static List<UkbProcedure> icuProcedures;
+  @Getter
+  private static List<UkbObservation> variantObservations;
   @Getter
   private static InputCodeSettings inputCodeSettings;
   @Getter
@@ -47,17 +60,26 @@ public class DashboardDataItemLogics {
    * Initialization of often used data collections.
    */
   public static void initializeData(InputCodeSettings inputCodeSettings,
-      List<UkbEncounter> encounters, List<UkbPatient> patients,
-      List<UkbLocation> locations) {
+      List<UkbEncounter> encounters, List<UkbPatient> patients, List<UkbObservation> observations,
+      List<UkbLocation> locations, List<UkbProcedure> icuProcedures,
+      DataItemContext dataItemContext) {
     DashboardDataItemLogics.inputCodeSettings = inputCodeSettings;
     DashboardDataItemLogics.encounters = encounters;
     DashboardDataItemLogics.patients = patients;
+    DashboardDataItemLogics.icuProcedures = icuProcedures;
+    DashboardDataItemLogics.observations = new ArrayList<>(getObservationsByContext(observations,
+        getInputCodeSettings(), dataItemContext));
+    Set<UkbObservation> variantObservationsByContext = getVariantObservationsByContext(observations,
+        getInputCodeSettings(), dataItemContext);
+    if (variantObservationsByContext != null) {
+      DashboardDataItemLogics.variantObservations = new ArrayList<>(variantObservationsByContext);
+    }
     DashboardDataItemLogics.locations = locations;
     if (encounters != null) {
       DashboardDataItemLogics.facilityContactEncounters = encounters.parallelStream()
-          .filter(EncounterFilter::isFacilityContact).toList();
+          .filter(UkbEncounter::isFacilityContact).toList();
       DashboardDataItemLogics.supplyContactEncounters = encounters.parallelStream()
-          .filter(EncounterFilter::isSupplyContact).toList();
+          .filter(UkbEncounter::isSupplyContact).toList();
     }
   }
 

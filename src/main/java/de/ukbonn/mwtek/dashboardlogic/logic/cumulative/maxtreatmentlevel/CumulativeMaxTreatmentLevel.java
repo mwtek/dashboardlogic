@@ -18,16 +18,16 @@
 
 package de.ukbonn.mwtek.dashboardlogic.logic.cumulative.maxtreatmentlevel;
 
+import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.TWELVE_DAYS_LOGIC;
 import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.ICU;
 import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.ICU_ECMO;
 import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.ICU_VENTILATION;
 import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.INPATIENT;
 import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.OUTPATIENT;
 
-import de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues;
 import de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels;
+import de.ukbonn.mwtek.dashboardlogic.logic.DashboardDataItemLogics;
 import de.ukbonn.mwtek.dashboardlogic.models.DiseaseDataItem;
-import de.ukbonn.mwtek.dashboardlogic.tools.EncounterFilter;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
 import de.ukbonn.mwtek.utilities.generic.time.TimerTools;
 import java.time.Instant;
@@ -53,13 +53,7 @@ import lombok.extern.slf4j.Slf4j;
  */
 
 @Slf4j
-public class CumulativeMaxTreatmentLevel {
-
-  public List<UkbEncounter> listEncounters;
-
-  public CumulativeMaxTreatmentLevel(List<UkbEncounter> listEncounter) {
-    listEncounters = listEncounter;
-  }
+public class CumulativeMaxTreatmentLevel extends DashboardDataItemLogics {
 
   /**
    * Returns a list containing encounter which has or had ambulant or stationary as their highest
@@ -90,16 +84,15 @@ public class CumulativeMaxTreatmentLevel {
         case OUTPATIENT -> {
           // If the 12 days appeared its minimum normal ward+ treatmentlevel
           ambulantPidSet.addAll(value.stream()
-              .filter(encounter -> EncounterFilter.isCaseClassOutpatient(encounter)
-                  && !encounter.hasExtension(
-                  DashboardLogicFixedValues.TWELVE_DAYS_LOGIC.getValue()))
+              .filter(encounter -> encounter.isCaseClassOutpatient()
+                  && !encounter.hasExtension(TWELVE_DAYS_LOGIC.getValue()))
               .map(UkbEncounter::getPatientId)
               .collect(Collectors.toSet()));
         }
         case INPATIENT -> {
           // Check if the encounter is not part of any icu+ treatmentlevel
           normalWardPidSet.addAll(value.stream()
-              .filter(EncounterFilter::isCaseClassInpatient)
+              .filter(UkbEncounter::isCaseClassInpatient)
               .filter(
                   e -> !mapIcu.get(ICU_ECMO).contains(e) && !mapIcu.get(ICU_VENTILATION).contains(e)
                       && !mapIcu.get(ICU).contains(e))

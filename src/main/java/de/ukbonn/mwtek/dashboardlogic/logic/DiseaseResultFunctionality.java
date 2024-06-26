@@ -201,8 +201,8 @@ public class DiseaseResultFunctionality {
       if (visitNumber != null) {
         facilityEncounterMap.put(visitNumber, facilityEncounter);
       } else {
-        log.warn("No identifier with slice 'Aufnahmenummer' was found for encounter with id "
-            + facilityEncounter.getId());
+        log.warn("No identifier with slice 'Aufnahmenummer' was found for encounter with id {}",
+            facilityEncounter.getId());
       }
     });
 
@@ -217,11 +217,11 @@ public class DiseaseResultFunctionality {
             output.put(supplyContactEncounter.getId(), facilityEncounter.getId());
           }
         } else {
-          log.warn("No visit number identifier found for supply contact encounter with id "
-              + supplyContactEncounter.getId());
+          log.warn("No visit number identifier found for supply contact encounter with id {}",
+              supplyContactEncounter.getId());
         }
       } catch (Exception ex) {
-        log.error("Error processing supply contact: " + ex.getMessage());
+        log.error("Error processing supply contact: {}", ex.getMessage());
       }
     });
 
@@ -249,17 +249,18 @@ public class DiseaseResultFunctionality {
                 facilityContact.addIdentifier(createIdentifierVisitNumber(facilityContact));
               }
             } else {
-              log.warn("No partOf identifier found for 'Encounter.abteilungskontakt' with id "
-                  + departmentContact.getId());
+              log.warn("No partOf identifier found for 'Encounter.abteilungskontakt' with id {}",
+                  departmentContact.getId());
             }
           } else {
             log.warn(
                 "No department reference found for 'Encounter.versorgungsstellenkontakt' with id "
-                    + supplyContact.getId());
+                    + "{}", supplyContact.getId());
           }
         } else {
-          log.warn("No partOf identifier found for 'Encounter.versorgungsstellenkontakt' with id "
-              + supplyContact.getId());
+          log.warn(
+              "No partOf identifier found for 'Encounter.versorgungsstellenkontakt' with id {}",
+              supplyContact.getId());
         }
       });
     }

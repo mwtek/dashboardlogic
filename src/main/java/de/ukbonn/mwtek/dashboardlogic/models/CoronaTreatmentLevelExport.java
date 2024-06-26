@@ -23,41 +23,42 @@ import java.util.List;
  * Export model for file generation that reports case/encounter ids of active cases separated by
  * treatment level.
  */
-public record CoronaTreatmentLevelExport(List<String> listNormalWard, List<String> listIcu,
-                                         List<String> listIcuVent, List<String> listEcmo) {
+public record CoronaTreatmentLevelExport(List<String> casesNormalWard, List<String> casesIcu,
+                                         List<String> casesIcuVent, List<String> casesEcmo) {
 
   private static final String deliminator = ";";
+  public static final String SUFFIX_FACILITY_CONTACT = "-000000-EK";
 
   public String toCsv() {
     StringBuilder sb = new StringBuilder();
     sb.append("Normalstation;ICU;ICU_mit_Beatmung;ICU_mit_ECMO\n");
-
-    int maxSize = Math.max(listNormalWard.size(), listIcu.size());
-    for (int i = 0; i < maxSize; i++) {
-      if (listNormalWard.size() > i && listNormalWard.get(i) != null) {
-        sb.append(listNormalWard.get(i).replace("-000000-EK", "")).append(deliminator);
-      } else {
-        sb.append(deliminator);
+    if (casesNormalWard != null && casesIcu != null && casesIcuVent != null && casesEcmo != null) {
+      int maxSize = Math.max(casesNormalWard.size(), casesIcu.size());
+      for (int i = 0; i < maxSize; i++) {
+        if (casesNormalWard.size() > i && casesNormalWard.get(i) != null) {
+          sb.append(casesNormalWard.get(i).replace(SUFFIX_FACILITY_CONTACT, ""))
+              .append(deliminator);
+        } else {
+          sb.append(deliminator);
+        }
+        if (casesIcu.size() > i && casesIcu.get(i) != null) {
+          sb.append(casesIcu.get(i).replace(SUFFIX_FACILITY_CONTACT, "")).append(deliminator);
+        } else {
+          sb.append(deliminator);
+        }
+        if (casesIcuVent.size() > i && casesIcuVent.get(i) != null) {
+          sb.append(casesIcuVent.get(i).replace(SUFFIX_FACILITY_CONTACT, "")).append(deliminator);
+        } else {
+          sb.append(deliminator);
+        }
+        if (casesEcmo.size() > i && casesEcmo.get(i) != null) {
+          sb.append(casesEcmo.get(i).replace(SUFFIX_FACILITY_CONTACT, ""));
+        } else {
+          sb.append(deliminator);
+        }
+        sb.append("\n");
       }
-      if (listIcu.size() > i && listIcu.get(i) != null) {
-        sb.append(listIcu.get(i).replace("-000000-EK", "")).append(deliminator);
-      } else {
-        sb.append(deliminator);
-      }
-      if (listIcuVent.size() > i && listIcuVent.get(i) != null) {
-        sb.append(listIcuVent.get(i).replace("-000000-EK", "")).append(deliminator);
-      } else {
-        sb.append(deliminator);
-      }
-      if (listEcmo.size() > i && listEcmo.get(i) != null) {
-        sb.append(listEcmo.get(i).replace("-000000-EK", ""));
-      } else {
-        sb.append(deliminator);
-      }
-
-      sb.append("\n");
     }
-
     return sb.toString();
   }
 }

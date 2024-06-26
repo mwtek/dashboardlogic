@@ -30,11 +30,11 @@ import static de.ukbonn.mwtek.dashboardlogic.enums.DataItemTypes.ITEMTYPE_DEBUG;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItemTypes.ITEMTYPE_LIST;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItemTypes.SUBITEMTYPE_DATE;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.CASENRS;
-import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.CUMULATE_AGE_MAXTREATMENTLEVEL_NORMAL_WARD;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.CUMULATIVE_AGE;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.CUMULATIVE_AGE_MAXTREATMENTLEVEL_ICU;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.CUMULATIVE_AGE_MAXTREATMENTLEVEL_ICU_WITH_ECMO;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.CUMULATIVE_AGE_MAXTREATMENTLEVEL_ICU_WITH_VENTILATION;
+import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.CUMULATIVE_AGE_MAXTREATMENTLEVEL_NORMAL_WARD;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.CUMULATIVE_AGE_MAXTREATMENTLEVEL_OUTPATIENT;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.CUMULATIVE_GENDER;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.CUMULATIVE_INPATIENT_AGE;
@@ -227,17 +227,25 @@ public class DataItemGenerator {
 
     // To obtain the case transfer history of an encounter, we need to check the supply level
     List<UkbEncounter> supplyContactEncounters = encounters.parallelStream()
-        .filter(UkbEncounter::isSupplyContact).toList();
+        .filter(UkbEncounter::isSupplyContact).filter(UkbEncounter::isCaseClassInpatient).toList();
 
     // Department contacts are just needed if we need to determine encounter hierarchy via .partOf
     List<UkbEncounter> departmentContactEncounters = encounters.parallelStream()
-        .filter(UkbEncounter::isDepartmentContact).toList();
+        .filter(UkbEncounter::isDepartmentContact).filter(UkbEncounter::isCaseClassInpatient)
+        .toList();
 
-    Map<String, String> supplyContactIdFacilityContactId =
-        generateSupplyContactToFacilityContactMap(
-            supplyContactEncounters, departmentContactEncounters, facilityContactEncounters,
-            usePartOfInsteadOfIdentifier);
-
+    // If no Encounter of type 'Versorgungsstellenkontakt' could be found, many data items cannot
+    // be meaningfully filled and these are excluded from the export.
+    boolean supplyContactsFound = isSupplyContactFound(supplyContactEncounters);
+    if (supplyContactsFound) {
+      Map<String, String> supplyContactIdFacilityContactId =
+          generateSupplyContactToFacilityContactMap(
+              supplyContactEncounters, departmentContactEncounters, facilityContactEncounters,
+              usePartOfInsteadOfIdentifier);
+    } else {
+      mapExcludeDataItems.putAll(
+          getAllDataItemsThatNeedSupplyContacts(dataItemContext));
+    }
     // Marking encounter resources as positive via setting of extensions
     DiseaseDetectionManagement.flagEncounters(encounters, conditions,
         observations, inputCodeSettings, dataItemContext);
@@ -563,7 +571,7 @@ public class DataItemGenerator {
               cumulativeMaxtreatmentlevelOutpatientAgeList));
     }
     String cumulativeAgeMaxTreatmentlevelNormalWardLabel = determineLabel(dataItemContext,
-        CUMULATE_AGE_MAXTREATMENTLEVEL_NORMAL_WARD);
+        CUMULATIVE_AGE_MAXTREATMENTLEVEL_NORMAL_WARD);
     // cumulative.age.maxtreatmentlevel.normal_ward
     if (isItemNotExcluded(mapExcludeDataItems, cumulativeAgeMaxTreatmentlevelNormalWardLabel,
         false)) {
@@ -854,11 +862,30 @@ public class DataItemGenerator {
     return currentDataList;
   }
 
-  private Map<String, Boolean> getAllDataItemsThatNeedSupplyContacts() {
+  private Map<String, Boolean> getAllDataItemsThatNeedSupplyContacts(
+      DataItemContext dataItemContext) {
     Map<String, Boolean> output = new HashMap<>();
-    output.put(CURRENT_TREATMENTLEVEL, true);
-    output.put(CURRENT_MAXTREATMENTLEVEL, true);
-    output.put(TIMELINE_MAXTREATMENTLEVEL, true);
+    output.put(determineLabel(dataItemContext, CURRENT_TREATMENTLEVEL), true);
+    output.put(determineLabel(dataItemContext, CURRENT_MAXTREATMENTLEVEL), true);
+    output.put(determineLabel(dataItemContext, CUMULATIVE_MAXTREATMENTLEVEL), true);
+    output.put(determineLabel(dataItemContext, TIMELINE_MAXTREATMENTLEVEL), true);
+    output.put(determineLabel(dataItemContext, CURRENT_AGE_MAXTREATMENTLEVEL_NORMAL_WARD), true);
+    output.put(determineLabel(dataItemContext, CURRENT_AGE_MAXTREATMENTLEVEL_ICU), true);
+    output.put(determineLabel(dataItemContext, CURRENT_AGE_MAXTREATMENTLEVEL_ICU_WITH_VENTILATION),
+        true);
+    output.put(determineLabel(dataItemContext, CURRENT_AGE_MAXTREATMENTLEVEL_ICU_WITH_ECMO), true);
+    output.put(determineLabel(dataItemContext, CUMULATIVE_AGE_MAXTREATMENTLEVEL_OUTPATIENT), true);
+    output.put(determineLabel(dataItemContext, CUMULATIVE_AGE_MAXTREATMENTLEVEL_NORMAL_WARD), true);
+    output.put(determineLabel(dataItemContext, CUMULATIVE_AGE_MAXTREATMENTLEVEL_ICU), true);
+    output.put(
+        determineLabel(dataItemContext, CUMULATIVE_AGE_MAXTREATMENTLEVEL_ICU_WITH_VENTILATION),
+        true);
+    output.put(determineLabel(dataItemContext, CUMULATIVE_AGE_MAXTREATMENTLEVEL_ICU_WITH_ECMO),
+        true);
+    output.put(determineLabel(dataItemContext, CUMULATIVE_LENGTHOFSTAY_ICU), true);
+    output.put(determineLabel(dataItemContext, CUMULATIVE_LENGTHOFSTAY_ICU_ALIVE), true);
+    output.put(determineLabel(dataItemContext, CUMULATIVE_LENGTHOFSTAY_ICU_DEAD), true);
+    output.put(CURRENT_TREATMENTLEVEL_CROSSTAB, true);
     return output;
   }
 
@@ -878,11 +905,10 @@ public class DataItemGenerator {
             .map(UkbEncounter::getCaseId).toList();
     if (!casesWithoutPeriodStart.isEmpty()) {
       log.debug(
-          "Warning: " + casesWithoutPeriodStart.size()
-              + " Encounters without period/period.start element have been detected [for example "
-              + "case with id: "
-              + casesWithoutPeriodStart.get(
-              0) + "]");
+          "Warning: {} Encounters without period/period.start element have been detected [for "
+              + "example case with id: {}]",
+          casesWithoutPeriodStart.size(), casesWithoutPeriodStart.get(
+              0));
     }
   }
 
@@ -901,6 +927,18 @@ public class DataItemGenerator {
               0) + "]");
     }
   }
+
+  private boolean isSupplyContactFound(List<UkbEncounter> supplyContacts) {
+    boolean supplyContactsFound = !supplyContacts.isEmpty();
+    if (!supplyContactsFound) {
+      log.warn(
+          "Warning: No supply contacts ('Versorgungsstellenkontakte') were found. All the data "
+              + "items that require"
+              + " the transfer history are therefore excluded from the output.");
+    }
+    return supplyContactsFound;
+  }
+
 
   private void addValuesToTimelineMaxMap(String item, Set<String> value,
       Map<String, List<Long>> mapResultTreatment) {

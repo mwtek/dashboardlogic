@@ -43,7 +43,7 @@ public class DataItems {
   public static final String CUMULATIVE_GENDER = "cumulative.gender";
   public static final String CUMULATIVE_AGE = "cumulative.age";
   public static final String CUMULATIVE_MAXTREATMENTLEVEL = "cumulative.maxtreatmentlevel";
-  public static final String CUMULATE_AGE_MAXTREATMENTLEVEL_NORMAL_WARD =
+  public static final String CUMULATIVE_AGE_MAXTREATMENTLEVEL_NORMAL_WARD =
       "cumulative.age.maxtreatmentlevel.normal_ward";
   public static final String CUMULATIVE_AGE_MAXTREATMENTLEVEL_OUTPATIENT = "cumulative.age"
       + ".maxtreatmentlevel.outpatient";

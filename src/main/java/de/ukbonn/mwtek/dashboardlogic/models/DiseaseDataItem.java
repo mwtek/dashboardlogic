@@ -37,5 +37,4 @@ public class DiseaseDataItem {
   private String itemname;
   private String itemtype;
   private Object data;
-
 }

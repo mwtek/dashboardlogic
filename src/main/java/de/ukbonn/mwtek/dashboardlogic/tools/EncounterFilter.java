@@ -19,31 +19,148 @@
 package de.ukbonn.mwtek.dashboardlogic.tools;
 
 import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.POSITIVE_RESULT;
+import static de.ukbonn.mwtek.dashboardlogic.enums.FlaggingExtension.POSITIVE_EXTENSION;
 
+import de.ukbonn.mwtek.dashboardlogic.models.CoreCaseData;
+import de.ukbonn.mwtek.utilities.fhir.misc.FhirConditionTools;
+import de.ukbonn.mwtek.utilities.fhir.resources.UkbCondition;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbLocation;
+import de.ukbonn.mwtek.utilities.fhir.resources.UkbPatient;
+import de.ukbonn.mwtek.utilities.generic.time.DateTools;
 import java.util.Collection;
+import java.util.Date;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 
-/**
- * Various auxiliary methods that affect the encounter resources.
- */
+/** Various auxiliary methods that affect the encounter resources. */
 @Slf4j
 public class EncounterFilter {
 
-  /**
-   * Determines whether the passed encounter instance has a covid-positive flag.
-   */
+  /** Determines whether the passed encounter instance has a covid-positive flag. */
   public static boolean isDiseasePositive(UkbEncounter encounter) {
     return encounter.hasExtension(POSITIVE_RESULT.getValue());
   }
 
   public static List<UkbEncounter> getPositiveCurrentlyOnIcuWardEncounters(
       Collection<UkbEncounter> supplyContactEncounters, List<UkbLocation> locations) {
-    return supplyContactEncounters
-        .stream().filter(EncounterFilter::isDiseasePositive)
+    return supplyContactEncounters.stream()
+        .filter(EncounterFilter::isDiseasePositive)
         .filter(x -> x.isCurrentlyOnIcuWard(LocationFilter.getIcuLocationIds(locations)))
+        .toList();
+  }
+
+  /**
+   * Retrieves a set of encounter IDs that match the specified ICD codes.
+   *
+   * @param conditions The list of conditions.
+   * @param icdCodes The list of ICD codes to match.
+   * @return A set of matching encounter IDs.
+   */
+  public static Set<String> getEncounterIdsByIcdCodes(
+      List<UkbCondition> conditions, List<String> icdCodes) {
+    return FhirConditionTools.getConditionsByIcdCodes(conditions, icdCodes).stream()
+        .map(UkbCondition::getCaseId)
+        .collect(Collectors.toSet());
+  }
+
+  /**
+   * Filters encounters based on a set of IDs.
+   *
+   * @param encounters The list of encounters to filter.
+   * @param ids The set of encounter IDs to retain.
+   * @return A set of filtered encounters.
+   */
+  public static Set<UkbEncounter> filterEncountersByIds(
+      List<UkbEncounter> encounters, Set<String> ids) {
+    return encounters.parallelStream()
+        .filter(encounter -> ids.contains(encounter.getId()))
+        .collect(Collectors.toSet());
+  }
+
+  /**
+   * Filters a list of encounters to return only those associated with patients who are 19 years old
+   * or younger at the time of the encounter.
+   *
+   * <p>This method uses the birthdays of patients to calculate their age based on the encounter
+   * start date. If a patient's birthday is not available, the encounter will not be included in the
+   * returned list.
+   *
+   * @param encounters The list of encounters to filter.
+   * @param patients The list of patients whose birthdays are necessary.
+   * @param upperAgeBorder Upper age border (including)
+   * @return A list of encounters where the patient's age is 19 years or less.
+   */
+  public static List<UkbEncounter> filterEncounterByAge(
+      List<UkbEncounter> encounters, List<UkbPatient> patients, int upperAgeBorder) {
+
+    // Generate a key value map for the patients for fast access in the encounter loop
+    Map<String, UkbPatient> patientMap =
+        patients.stream()
+            .filter(UkbPatient::hasBirthDate)
+            .collect(Collectors.toMap(UkbPatient::getId, patient -> patient));
+
+    // Filter encounters by age
+    return encounters.parallelStream()
+        .filter(
+            encounter -> {
+              // Find patient by ID
+              UkbPatient patient = patientMap.get(encounter.getPatientId());
+              Date birthDate = patient.hasBirthDate() ? patient.getBirthDate() : null;
+
+              if (birthDate != null) {
+                int age =
+                    DateTools.calcYearsBetweenDates(encounter.getPeriod().getStart(), birthDate);
+                log.trace(
+                    "Age of {} and admission date {} is: {}",
+                    encounter.getId(),
+                    encounter.getPeriod().getStart(),
+                    age);
+                return age <= upperAgeBorder;
+              } else {
+                log.warn("No birthdate found for patient {}", patient.getId());
+              }
+              return false;
+            })
+        .collect(Collectors.toList());
+  }
+
+  /**
+   * Checks if a given encounter is valid based on the patient's age at admission. An encounter is
+   * considered valid if it exists in the provided case data map and the age at admission is below
+   * the specified upper age limit.
+   *
+   * @param coreCaseDataByEncounterIdMap A map containing core case data indexed by encounter IDs.
+   *     This map is used to check if the encounter is part of the dataset.
+   * @param encounter The encounter to be validated against the age criteria.
+   * @param upperAgeBorder The upper age limit for the encounter to be considered valid.
+   * @return true if the encounter is valid (exists in the map, and the age at admission is below
+   *     the upper age limit); false otherwise.
+   */
+  public static boolean isEncounterValidByAge(
+      Map<String, CoreCaseData> coreCaseDataByEncounterIdMap,
+      UkbEncounter encounter,
+      int upperAgeBorder) {
+    // If the current case is not part of the map, the case got already filtered by age
+    if (!coreCaseDataByEncounterIdMap.containsKey(encounter.getId())) {
+      return false;
+    }
+    return coreCaseDataByEncounterIdMap.get(encounter.getId()).getAgeAtAdmission() < upperAgeBorder;
+  }
+
+  public static List<UkbEncounter> getInpatientFacilityEncounters(
+      List<UkbEncounter> ukbEncounters) {
+    return ukbEncounters.parallelStream()
+        .filter(UkbEncounter::isFacilityContact)
+        .filter(x -> !x.isCaseClassOutpatient())
+        .filter(x -> !x.isSemiStationary())
+        .peek(
+            x ->
+                x.addExtension(
+                    POSITIVE_EXTENSION)) // Add an extension to be able to use former methods
         .toList();
   }
 }

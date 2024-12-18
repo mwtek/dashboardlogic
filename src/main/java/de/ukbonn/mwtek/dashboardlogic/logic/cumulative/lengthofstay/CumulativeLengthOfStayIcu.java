@@ -19,14 +19,16 @@ package de.ukbonn.mwtek.dashboardlogic.logic.cumulative.lengthofstay;
 
 import static de.ukbonn.mwtek.dashboardlogic.logic.CoronaResultFunctionality.calculateDaysInBetweenInHours;
 import static de.ukbonn.mwtek.dashboardlogic.logic.DiseaseResultFunctionality.extractIdFromReference;
+import static de.ukbonn.mwtek.dashboardlogic.logic.DiseaseResultFunctionality.isLocationReferenceExisting;
 
+import de.ukbonn.mwtek.dashboardlogic.DashboardDataItemLogic;
 import de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels;
 import de.ukbonn.mwtek.dashboardlogic.enums.VitalStatus;
-import de.ukbonn.mwtek.dashboardlogic.logic.DashboardDataItemLogics;
 import de.ukbonn.mwtek.dashboardlogic.models.DiseaseDataItem;
 import de.ukbonn.mwtek.dashboardlogic.tools.EncounterFilter;
 import de.ukbonn.mwtek.dashboardlogic.tools.LocationFilter;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
+import de.ukbonn.mwtek.utilities.fhir.resources.UkbLocation;
 import de.ukbonn.mwtek.utilities.generic.time.TimerTools;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -41,35 +43,34 @@ import lombok.extern.slf4j.Slf4j;
 import org.hl7.fhir.r4.model.Encounter;
 
 /**
- * This class is used for generating the data items
- * {@link DiseaseDataItem cumulative.lengthofstay.icu} and the subitems.
+ * This class is used for generating the data items {@link DiseaseDataItem
+ * cumulative.lengthofstay.icu} and the subitems.
  *
  * @author <a href="mailto:david.meyers@ukbonn.de">David Meyers</a>
  * @author <a href="mailto:berke_enes.dincel@ukbonn.de">Berke Enes Dincel</a>
  */
-
 @Slf4j
-public class CumulativeLengthOfStayIcu extends DashboardDataItemLogics {
+public class CumulativeLengthOfStayIcu extends DashboardDataItemLogic {
 
   /**
    * Creates a map containing the length of stay in hours for every patient/encounter who was in
    * intensive care
-   * <p>
-   * Used for cumulative.lengthofstay.icu
+   *
+   * <p>Used for cumulative.lengthofstay.icu
    *
    * @param icuSupplyContactEncounters The icu information can be found on the Encounter.location of
-   *                                   the supply contact.
+   *     the supply contact.
    * @return A Map that links a patient id to a map that containing the length of stay in the
-   * hospital and all the case ids from which this total was calculated
+   *     hospital and all the case ids from which this total was calculated
    */
   public static Map<String, Map<Long, Set<String>>> createIcuLengthOfStayList(
-      List<UkbEncounter> icuSupplyContactEncounters) {
+      List<UkbEncounter> icuSupplyContactEncounters, List<UkbLocation> locations) {
 
     log.debug("started createIcuLengthOfStayList");
     Instant startTimer = TimerTools.startTimer();
     Map<String, Map<Long, Set<String>>> mapResult = new HashMap<>();
     // If there are no location resources existing, its impossible to calculate icu stay lengths
-    if (getLocations() == null) {
+    if (locations == null) {
       return null;
     }
 
@@ -77,12 +78,13 @@ public class CumulativeLengthOfStayIcu extends DashboardDataItemLogics {
     // since in the location components within an Encounter resource, at best ward/room and bed are
     // listed with identical time periods and the stay should only be evaluated once. The highest of
     // these hierarchy levels should be sufficient.
-    Set<String> icuLocationIds = LocationFilter.getIcuLocationIds(getLocations());
+    Set<String> icuLocationIds = LocationFilter.getIcuLocationIds(locations);
 
     // Just the positive encounters need to be counted
     List<UkbEncounter> icuSupplyContactEncountersPositive =
         icuSupplyContactEncounters.parallelStream()
-            .filter(EncounterFilter::isDiseasePositive).toList();
+            .filter(EncounterFilter::isDiseasePositive)
+            .toList();
 
     // iterate through every encounter and calculates amount of time spent in icu
     for (UkbEncounter encounter : icuSupplyContactEncountersPositive) {
@@ -93,12 +95,11 @@ public class CumulativeLengthOfStayIcu extends DashboardDataItemLogics {
       List<Encounter.EncounterLocationComponent> icuEncounterLocations = new ArrayList<>();
       try {
         for (Encounter.EncounterLocationComponent location : encounter.getLocation()) {
-          if (location != null && location.getLocation() != null && !location.getLocation()
-              .isEmpty()) {
+          if (isLocationReferenceExisting(location)) {
             if (icuLocationIds.contains(extractIdFromReference(location.getLocation()))) {
               icuEncounterLocations.add(location);
             }
-          }
+          } else log.warn("Missing location reference for encounter: {}", encounter.getId());
         }
       } catch (Exception ex) {
         log.error("Error in the createIcuLengthOfStayList generation ", ex);
@@ -107,19 +108,26 @@ public class CumulativeLengthOfStayIcu extends DashboardDataItemLogics {
       for (Encounter.EncounterLocationComponent location : icuEncounterLocations) {
         if (location.hasPeriod() && location.getPeriod().hasStart()) {
           LocalDateTime start =
-              location.getPeriod().getStart().toInstant().atZone(ZoneId.systemDefault())
+              location
+                  .getPeriod()
+                  .getStart()
+                  .toInstant()
+                  .atZone(ZoneId.systemDefault())
                   .toLocalDateTime();
 
           if (location.getPeriod().hasStart() && location.getPeriod().hasEnd()) {
             LocalDateTime end =
-                location.getPeriod().getEnd().toInstant().atZone(ZoneId.systemDefault())
+                location
+                    .getPeriod()
+                    .getEnd()
+                    .toInstant()
+                    .atZone(ZoneId.systemDefault())
                     .toLocalDateTime();
             hours = calculateDaysInBetweenInHours(start, end);
             addIcuHours(mapResult, pid, hours, encounter);
           } else if (!location.getPeriod().hasEnd()) {
             // Calculate with current Date
-            hours = calculateDaysInBetweenInHours(start,
-                LocalDateTime.now());
+            hours = calculateDaysInBetweenInHours(start, LocalDateTime.now());
             addIcuHours(mapResult, pid, hours, encounter);
           }
         }
@@ -134,52 +142,56 @@ public class CumulativeLengthOfStayIcu extends DashboardDataItemLogics {
    * this patient. If this is the case, the old value is increased by the specified number of hours.
    * [ Used by: createIcuHoursList ]
    *
-   * @param mapResult  A map that assigns a map with number of Icu Hours and the underlying case ids
-   *                   to a patient id
-   * @param patientId  patient resource id
+   * @param mapResult A map that assigns a map with number of Icu Hours and the underlying case ids
+   *     to a patient id
+   * @param patientId patient resource id
    * @param hoursToAdd Number of hours of Icu stay to be assigned to the respective patient ID or to
-   *                   be added to the previous total.
-   * @param encounter  {@link UkbEncounter} that is considered
+   *     be added to the previous total.
+   * @param encounter {@link UkbEncounter} that is considered
    */
-  private static void addIcuHours(Map<String, Map<Long, Set<String>>> mapResult, String patientId,
-      Long hoursToAdd, UkbEncounter encounter) {
+  private static void addIcuHours(
+      Map<String, Map<Long, Set<String>>> mapResult,
+      String patientId,
+      Long hoursToAdd,
+      UkbEncounter encounter) {
     // Check if there are already saved hours for the patient
-    mapResult.compute(patientId, (key, mapHourCase) -> {
-      if (mapHourCase == null) {
-        // If the patient is not present, create a new entry
-        Set<String> listCaseId = new HashSet<>();
-        listCaseId.add(encounter.getId());
-        Map<Long, Set<String>> mapTemp = new HashMap<>();
-        mapTemp.put(hoursToAdd, listCaseId);
-        return mapTemp;
-      } else {
-        // The patient is already present, update the hours and the list of cases
-        Map.Entry<Long, Set<String>> entry = mapHourCase.entrySet().iterator().next();
-        Long keyNew = entry.getKey() + hoursToAdd;
-        Set<String> listCases = entry.getValue();
-        listCases.add(encounter.getId());
-        mapHourCase.clear();
-        mapHourCase.put(keyNew, listCases);
-        return mapHourCase;
-      }
-    });
+    mapResult.compute(
+        patientId,
+        (key, mapHourCase) -> {
+          if (mapHourCase == null) {
+            // If the patient is not present, create a new entry
+            Set<String> listCaseId = new HashSet<>();
+            listCaseId.add(encounter.getId());
+            Map<Long, Set<String>> mapTemp = new HashMap<>();
+            mapTemp.put(hoursToAdd, listCaseId);
+            return mapTemp;
+          } else {
+            // The patient is already present, update the hours and the list of cases
+            Map.Entry<Long, Set<String>> entry = mapHourCase.entrySet().iterator().next();
+            Long keyNew = entry.getKey() + hoursToAdd;
+            Set<String> listCases = entry.getValue();
+            listCases.add(encounter.getId());
+            mapHourCase.clear();
+            mapHourCase.put(keyNew, listCases);
+            return mapHourCase;
+          }
+        });
   }
-
 
   /**
    * Creates a map containing the length of stay in hours for ICU cases where the patients did not
    * decease.
-   * <p>
-   * This method is used by cumulative.lengthofstay.icu.alive and dead.
    *
-   * @param vitalStatus      Vital status of a patient (e.g. {@link VitalStatus#ALIVE})
+   * <p>This method is used by cumulative.lengthofstay.icu.alive and dead.
+   *
+   * @param vitalStatus Vital status of a patient (e.g. {@link VitalStatus#ALIVE})
    * @param mapIcuLengthList Map with the number of ICU stay hours per patientId
-   * @param mapIcu           Map that assigns a list of case numbers to an ICU treatment level
-   *                         class
+   * @param mapIcu Map that assigns a list of case numbers to an ICU treatment level class
    * @return A map containing filtered ICU length lists based on the given vital status.
    */
   public static Map<String, Map<Long, Set<String>>> createIcuLengthListByVitalstatus(
-      VitalStatus vitalStatus, Map<String, Map<Long, Set<String>>> mapIcuLengthList,
+      VitalStatus vitalStatus,
+      Map<String, Map<Long, Set<String>>> mapIcuLengthList,
       Map<TreatmentLevels, List<UkbEncounter>> mapIcu) {
 
     log.debug("started createIcuLengthListByVitalstatus");
@@ -209,7 +221,7 @@ public class CumulativeLengthOfStayIcu extends DashboardDataItemLogics {
    * Determines whether an encounter should be included based on the vital status of the patient.
    *
    * @param vitalStatus The {@link VitalStatus} of the patient
-   * @param encounter   The encounter to be evaluated
+   * @param encounter The encounter to be evaluated
    * @return True if the encounter should be included, otherwise false
    */
   private static boolean shouldIncludeEncounter(VitalStatus vitalStatus, UkbEncounter encounter) {
@@ -224,5 +236,4 @@ public class CumulativeLengthOfStayIcu extends DashboardDataItemLogics {
     }
     return false; // Do not include encounter if vital status is null
   }
-
 }

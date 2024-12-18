@@ -26,18 +26,20 @@ import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Class for all value determination operations necessary for the applications of the model
- * formula.
+ * Class for all value determination operations necessary for the applications of the model formula.
  */
 @Slf4j
 public class ValueOperations {
 
   public static final int dayInSeconds = 24 * 60 * 60;
 
-  public static Double getDiscriminantValue(Double currentCreatinine, Double firstCreatinine,
+  public static Double getDiscriminantValue(
+      Double currentCreatinine,
+      Double firstCreatinine,
       Double currentUrea,
-      Double currentLactate, Double meanUrineOutput) {
-    //Calculating discriminant value
+      Double currentLactate,
+      Double meanUrineOutput) {
+    // Calculating discriminant value
     try {
       return -4.7023
           + (1.7247 * (currentCreatinine / firstCreatinine))
@@ -50,22 +52,24 @@ public class ValueOperations {
     }
   }
 
-  public static Double getLatestValueInPeriod(Collection<CoreBaseDataItem> coreBaseDataItemList,
-      long periodFrom,
-      long periodTo) {
+  public static Double getLatestValueInPeriod(
+      Collection<CoreBaseDataItem> coreBaseDataItemList, long periodFrom, long periodTo) {
     if (coreBaseDataItemList == null || coreBaseDataItemList.isEmpty()) {
       return null;
     }
-    //Filtering the items within the given time frame
-    var itemsWithinTimeFrame = coreBaseDataItemList.stream()
-        .filter(o -> DateTools.dateToUnixTime(o.dateFrom()) >= periodFrom
-            && DateTools.dateToUnixTime(o.dateFrom()) <= periodTo)
-        .toList();
+    // Filtering the items within the given time frame
+    var itemsWithinTimeFrame =
+        coreBaseDataItemList.stream()
+            .filter(
+                o ->
+                    DateTools.dateToUnixTime(o.dateFrom()) >= periodFrom
+                        && DateTools.dateToUnixTime(o.dateFrom()) <= periodTo)
+            .toList();
     if (itemsWithinTimeFrame.isEmpty()) {
       return null;
     }
 
-    //Returning latest value
+    // Returning latest value
     var latestObject = Collections.max(itemsWithinTimeFrame);
     return latestObject.value();
   }
@@ -85,25 +89,27 @@ public class ValueOperations {
     return closestObject;
   }
 
-  public static Double getClosestValueToMid(Collection<CoreBaseDataItem> coreBaseDataItemList,
-      long periodFrom,
-      long periodTo) {
+  public static Double getClosestValueToMid(
+      Collection<CoreBaseDataItem> coreBaseDataItemList, long periodFrom, long periodTo) {
     if (coreBaseDataItemList == null || coreBaseDataItemList.isEmpty()) {
       return null;
     }
-    //Filtering the items within the given time frame
-    var itemsWithinTimeFrame = coreBaseDataItemList.stream()
-        .filter(o -> DateTools.dateToUnixTime(o.dateFrom()) >= periodFrom
-            && DateTools.dateToUnixTime(o.dateFrom()) <= periodTo)
-        .toList();
+    // Filtering the items within the given time frame
+    var itemsWithinTimeFrame =
+        coreBaseDataItemList.stream()
+            .filter(
+                o ->
+                    DateTools.dateToUnixTime(o.dateFrom()) >= periodFrom
+                        && DateTools.dateToUnixTime(o.dateFrom()) <= periodTo)
+            .toList();
     if (itemsWithinTimeFrame.isEmpty()) {
       return null;
     }
 
-    //Getting the closest object to mid of the given time period
+    // Getting the closest object to mid of the given time period
     var closestObjectToMid = findClosestObject(itemsWithinTimeFrame, ((periodTo + periodFrom) / 2));
     if (closestObjectToMid != null) {
-      //If the closest object is within 3 hours of periodTo then return null
+      // If the closest object is within 3 hours of periodTo then return null
       int threeHoursInSeconds = 3 * 60 * 60;
       if ((periodTo - DateTools.dateToUnixTime(closestObjectToMid.dateFrom()))
           < threeHoursInSeconds) {
@@ -120,52 +126,57 @@ public class ValueOperations {
       return null;
     }
 
-    //Returning oldest value
+    // Returning oldest value
     var oldestObject = Collections.min(coreBaseDataItemList);
     return oldestObject.value();
   }
 
-  public static Double getMeanUrineValueInPeriod(Collection<CoreBaseDataItem> coreBaseDataItemList,
+  public static Double getMeanUrineValueInPeriod(
+      Collection<CoreBaseDataItem> coreBaseDataItemList,
       Double bodyWeight,
-      long periodFrom, long periodTo) {
-    if (coreBaseDataItemList == null || coreBaseDataItemList.isEmpty() || bodyWeight == null
+      long periodFrom,
+      long periodTo) {
+    if (coreBaseDataItemList == null
+        || coreBaseDataItemList.isEmpty()
+        || bodyWeight == null
         || bodyWeight <= 0) {
       return null;
     }
 
-    //Filtering the items within periodFrom and periodTo and sort it
-    var itemsWithinPeriod = coreBaseDataItemList.stream()
-        .filter(o -> DateTools.dateToUnixTime(o.dateFrom()) >= periodFrom
-            && DateTools.dateToUnixTime(o.dateFrom()) <= periodTo)
-        .sorted()
-        .toList();
+    // Filtering the items within periodFrom and periodTo and sort it
+    var itemsWithinPeriod =
+        coreBaseDataItemList.stream()
+            .filter(
+                o ->
+                    DateTools.dateToUnixTime(o.dateFrom()) >= periodFrom
+                        && DateTools.dateToUnixTime(o.dateFrom()) <= periodTo)
+            .sorted()
+            .toList();
     if (itemsWithinPeriod.isEmpty()) {
       return null;
     }
 
-    //At least 2 entries has to be present for calculation
+    // At least 2 entries has to be present for calculation
     if (itemsWithinPeriod.size() < 2) {
       return null;
     }
 
-    //Calculating mean
+    // Calculating mean
     double totalValue = 0;
     for (int i = 1; i < itemsWithinPeriod.size(); i++) {
       totalValue = totalValue + itemsWithinPeriod.get(i).value();
     }
 
-    //return value per hour per kg bodyWeight
-    return totalValue / (
-        ((DateTools.dateToUnixTime(itemsWithinPeriod.get(itemsWithinPeriod.size() - 1).dateFrom())
-            - DateTools.dateToUnixTime(itemsWithinPeriod.get(0).dateFrom()))
-            / 3600.0) * bodyWeight);
+    // return value per hour per kg bodyWeight
+    return totalValue
+        / (((DateTools.dateToUnixTime(
+                        itemsWithinPeriod.get(itemsWithinPeriod.size() - 1).dateFrom())
+                    - DateTools.dateToUnixTime(itemsWithinPeriod.get(0).dateFrom()))
+                / 3600.0)
+            * bodyWeight);
   }
 
   public static Long getMaxValueLowerThan(List<Long> list, Long value) {
-    return list.stream()
-        .filter(n -> n < value)
-        .max(Long::compare)
-        .orElse(null);
+    return list.stream().filter(n -> n < value).max(Long::compare).orElse(null);
   }
-
 }

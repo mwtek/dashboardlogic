@@ -18,6 +18,7 @@
 package de.ukbonn.mwtek.dashboardlogic.settings;
 
 import java.util.List;
+import java.util.Map;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -47,12 +48,20 @@ public class InputCodeSettings {
 
   private List<String> influenzaConditionIcdCodes;
 
-  public InputCodeSettings(List<String> covidObservationPcrLoincCodes,
+  private Map<String, List<String>> kidsRadarConditionKjpIcdCodes;
+
+  private Map<String, List<String>> kidsRadarConditionRsvIcdCodes;
+
+  public InputCodeSettings(
+      List<String> covidObservationPcrLoincCodes,
       List<String> covidObservationVariantLoincCodes,
       List<String> covidConditionIcdCodes,
-      List<String> procedureVentilationCodes, List<String> procedureEcmoCodes,
+      List<String> procedureVentilationCodes,
+      List<String> procedureEcmoCodes,
       List<String> influenzaObservationPcrLoincCodes,
-      List<String> influenzaConditionIcdCodes) {
+      List<String> influenzaConditionIcdCodes,
+      Map<String, List<String>> kidsRadarConditionKjpIcdCodes,
+      Map<String, List<String>> kidsRadarConditionRsvIcdCodes) {
     this.covidObservationPcrLoincCodes = covidObservationPcrLoincCodes;
     this.covidObservationVariantLoincCodes = covidObservationVariantLoincCodes;
     this.covidConditionIcdCodes = covidConditionIcdCodes;
@@ -60,5 +69,7 @@ public class InputCodeSettings {
     this.procedureEcmoCodes = procedureEcmoCodes;
     this.influenzaObservationPcrLoincCodes = influenzaObservationPcrLoincCodes;
     this.influenzaConditionIcdCodes = influenzaConditionIcdCodes;
+    this.kidsRadarConditionKjpIcdCodes = kidsRadarConditionKjpIcdCodes;
+    this.kidsRadarConditionRsvIcdCodes = kidsRadarConditionRsvIcdCodes;
   }
 }

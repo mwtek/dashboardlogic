@@ -47,11 +47,12 @@ public class EncounterExampleData {
     List<UkbEncounter> encounterExamples = new ArrayList<>();
 
     // Adding an encounter resource in-progress and got a valid icu transfer.
-    UkbEncounter encounterInpatientInProgressFacilityContact = new UkbEncounter(
-        ENCOUNTER_ID_INPATIENT,
-        new Encounter.EncounterStatusEnumFactory().fromType(
-            new StringType(EncounterStatus.INPROGRESS.toCode())),
-        new Coding("http://fhir.de/ValueSet/EncounterClassDE", "IMP", null));
+    UkbEncounter encounterInpatientInProgressFacilityContact =
+        new UkbEncounter(
+            ENCOUNTER_ID_INPATIENT,
+            new Encounter.EncounterStatusEnumFactory()
+                .fromType(new StringType(EncounterStatus.INPROGRESS.toCode())),
+            new Coding("http://fhir.de/ValueSet/EncounterClassDE", "IMP", null));
     encounterInpatientInProgressFacilityContact.addIdentifier(
         createIdentifier(ENCOUNTER_ID_INPATIENT));
     encounterInpatientInProgressFacilityContact.addExtension(POSITIVE_EXTENSION);
@@ -60,11 +61,12 @@ public class EncounterExampleData {
     encounterExamples.add(encounterInpatientInProgressFacilityContact);
 
     // A corresponding supply contact
-    UkbEncounter encounterInpatientInProgressSupplyContact = new UkbEncounter(
-        ENCOUNTER_ID_INPATIENT,
-        new Encounter.EncounterStatusEnumFactory().fromType(
-            new StringType(EncounterStatus.INPROGRESS.toCode())),
-        new Coding("http://fhir.de/ValueSet/EncounterClassDE", "IMP", null));
+    UkbEncounter encounterInpatientInProgressSupplyContact =
+        new UkbEncounter(
+            ENCOUNTER_ID_INPATIENT,
+            new Encounter.EncounterStatusEnumFactory()
+                .fromType(new StringType(EncounterStatus.INPROGRESS.toCode())),
+            new Coding("http://fhir.de/ValueSet/EncounterClassDE", "IMP", null));
     encounterInpatientInProgressSupplyContact.addIdentifier(
         createIdentifier(ENCOUNTER_ID_INPATIENT));
     encounterInpatientInProgressSupplyContact.addLocation(
@@ -75,10 +77,12 @@ public class EncounterExampleData {
     encounterExamples.add(encounterInpatientInProgressSupplyContact);
 
     // Missing code system in codings should all be handled and not throw any exception.
-    UkbEncounter encounterWithMissingCodeSystems = new UkbEncounter(ENCOUNTER_ID_MISSING_ATTRIBUTES,
-        new Encounter.EncounterStatusEnumFactory().fromType(
-            new StringType(EncounterStatus.INPROGRESS.toCode())),
-        new Coding(null, "IMP", null));
+    UkbEncounter encounterWithMissingCodeSystems =
+        new UkbEncounter(
+            ENCOUNTER_ID_MISSING_ATTRIBUTES,
+            new Encounter.EncounterStatusEnumFactory()
+                .fromType(new StringType(EncounterStatus.INPROGRESS.toCode())),
+            new Coding(null, "IMP", null));
     // Usually the encounter.type.kontaktart.system = "http://fhir.de/CodeSystem/kontaktart-de"
     encounterWithMissingCodeSystems.addIdentifier(new Identifier());
     encounterWithMissingCodeSystems.addType(
@@ -90,10 +94,12 @@ public class EncounterExampleData {
     encounterExamples.add(encounterWithMissingCodeSystems);
 
     // Missing code system in codings should all be handled and not throw any exception.
-    UkbEncounter encounterWithMissingIdentifier = new UkbEncounter(ENCOUNTER_ID_MISSING_IDENTIFIER,
-        new Encounter.EncounterStatusEnumFactory().fromType(
-            new StringType(EncounterStatus.INPROGRESS.toCode())),
-        new Coding(null, "IMP", null));
+    UkbEncounter encounterWithMissingIdentifier =
+        new UkbEncounter(
+            ENCOUNTER_ID_MISSING_IDENTIFIER,
+            new Encounter.EncounterStatusEnumFactory()
+                .fromType(new StringType(EncounterStatus.INPROGRESS.toCode())),
+            new Coding(null, "IMP", null));
     // Usually the encounter.type.kontaktart.system = "http://fhir.de/CodeSystem/kontaktart-de"
     encounterWithMissingIdentifier.addType(
         new CodeableConcept().addCoding(new Coding(null, "vorstationaer", "vorstationaer")));
@@ -108,8 +114,7 @@ public class EncounterExampleData {
     return new Identifier().setValue(encounterIdInpatient);
   }
 
-  private static CodeableConcept getEncounterType(
-      EncounterContactLevel encounterContactLevel) {
+  private static CodeableConcept getEncounterType(EncounterContactLevel encounterContactLevel) {
     CodeableConcept ccContactLevel = new CodeableConcept();
     Coding codingContactLevel = new Coding();
     ccContactLevel.addCoding(codingContactLevel);
@@ -130,5 +135,4 @@ public class EncounterExampleData {
     }
     return ccContactLevel;
   }
-
 }

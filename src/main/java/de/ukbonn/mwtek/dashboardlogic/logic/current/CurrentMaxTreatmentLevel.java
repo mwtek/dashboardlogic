@@ -22,8 +22,8 @@ import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.ICU_ECMO;
 import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.ICU_VENTILATION;
 import static de.ukbonn.mwtek.dashboardlogic.tools.EncounterFilter.isDiseasePositive;
 
+import de.ukbonn.mwtek.dashboardlogic.DashboardDataItemLogic;
 import de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels;
-import de.ukbonn.mwtek.dashboardlogic.logic.DashboardDataItemLogics;
 import de.ukbonn.mwtek.dashboardlogic.models.DiseaseDataItem;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
 import de.ukbonn.mwtek.utilities.generic.time.TimerTools;
@@ -34,15 +34,14 @@ import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * This class is used for generating the data item
- * {@link DiseaseDataItem current.maxtreatmentlevel}.
+ * This class is used for generating the data item {@link DiseaseDataItem
+ * current.maxtreatmentlevel}.
  *
  * @author <a href="mailto:david.meyers@ukbonn.de">David Meyers</a>
  * @author <a href="mailto:berke_enes.dincel@ukbonn.de">Berke Enes Dincel</a>
  */
-
 @Slf4j
-public class CurrentMaxTreatmentLevel extends DashboardDataItemLogics {
+public class CurrentMaxTreatmentLevel extends DashboardDataItemLogic {
 
   private List<UkbEncounter> facilityContactsInpatients;
 
@@ -50,22 +49,22 @@ public class CurrentMaxTreatmentLevel extends DashboardDataItemLogics {
    * Search for the maximum treatment level of the current ongoing encounter, for the
    * current.maxtreatmentlevel
    *
-   * @param mapIcu         Map that assigns a list of case numbers to an ICU treatment level class.
+   * @param mapIcu Map that assigns a list of case numbers to an ICU treatment level class.
    * @param treatmentLevel Treatmentlevel as a separation criterion.
    * @return All current ongoing inpatient disease-positive encounters for the given
-   * maxtreatmentlevel.
+   *     maxtreatmentlevel.
    */
   @SuppressWarnings("incomplete-switch")
   public List<UkbEncounter> getNumberOfCurrentMaxTreatmentLevel(
       Map<TreatmentLevels, List<UkbEncounter>> mapIcu,
+      List<UkbEncounter> facilityContacts,
       TreatmentLevels treatmentLevel) {
     log.debug("started getNumberOfCurrentMaxTreatmentLevel");
     Instant startTimer = TimerTools.startTimer();
 
     if (facilityContactsInpatients == null) {
-      facilityContactsInpatients = getFacilityContactEncounters().parallelStream()
-          .filter(UkbEncounter::isCaseClassInpatient)
-          .toList();
+      facilityContactsInpatients =
+          facilityContacts.parallelStream().filter(UkbEncounter::isCaseClassInpatient).toList();
     }
 
     List<UkbEncounter> results = new ArrayList<>();
@@ -80,8 +79,10 @@ public class CurrentMaxTreatmentLevel extends DashboardDataItemLogics {
           for (UkbEncounter currentEncounter : facilityContactsInpatients) {
             isPositive = isDiseasePositive(currentEncounter);
 
-            if (currentEncounter.isActive() && isPositive && !icuEncounters.contains(
-                currentEncounter) && !icuVentEncounters.contains(currentEncounter)
+            if (currentEncounter.isActive()
+                && isPositive
+                && !icuEncounters.contains(currentEncounter)
+                && !icuVentEncounters.contains(currentEncounter)
                 && !ecmoEncounters.contains(currentEncounter)) {
               results.add(currentEncounter);
             }
@@ -92,9 +93,11 @@ public class CurrentMaxTreatmentLevel extends DashboardDataItemLogics {
           for (UkbEncounter currentEncounter : facilityContactsInpatients) {
             isPositive = isDiseasePositive(currentEncounter);
 
-            if (!icuVentEncounters.contains(currentEncounter) && !ecmoEncounters.contains(
-                currentEncounter) && icuEncounters.contains(currentEncounter)
-                && currentEncounter.isActive() && isPositive) {
+            if (!icuVentEncounters.contains(currentEncounter)
+                && !ecmoEncounters.contains(currentEncounter)
+                && icuEncounters.contains(currentEncounter)
+                && currentEncounter.isActive()
+                && isPositive) {
               results.add(currentEncounter);
             }
           }
@@ -104,8 +107,9 @@ public class CurrentMaxTreatmentLevel extends DashboardDataItemLogics {
           for (UkbEncounter currentEncounter : facilityContactsInpatients) {
             isPositive = isDiseasePositive(currentEncounter);
 
-            if (currentEncounter.isActive() && isPositive && !ecmoEncounters.contains(
-                currentEncounter)
+            if (currentEncounter.isActive()
+                && isPositive
+                && !ecmoEncounters.contains(currentEncounter)
                 && icuVentEncounters.contains(currentEncounter)) {
               results.add(currentEncounter);
             }
@@ -116,8 +120,9 @@ public class CurrentMaxTreatmentLevel extends DashboardDataItemLogics {
           for (UkbEncounter currentEncounter : facilityContactsInpatients) {
             isPositive = isDiseasePositive(currentEncounter);
 
-            if (currentEncounter.isActive() && isPositive && ecmoEncounters.contains(
-                currentEncounter)) {
+            if (currentEncounter.isActive()
+                && isPositive
+                && ecmoEncounters.contains(currentEncounter)) {
               results.add(currentEncounter);
             }
           }

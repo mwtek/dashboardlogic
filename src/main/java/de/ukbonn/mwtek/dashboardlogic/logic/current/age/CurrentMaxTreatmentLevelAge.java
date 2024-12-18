@@ -32,16 +32,14 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * This class is used for generating the data item
- * {@link DiseaseDataItem current.maxtreatmentlevel.age.* with subitems like *.normal_ward and
- * *.age.icu}.
+ * This class is used for generating the data item {@link DiseaseDataItem
+ * current.maxtreatmentlevel.age.* with subitems like *.normal_ward and *.age.icu}.
  *
  * @author <a href="mailto:david.meyers@ukbonn.de">David Meyers</a>
  * @author <a href="mailto:berke_enes.dincel@ukbonn.de">Berke Enes Dincel</a>
  */
-
-public record CurrentMaxTreatmentLevelAge(List<UkbPatient> listPatients,
-                                          List<UkbEncounter> listCurrentMaxEncounter) {
+public record CurrentMaxTreatmentLevelAge(
+    List<UkbPatient> listPatients, List<UkbEncounter> listCurrentMaxEncounter) {
 
   /**
    * Creates a list of ages for patients with encounters in the current maximum encounter list.
@@ -59,15 +57,18 @@ public record CurrentMaxTreatmentLevelAge(List<UkbPatient> listPatients,
 
     // Convert the list of current maximum encounter PIDs to a set for efficient containment checks
     Set<String> currentMaxEncounterPidSet =
-        listCurrentMaxEncounter.stream().map(UkbEncounter::getPatientId)
+        listCurrentMaxEncounter.stream()
+            .map(UkbEncounter::getPatientId)
             .collect(Collectors.toSet());
 
     // Iterate over encounters in the positive encounter map and assign first admission dates
     mapPositiveEncounterByClass.values().stream()
         .flatMap(List::stream)
         .filter(encounter -> currentMaxEncounterPidSet.contains(encounter.getPatientId()))
-        .forEach(encounter -> CoronaResultFunctionality.assignFirstAdmissionDateToPid(encounter,
-            currentMaxPidAdmissionMap));
+        .forEach(
+            encounter ->
+                CoronaResultFunctionality.assignFirstAdmissionDateToPid(
+                    encounter, currentMaxPidAdmissionMap));
 
     // Calculate and check the age group for patients in the current maximum encounter list
     calculateAndCheckAgeGroup(currentMaxPidAdmissionMap, resultList, listPatients);
@@ -83,42 +84,44 @@ public record CurrentMaxTreatmentLevelAge(List<UkbPatient> listPatients,
    * Calculates and checks the age group for patients based on their first admission date.
    *
    * @param pidAdmissionMap Map of patient IDs to their first admission encounters.
-   * @param resultList      List to store the calculated ages.
-   * @param listPatients    List of patients for additional information.
+   * @param resultList List to store the calculated ages.
+   * @param listPatients List of patients for additional information.
    */
-  private static void calculateAndCheckAgeGroup(Map<String, UkbEncounter> pidAdmissionMap,
-      List<Long> resultList, List<UkbPatient> listPatients) {
+  private static void calculateAndCheckAgeGroup(
+      Map<String, UkbEncounter> pidAdmissionMap,
+      List<Long> resultList,
+      List<UkbPatient> listPatients) {
     // Filter the patients with a valid birthday
-    List<UkbPatient> validPatientsWithBirthday = listPatients.stream()
-        .filter(UkbPatient::hasBirthDate)
-        .toList();
+    List<UkbPatient> validPatientsWithBirthday =
+        listPatients.stream().filter(UkbPatient::hasBirthDate).toList();
 
-    pidAdmissionMap.forEach((pid, encounter) -> {
-      Date birthdayPatient = findBirthdayForPatient(pid, validPatientsWithBirthday);
-      if (encounter.isPeriodStartExistent() && birthdayPatient != null) {
-        // Calculate the age based on the birthday and the encounter's start period
-        int age = CoronaResultFunctionality.calculateAge(birthdayPatient,
-            encounter.getPeriod().getStart());
-        long cohortAge = CoronaResultFunctionality.checkAgeGroup(age);
-        resultList.add(cohortAge);
-      }
-    });
+    pidAdmissionMap.forEach(
+        (pid, encounter) -> {
+          Date birthdayPatient = findBirthdayForPatient(pid, validPatientsWithBirthday);
+          if (encounter.isPeriodStartExistent() && birthdayPatient != null) {
+            // Calculate the age based on the birthday and the encounter's start period
+            int age =
+                CoronaResultFunctionality.calculateAge(
+                    birthdayPatient, encounter.getPeriod().getStart());
+            long cohortAge = CoronaResultFunctionality.checkAgeGroup(age);
+            resultList.add(cohortAge);
+          }
+        });
   }
 
   /**
    * Finds the birthday for a given patient ID in the list of valid patients with a birthday.
    *
-   * @param patientId                 The ID of the patient.
+   * @param patientId The ID of the patient.
    * @param validPatientsWithBirthday List of valid patients with a birthday.
    * @return The birthday of the patient or {@code null} if not found.
    */
-  private static Date findBirthdayForPatient(String patientId,
-      List<UkbPatient> validPatientsWithBirthday) {
+  private static Date findBirthdayForPatient(
+      String patientId, List<UkbPatient> validPatientsWithBirthday) {
     return validPatientsWithBirthday.stream()
         .filter(patient -> patientId.equals(patient.getId()))
         .map(UkbPatient::getBirthDate)
         .findFirst()
         .orElseGet(() -> null);
   }
-
 }

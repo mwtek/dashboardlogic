@@ -24,7 +24,7 @@ import static de.ukbonn.mwtek.dashboardlogic.examples.EncounterExampleData.getEx
 
 import de.ukbonn.mwtek.dashboardlogic.enums.DataItemContext;
 import de.ukbonn.mwtek.dashboardlogic.examples.InputCodeSettingsExampleData;
-import de.ukbonn.mwtek.dashboardlogic.logic.DashboardDataItemLogics;
+import de.ukbonn.mwtek.dashboardlogic.logic.DashboardData;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbPatient;
 import java.util.ArrayList;
 import java.util.List;
@@ -40,8 +40,9 @@ import org.springframework.util.Assert;
 public class CumulativeZipCodeTests {
 
   @Test
-  @DisplayName("Ensuring that the cumulative.zipcode data item is able to handle empty fields in "
-      + "the patient resource even with missing fields.")
+  @DisplayName(
+      "Ensuring that the cumulative.zipcode data item is able to handle empty fields in "
+          + "the patient resource even with missing fields.")
   void testCumulativeResults() {
     // Initialization of the input list
     List<UkbPatient> patients = new ArrayList<>();
@@ -54,8 +55,8 @@ public class CumulativeZipCodeTests {
         new Identifier().setValue(ENCOUNTER_ID_INPATIENT).setUse(IdentifierUse.OFFICIAL));
     humanNames.add(new HumanName().setFamily("Testpatient"));
     addresses.add(new Address().setPostalCode("12345").setCountry("DE"));
-    UkbPatient patientWithMissingCountryCode = new UkbPatient(identifiers, humanNames,
-        AdministrativeGender.MALE, addresses);
+    UkbPatient patientWithMissingCountryCode =
+        new UkbPatient(identifiers, humanNames, AdministrativeGender.MALE, addresses);
     patientWithMissingCountryCode.setId(ENCOUNTER_ID_INPATIENT);
 
     patients.add(patientWithMissingCountryCode);
@@ -69,17 +70,32 @@ public class CumulativeZipCodeTests {
         new Identifier().setValue(ENCOUNTER_ID_MISSING_IDENTIFIER).setUse(IdentifierUse.OFFICIAL));
     humanNamesPatientTwo.add(new HumanName().setFamily("Testpatient"));
     addressesPatientTwo.add(new Address().setCountry("DE"));
-    UkbPatient patientWithMissingZipCode = new UkbPatient(identifiersPatientTwo,
-        humanNamesPatientTwo,
-        AdministrativeGender.MALE, addressesPatientTwo);
+    UkbPatient patientWithMissingZipCode =
+        new UkbPatient(
+            identifiersPatientTwo,
+            humanNamesPatientTwo,
+            AdministrativeGender.MALE,
+            addressesPatientTwo);
     patientWithMissingZipCode.setId(ENCOUNTER_ID_MISSING_IDENTIFIER);
 
     patients.add(patientWithMissingZipCode);
 
-    DashboardDataItemLogics.initializeData(InputCodeSettingsExampleData.getExampleData(),
-        getExampleList(), patients, null, null, null, DataItemContext.COVID);
+    DashboardData dbData =
+        new DashboardData()
+            .initializeData(
+                InputCodeSettingsExampleData.getExampleData(),
+                null,
+                getExampleList(),
+                patients,
+                null,
+                null,
+                null,
+                null,
+                DataItemContext.COVID);
 
-    List<String> result = new CumulativeZipCode().createZipCodeList();
+    List<String> result =
+        new CumulativeZipCode()
+            .createZipCodeList(dbData.getEncounters(), null, dbData.getPatients(), null);
     // Even the ones with missing value should return a "null" string.
     Assert.isTrue(result.size() == patients.size(), "");
   }

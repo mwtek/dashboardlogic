@@ -48,11 +48,10 @@ public enum DashboardLogicFixedValues {
   FEMALE_SPECIFICATION("Female"),
   DIVERSE_SPECIFICATION("Diverse"),
 
-
   // Administrative data patient
   /*
-   ISO 3166 country code
-   */
+  ISO 3166 country code
+  */
   COUNTRY_CODE("DE"),
   CITY_BONN("Bonn"),
 
@@ -66,7 +65,6 @@ public enum DashboardLogicFixedValues {
   // ICD code without exclamation mark, as it is used in an "observation contains" logic to make
   // further processing more robust.
   U071("U07.1"),
-  U072("U07.2"),
 
   // Diagnosis Reliability
   DIAG_RELIABILITY_MISSING("No Code"),
@@ -83,8 +81,8 @@ public enum DashboardLogicFixedValues {
 
   DIAG_RELIABILITY_Z("Z");
 
-  public static final String OBSERVATION_INTERPRETATION_SYSTEM = "http://terminology.hl7"
-      + ".org/CodeSystem/v3-ObservationInterpretation";
+  public static final String OBSERVATION_INTERPRETATION_SYSTEM =
+      "http://terminology.hl7" + ".org/CodeSystem/v3-ObservationInterpretation";
 
   // Display forms of the covid-19 variants to check against
   public static final String VARIANT_ALPHA = "Alpha";
@@ -109,7 +107,9 @@ public enum DashboardLogicFixedValues {
    * ValueSet of diagnostic certainties for outpatient diagnoses for borderline COVID-19 findings
    */
   public static final ImmutableList<String> DIAGNOSIS_SECURITY_BORDERLINE =
-      ImmutableList.of(DIAG_RELIABILITY_V.getValue(), DIAG_RELIABILITY_G.getValue(),
+      ImmutableList.of(
+          DIAG_RELIABILITY_V.getValue(),
+          DIAG_RELIABILITY_G.getValue(),
           DIAG_RELIABILITY_Z.getValue());
 
   /**
@@ -118,15 +118,11 @@ public enum DashboardLogicFixedValues {
   public static final ImmutableList<DashboardLogicFixedValues> DIAGNOSIS_SECURITY_BORDERLINE_ENUM =
       ImmutableList.of(DIAG_RELIABILITY_V, DIAG_RELIABILITY_G, DIAG_RELIABILITY_Z);
 
-  /**
-   * ValueSet of diagnostic certainties for outpatient diagnoses for negative COVID-19 findings
-   */
+  /** ValueSet of diagnostic certainties for outpatient diagnoses for negative COVID-19 findings */
   public static final ImmutableList<String> DIAGNOSIS_SECURITY_NEGATIVE =
       ImmutableList.of(DIAG_RELIABILITY_A.getValue());
 
-  /**
-   * ValueSet of diagnostic certainties for outpatient diagnoses for negative COVID-19 findings
-   */
+  /** ValueSet of diagnostic certainties for outpatient diagnoses for negative COVID-19 findings */
   public static final ImmutableList<DashboardLogicFixedValues> DIAGNOSIS_SECURITY_NEGATIVE_ENUM =
       ImmutableList.of(DIAG_RELIABILITY_A);
 
@@ -135,5 +131,4 @@ public enum DashboardLogicFixedValues {
   DashboardLogicFixedValues(String value) {
     this.value = value;
   }
-
 }

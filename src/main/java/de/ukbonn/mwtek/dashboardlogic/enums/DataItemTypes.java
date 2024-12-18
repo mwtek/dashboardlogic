@@ -25,10 +25,13 @@ package de.ukbonn.mwtek.dashboardlogic.enums;
  */
 public class DataItemTypes {
 
-  public final static String ITEMTYPE_AGGREGATED = "aggregated";
-  public final static String ITEMTYPE_LIST = "list";
-  public final static String ITEMTYPE_LIST_NESTED_ARRAYS = "listnestedarrays";
-  public final static String ITEMTYPE_LIST_TUPEL = "listtupel";
-  public final static String ITEMTYPE_DEBUG = "debug";
-  public final static String SUBITEMTYPE_DATE = "date";
+  public static final String ITEMTYPE_AGGREGATED = "aggregated";
+  public static final String ITEMTYPE_LIST = "list";
+  public static final String ITEMTYPE_CHART_LIST = "chartlist";
+  public static final String ITEMTYPE_LIST_NESTED_ARRAYS = "listnestedarrays";
+  public static final String ITEMTYPE_LIST_TUPEL = "listtupel";
+  public static final String ITEMTYPE_STACKED_BAR_CHARTS = "stackedbarcharts";
+  public static final String ITEMTYPE_PIE_CHARTS = "piecharts";
+  public static final String ITEMTYPE_DEBUG = "debug";
+  public static final String SUBITEMTYPE_DATE = "date";
 }

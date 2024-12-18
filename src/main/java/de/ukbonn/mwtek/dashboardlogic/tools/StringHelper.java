@@ -21,21 +21,18 @@ package de.ukbonn.mwtek.dashboardlogic.tools;
 
 import java.util.Set;
 
-/**
- * Auxiliary methods for string operations.
- */
+/** Auxiliary methods for string operations. */
 public class StringHelper {
 
   /**
    * Check if a term or code from the ValueSet is a subelement of the given text.
-   * <p>
-   * For example, if the ValueSet contains "My", it would output a positive result for a given
+   *
+   * <p>For example, if the ValueSet contains "My", it would output a positive result for a given
    * string "SARS-CoV-2-My-Variant".
    *
-   * @param valueSet          ValueSet of any codes whose existence in the string should be
-   *                          checked.
+   * @param valueSet ValueSet of any codes whose existence in the string should be checked.
    * @param stringToBeChecked The text element to be checked for the existence of character strings
-   *                          from the ValueSet.
+   *     from the ValueSet.
    * @return <code>True</code> if a code of the ValueSet is found in the given string.
    */
   public static boolean isAnyMatchSetWithString(Set<String> valueSet, String stringToBeChecked) {

@@ -33,11 +33,13 @@ import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.VAR
 import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.VARIANT_UNKNOWN;
 import static de.ukbonn.mwtek.dashboardlogic.logic.CoronaResultFunctionality.getDatesOutputList;
 import static de.ukbonn.mwtek.dashboardlogic.logic.CoronaResultFunctionality.isCodingValid;
+import static de.ukbonn.mwtek.dashboardlogic.logic.DiseaseResultFunctionality.getKickOffDateInSeconds;
 import static de.ukbonn.mwtek.dashboardlogic.tools.StringHelper.isAnyMatchSetWithString;
 import static de.ukbonn.mwtek.utilities.enums.TerminologySystems.LOINC;
 
-import de.ukbonn.mwtek.dashboardlogic.enums.CoronaDashboardConstants;
-import de.ukbonn.mwtek.dashboardlogic.logic.DashboardDataItemLogics;
+import de.ukbonn.mwtek.dashboardlogic.DashboardDataItemLogic;
+import de.ukbonn.mwtek.dashboardlogic.enums.DataItemContext;
+import de.ukbonn.mwtek.dashboardlogic.enums.NumDashboardConstants;
 import de.ukbonn.mwtek.dashboardlogic.models.DiseaseDataItem;
 import de.ukbonn.mwtek.dashboardlogic.settings.InputCodeSettings;
 import de.ukbonn.mwtek.dashboardlogic.settings.VariantSettings;
@@ -52,16 +54,18 @@ import org.hl7.fhir.r4.model.Coding;
 import org.hl7.fhir.r4.model.Observation;
 
 /**
- * This class is used for generating the data item
- * {@link DiseaseDataItem timeline.varianttestresults}.
+ * This class is used for generating the data item {@link DiseaseDataItem
+ * timeline.varianttestresults}.
  *
  * @author <a href="mailto:david.meyers@ukbonn.de">David Meyers</a>
  * @author <a href="mailto:berke_enes.dincel@ukbonn.de">Berke Enes Dincel</a>
  */
 @Slf4j
-public class TimelineVariantTestResults extends DashboardDataItemLogics {
+public class TimelineVariantTestResults extends DashboardDataItemLogic {
 
-  public Map<String, List<Long>> createTimelineVariantsTests(VariantSettings variantSettings,
+  public Map<String, List<Long>> createTimelineVariantsTests(
+      List<UkbObservation> observations,
+      VariantSettings variantSettings,
       InputCodeSettings inputCodeSettings) {
     Map<String, List<Long>> variantMap = new LinkedHashMap<>();
     List<String> observationVariantLoincCodes =
@@ -77,15 +81,16 @@ public class TimelineVariantTestResults extends DashboardDataItemLogics {
     variantMap.put(VARIANT_NON_VOC, new ArrayList<>());
     variantMap.put(VARIANT_UNKNOWN, new ArrayList<>());
 
-    List<UkbObservation> variantObservations = getVariantObservations().stream()
-        .filter(x -> isCodingValid(x.getCode(), LOINC,
-            observationVariantLoincCodes))
-        .filter(Observation::hasValueCodeableConcept).toList();
+    List<UkbObservation> variantObservations =
+        observations.stream()
+            .filter(x -> isCodingValid(x.getCode(), LOINC, observationVariantLoincCodes))
+            .filter(Observation::hasValueCodeableConcept)
+            .toList();
 
     long currentUnixTime = DateTools.getCurrentUnixTime();
 
     // initialization of the map with the date entries to keep the order ascending
-    long startDate = CoronaDashboardConstants.QUALIFYING_DATE;
+    long startDate = getKickOffDateInSeconds(DataItemContext.COVID);
     while (startDate <= currentUnixTime) {
       long alphaCount = 0;
       long betaCount = 0;
@@ -97,28 +102,33 @@ public class TimelineVariantTestResults extends DashboardDataItemLogics {
       long unknownCount = 0;
 
       final long checkDateUnix = startDate;
-      final long nextDateUnix = startDate + CoronaDashboardConstants.DAY_IN_SECONDS;
+      final long nextDateUnix = startDate + NumDashboardConstants.DAY_IN_SECONDS;
 
       // Retrieve all observations for the checked date
-      List<UkbObservation> validVariantObservations = variantObservations.stream()
-          .filter(x -> checkDateUnix <= DateTools.dateToUnixTime(
-              x.getEffectiveDateTimeType().getValue()))
-          .filter(x -> nextDateUnix > DateTools.dateToUnixTime(
-              x.getEffectiveDateTimeType().getValue())).toList();
+      List<UkbObservation> validVariantObservations =
+          variantObservations.stream()
+              .filter(
+                  x ->
+                      checkDateUnix
+                          <= DateTools.dateToUnixTime(x.getEffectiveDateTimeType().getValue()))
+              .filter(
+                  x ->
+                      nextDateUnix
+                          > DateTools.dateToUnixTime(x.getEffectiveDateTimeType().getValue()))
+              .toList();
 
       for (UkbObservation variantObservation : validVariantObservations) {
-//        boolean observationContainsLoinc =
-//            variantObservation.getValueCodeableConcept().getCoding().stream()
-//                .filter(x -> x.hasSystem()).anyMatch(
-//                    x -> x.getSystem().equals(CoronaFixedValues.LOINC_SYSTEM.getValue()));
+        //        boolean observationContainsLoinc =
+        //            variantObservation.getValueCodeableConcept().getCoding().stream()
+        //                .filter(x -> x.hasSystem()).anyMatch(
+        //                    x -> x.getSystem().equals(CoronaFixedValues.LOINC_SYSTEM.getValue()));
 
         // If a LOINC notation is found, only this is read. Otherwise, an attempt is made to
         // determine the variant information via the free text.
         for (Coding variantCoding : variantObservation.getValueCodeableConcept().getCoding()) {
           // For now the display values are checked since its more flexible if new variants
           // appear or to generalize non-voc variants
-          if (variantCoding.hasSystem() && variantCoding.getSystem()
-              .equals(LOINC)) {
+          if (variantCoding.hasSystem() && variantCoding.getSystem().equals(LOINC)) {
             switch (variantCoding.getCode()) {
               case VARIANT_ALPHA_LOINC -> alphaCount++;
               case VARIANT_BETA_LOINC -> betaCount++;
@@ -137,9 +147,10 @@ public class TimelineVariantTestResults extends DashboardDataItemLogics {
                   nonVocCount++;
                 } else {
                   unknownCount++;
-//                  log.debug(
-//                      "No support for covid variant with loinc code: " + variantCoding.getCode()
-//                          + " and display: " + variantCoding.getDisplay());
+                  //                  log.debug(
+                  //                      "No support for covid variant with loinc code: " +
+                  // variantCoding.getCode()
+                  //                          + " and display: " + variantCoding.getDisplay());
                 }
               }
             }
@@ -155,10 +166,9 @@ public class TimelineVariantTestResults extends DashboardDataItemLogics {
       variantMap.get(VARIANT_NON_VOC).add(nonVocCount);
       variantMap.get(VARIANT_UNKNOWN).add(unknownCount);
 
-      startDate += CoronaDashboardConstants.DAY_IN_SECONDS;
+      startDate += NumDashboardConstants.DAY_IN_SECONDS;
     }
-    variantMap
-        .put(DATE.getValue(), getDatesOutputList());
+    variantMap.put(DATE.getValue(), getDatesOutputList(DataItemContext.COVID));
 
     return variantMap;
   }

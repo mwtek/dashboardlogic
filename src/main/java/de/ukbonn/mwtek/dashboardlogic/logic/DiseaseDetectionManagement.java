@@ -30,10 +30,11 @@ import static de.ukbonn.mwtek.utilities.enums.TerminologySystems.LOINC;
 import static de.ukbonn.mwtek.utilities.fhir.misc.FhirCodingTools.isCodeInCodesystem;
 import static de.ukbonn.mwtek.utilities.fhir.misc.FhirTools.flagEncountersByIdentifierValue;
 
-import de.ukbonn.mwtek.dashboardlogic.enums.CoronaDashboardConstants;
 import de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues;
 import de.ukbonn.mwtek.dashboardlogic.enums.DataItemContext;
+import de.ukbonn.mwtek.dashboardlogic.enums.NumDashboardConstants;
 import de.ukbonn.mwtek.dashboardlogic.settings.InputCodeSettings;
+import de.ukbonn.mwtek.dashboardlogic.settings.QualitativeLabCodesSettings;
 import de.ukbonn.mwtek.utilities.fhir.misc.FhirConditionTools;
 import de.ukbonn.mwtek.utilities.fhir.misc.FhirTools;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbCondition;
@@ -69,16 +70,19 @@ public class DiseaseDetectionManagement {
    * (Exclusion via negative diagnostic code), as far as this information can be determined from the
    * corresponding observation and condition resources.
    *
-   * @param ukbEncounters     List of all {@linkplain UkbEncounter} resources that could be
-   *                          flagged.
-   * @param ukbConditions     List of all {@linkplain UkbCondition} resources with U07.* ICD codes.
-   * @param ukbObservations   List of all observation resources with a disease-related PCR code.
+   * @param ukbEncounters List of all {@linkplain UkbEncounter} resources that could be flagged.
+   * @param ukbConditions List of all {@linkplain UkbCondition} resources with U07.* ICD codes.
+   * @param ukbObservations List of all observation resources with a disease-related PCR code.
    * @param inputCodeSettings The configuration of the parameterizable codes such as the observation
-   *                          codes or procedure codes.
+   *     codes or procedure codes.
    */
-  public static void flagEncounters(List<UkbEncounter> ukbEncounters,
-      List<UkbCondition> ukbConditions, List<UkbObservation> ukbObservations,
-      InputCodeSettings inputCodeSettings, DataItemContext dataItemContext) {
+  public static void flagEncounters(
+      List<UkbEncounter> ukbEncounters,
+      List<UkbCondition> ukbConditions,
+      List<UkbObservation> ukbObservations,
+      InputCodeSettings inputCodeSettings,
+      QualitativeLabCodesSettings qualitativeLabCodesSettings,
+      DataItemContext dataItemContext) {
     log.debug("started flagCases");
     Instant startTimer = TimerTools.startTimer();
     // The encounter ids of the disease-positive encounters
@@ -87,31 +91,31 @@ public class DiseaseDetectionManagement {
     // create maps <DiagnoseCodes, Set<CaseId>>
     switch (dataItemContext) {
       case COVID -> {
-        positiveEncounterIds = getEncounterIdsWithPositiveLabObs(ukbObservations,
-            inputCodeSettings, dataItemContext);
-        Set<String> caseIdsWithIcdCode = FhirConditionTools.getEncounterIdsByIcdCodes(
-            ukbConditions, U071.getValue());
+        positiveEncounterIds =
+            getEncounterIdsWithPositiveLabObs(
+                ukbObservations, inputCodeSettings, dataItemContext, qualitativeLabCodesSettings);
+        Set<String> caseIdsWithIcdCode =
+            FhirConditionTools.getEncounterIdsByIcdCodes(ukbConditions, U071.getValue());
         positiveEncounterIds.addAll(caseIdsWithIcdCode);
       }
       case INFLUENZA -> {
-        positiveEncounterIds = getEncounterIdsWithPositiveLabObs(ukbObservations,
-            inputCodeSettings, dataItemContext);
+        positiveEncounterIds =
+            getEncounterIdsWithPositiveLabObs(
+                ukbObservations, inputCodeSettings, dataItemContext, qualitativeLabCodesSettings);
         Set<String> positiveIcdCodes = Set.of("J10.0", "J10.1", "J10.8", "J09");
         // The suspected handling is part of the data set description but got no impact on any
         // data item at the moment
-        Set<String> encounterIdsWithPositiveIcdCode = FhirConditionTools.getEncounterIdsByIcdCodes(
-            ukbConditions, positiveIcdCodes);
+        Set<String> encounterIdsWithPositiveIcdCode =
+            FhirConditionTools.getEncounterIdsByIcdCodes(ukbConditions, positiveIcdCodes);
         positiveEncounterIds.addAll(encounterIdsWithPositiveIcdCode);
       }
     }
     // Identify the facility contact <-> supply contact connection via 'encounter.identifier
     // .aufnahmenummer' and flag them as disease-positive if needed
-    Set<String> positiveVisitNumbers = FhirTools.getVisitNumberIdentifiers(
-        positiveEncounterIds,
-        ukbEncounters);
-    flaggedEncounters = flagEncountersByIdentifierValue(
-        positiveVisitNumbers,
-        ukbEncounters, POSITIVE_EXTENSION);
+    Set<String> positiveVisitNumbers =
+        FhirTools.getVisitNumberIdentifiers(positiveEncounterIds, ukbEncounters);
+    flaggedEncounters =
+        flagEncountersByIdentifierValue(positiveVisitNumbers, ukbEncounters, POSITIVE_EXTENSION);
 
     // 12-days-logic and flagging the encounter if the prerequisites are fulfilled
     detectPositiveInpatientEncountersByPreviousEncounters(flaggedEncounters, ukbEncounters);
@@ -123,31 +127,33 @@ public class DiseaseDetectionManagement {
    * but fall under the twelve-day logic are considered as positive
    *
    * @param flaggedEncounter Set containing (minimum) all encounters with a positive disease marker
-   * @param encountersAll    List of all encounters (including the non-flagged ones) that may now be
-   *                         flagged due to the 12-day logic.
+   * @param encountersAll List of all encounters (including the non-flagged ones) that may now be
+   *     flagged due to the 12-day logic.
    */
   public static void detectPositiveInpatientEncountersByPreviousEncounters(
-      Set<UkbEncounter> flaggedEncounter,
-      List<UkbEncounter> encountersAll) {
+      Set<UkbEncounter> flaggedEncounter, List<UkbEncounter> encountersAll) {
 
     // Start logging
     log.debug("started detectPositiveInpatientEncountersByPreviousEncounters");
     Instant startTimer = TimerTools.startTimer();
 
-    Set<UkbEncounter> positiveOutpatientEncounter = flaggedEncounter.parallelStream()
-        .filter(UkbEncounter::isCaseClassOutpatient)
-        .collect(Collectors.toSet());
+    Set<UkbEncounter> positiveOutpatientEncounter =
+        flaggedEncounter.parallelStream()
+            .filter(UkbEncounter::isCaseClassOutpatient)
+            .collect(Collectors.toSet());
 
     // Extract patient IDs from flagged encounters marked as outpatient
-    Set<String> positiveOutpatientPatientIds = positiveOutpatientEncounter.stream()
-        .map(UkbEncounter::getPatientId)
-        .collect(Collectors.toSet());
+    Set<String> positiveOutpatientPatientIds =
+        positiveOutpatientEncounter.stream()
+            .map(UkbEncounter::getPatientId)
+            .collect(Collectors.toSet());
 
     // Filter encounters for inpatients using positive outpatient patient IDs
-    Map<String, List<UkbEncounter>> inpatientEncountersByPatientId = encountersAll.stream()
-        .filter(encounter -> positiveOutpatientPatientIds.contains(encounter.getPatientId()))
-        .filter(UkbEncounter::isCaseClassInpatient)
-        .collect(Collectors.groupingBy(UkbEncounter::getPatientId));
+    Map<String, List<UkbEncounter>> inpatientEncountersByPatientId =
+        encountersAll.stream()
+            .filter(encounter -> positiveOutpatientPatientIds.contains(encounter.getPatientId()))
+            .filter(UkbEncounter::isCaseClassInpatient)
+            .collect(Collectors.groupingBy(UkbEncounter::getPatientId));
 
     // Loop through flagged encounters
     for (UkbEncounter outpatientEncounter : positiveOutpatientEncounter) {
@@ -159,8 +165,8 @@ public class DiseaseDetectionManagement {
       Date outpatientStart = outpatientEncounter.getPeriod().getStart();
 
       // Get inpatient encounters for the same patient ID
-      List<UkbEncounter> inpatientEncounters = inpatientEncountersByPatientId.get(
-          outpatientEncounter.getPatientId());
+      List<UkbEncounter> inpatientEncounters =
+          inpatientEncountersByPatientId.get(outpatientEncounter.getPatientId());
       if (inpatientEncounters == null) {
         continue; // No inpatient encounters for this patient
       }
@@ -178,37 +184,38 @@ public class DiseaseDetectionManagement {
         // Check if outpatient encounter is before inpatient encounter
         if (outpatientStart.before(inpatientStart)) {
           // Calculate the number of days between outpatient and inpatient encounters
-          long days = ChronoUnit.DAYS.between(
-              outpatientStart.toInstant().atZone(ZoneId.systemDefault()).toLocalDate(),
-              inpatientStart.toInstant().atZone(ZoneId.systemDefault()).toLocalDate()
-          );
+          long days =
+              ChronoUnit.DAYS.between(
+                  outpatientStart.toInstant().atZone(ZoneId.systemDefault()).toLocalDate(),
+                  inpatientStart.toInstant().atZone(ZoneId.systemDefault()).toLocalDate());
 
           // Check if days fall within the defined period
-          if (days <= CoronaDashboardConstants.DAYS_AFTER_OUTPATIENT_STAY) {
+          if (days <= NumDashboardConstants.DAYS_AFTER_OUTPATIENT_STAY) {
             // Add an extension to inpatient encounter
             inpatientEncounter.addExtension(TWELVE_DAYS_EXTENSION);
             // Log if inpatient encounter is marked as positive
             if (!inpatientEncounter.hasExtension(POSITIVE_RESULT.getValue())) {
-              log.debug("The encounter with id " + inpatientEncounter.getId()
-                  + " was marked as positive because a previous outpatient case not older"
-                  + " than 12 days was positive.");
+              log.debug(
+                  "The encounter with id "
+                      + inpatientEncounter.getId()
+                      + " was marked as positive because a previous outpatient case not older"
+                      + " than 12 days was positive.");
             }
           }
         }
       }
     }
     // Stop timer and log
-    TimerTools.stopTimerAndLog(startTimer,
-        "finished detectPositiveInpatientEncountersByPreviousEncounters");
+    TimerTools.stopTimerAndLog(
+        startTimer, "finished detectPositiveInpatientEncountersByPreviousEncounters");
   }
-
 
   /**
    * Creation of a map that assigns the respective case numbers for a given ICD code to a diagnosis
    * certainty.
    *
    * @param listConditions List of all condition resources with U07.* ICD codes
-   * @param icdCode        The ICD diagnosis code to be checked (e.g. U07.1)
+   * @param icdCode The ICD diagnosis code to be checked (e.g. U07.1)
    * @return Map with diagnosis code and a list of case numbers per diagnosis code
    */
   @Deprecated
@@ -221,50 +228,63 @@ public class DiseaseDetectionManagement {
     for (UkbCondition condition : listConditions) {
       // Check if the condition contains an ICD-10-GM code system and if it contains the given
       // icd code
-      if (condition.hasCode() && condition.getCode()
-          .hasCoding(ICD_SYSTEM.getValue(), icdCode)) {
-        condition.getCode().getCoding().forEach(coding -> {
-          if (coding.getSystem().equals(ICD_SYSTEM.getValue())) {
-            Set<String> caseIds = new HashSet<>();
-            String icdDiagReliabilityCode = null;
-            // Detect the diagnosis reliability which is part of an extension
-            if (coding.hasExtension(
-                DashboardLogicFixedValues.ICD_DIAG_RELIABILITY_EXT_URL.getValue())) {
-              Extension extDiagReliability = coding.getExtensionByUrl(
-                  DashboardLogicFixedValues.ICD_DIAG_RELIABILITY_EXT_URL.getValue());
-              if (extDiagReliability.getValue() instanceof Coding codingExtDiagReliability) {
-                // The Coding got a fixed url as a system
-                if (codingExtDiagReliability.getSystem()
-                    .equals(DashboardLogicFixedValues.ICD_DIAG_RELIABILITY_CODING_SYSTEM.getValue())
-                    && codingExtDiagReliability.hasCode()) {
-                  // check if ICD diagnosis reliability code (usually a letter) is available
-                  icdDiagReliabilityCode = codingExtDiagReliability.getCode();
-                } // if codingExtDiagReliability.getSystem()
-              } // if extDiagReliability.getValue()
-            } // if coding.hasExtension
-            if (icdDiagReliabilityCode == null) {
-              icdDiagReliabilityCode =
-                  DashboardLogicFixedValues.DIAG_RELIABILITY_MISSING.getValue();
-            }
+      if (condition.hasCode() && condition.getCode().hasCoding(ICD_SYSTEM.getValue(), icdCode)) {
+        condition
+            .getCode()
+            .getCoding()
+            .forEach(
+                coding -> {
+                  if (coding.getSystem().equals(ICD_SYSTEM.getValue())) {
+                    Set<String> caseIds = new HashSet<>();
+                    String icdDiagReliabilityCode = null;
+                    // Detect the diagnosis reliability which is part of an extension
+                    if (coding.hasExtension(
+                        DashboardLogicFixedValues.ICD_DIAG_RELIABILITY_EXT_URL.getValue())) {
+                      Extension extDiagReliability =
+                          coding.getExtensionByUrl(
+                              DashboardLogicFixedValues.ICD_DIAG_RELIABILITY_EXT_URL.getValue());
+                      if (extDiagReliability.getValue()
+                          instanceof Coding codingExtDiagReliability) {
+                        // The Coding got a fixed url as a system
+                        if (codingExtDiagReliability
+                                .getSystem()
+                                .equals(
+                                    DashboardLogicFixedValues.ICD_DIAG_RELIABILITY_CODING_SYSTEM
+                                        .getValue())
+                            && codingExtDiagReliability.hasCode()) {
+                          // check if ICD diagnosis reliability code (usually a letter) is available
+                          icdDiagReliabilityCode = codingExtDiagReliability.getCode();
+                        } // if codingExtDiagReliability.getSystem()
+                      } // if extDiagReliability.getValue()
+                    } // if coding.hasExtension
+                    if (icdDiagReliabilityCode == null) {
+                      icdDiagReliabilityCode =
+                          DashboardLogicFixedValues.DIAG_RELIABILITY_MISSING.getValue();
+                    }
 
-            String caseId = condition.getCaseId();
-            if (caseId != null) {
-              caseIds.add(caseId);
-              // If there is already an entry for the given reliability code exists -> add the
-              // case id to the existing set
-              if (mapResultDiagnoseCaseIds.containsKey(icdDiagReliabilityCode)) {
-                mapResultDiagnoseCaseIds.computeIfPresent(icdDiagReliabilityCode, (k, v) -> {
-                  v.add(caseId);
-                  return v;
+                    String caseId = condition.getCaseId();
+                    if (caseId != null) {
+                      caseIds.add(caseId);
+                      // If there is already an entry for the given reliability code exists -> add
+                      // the
+                      // case id to the existing set
+                      if (mapResultDiagnoseCaseIds.containsKey(icdDiagReliabilityCode)) {
+                        mapResultDiagnoseCaseIds.computeIfPresent(
+                            icdDiagReliabilityCode,
+                            (k, v) -> {
+                              v.add(caseId);
+                              return v;
+                            });
+                      } else {
+                        mapResultDiagnoseCaseIds.put(icdDiagReliabilityCode, caseIds);
+                      }
+                    } else {
+                      log.warn(
+                          "No case id found in the condition resource with ID: "
+                              + condition.getId());
+                    }
+                  }
                 });
-              } else {
-                mapResultDiagnoseCaseIds.put(icdDiagReliabilityCode, caseIds);
-              }
-            } else {
-              log.warn("No case id found in the condition resource with ID: " + condition.getId());
-            }
-          }
-        });
       }
     }
 
@@ -274,38 +294,49 @@ public class DiseaseDetectionManagement {
   /**
    * Creation of a set of caseIds that have a disease positive lab result.
    *
-   * @param labObservations   A list with {@link UkbObservation observation resources}.
+   * @param labObservations A list with {@link UkbObservation observation resources}.
    * @param inputCodeSettings The configuration of the parameterizable codes such as the observation
-   *                          codes or procedure codes.
+   *     codes or procedure codes.
    * @return set of case ids that have a disease positive lab result
    */
-  public static Set<String> getEncounterIdsWithPositiveLabObs(List<UkbObservation> labObservations,
-      InputCodeSettings inputCodeSettings, DataItemContext dataItemContext) {
+  public static Set<String> getEncounterIdsWithPositiveLabObs(
+      List<UkbObservation> labObservations,
+      InputCodeSettings inputCodeSettings,
+      DataItemContext dataItemContext,
+      QualitativeLabCodesSettings qualitativeLabCodesSettings) {
     Set<String> positiveEncounterIds;
-    Set<UkbObservation> positiveObservations = getObservationsByContext(labObservations,
-        inputCodeSettings, dataItemContext);
+    Set<UkbObservation> positiveObservations =
+        getObservationsByContext(labObservations, inputCodeSettings, dataItemContext);
     // For logging purposes, we look for observations that contain a loinc coding,
     // but don't have any values
-    List<String> loincCodes = switch (dataItemContext) {
-      case COVID -> inputCodeSettings.getCovidObservationPcrLoincCodes();
-      case INFLUENZA -> inputCodeSettings.getInfluenzaObservationPcrLoincCodes();
-    };
+    List<String> loincCodes =
+        switch (dataItemContext) {
+          case COVID -> inputCodeSettings.getCovidObservationPcrLoincCodes();
+          case INFLUENZA -> inputCodeSettings.getInfluenzaObservationPcrLoincCodes();
+          case KIDS_RADAR -> null;
+          case KIDS_RADAR_KJP -> null;
+          case KIDS_RADAR_RSV -> null;
+        };
 
-    Set<String> observationsWithoutResult = labObservations.parallelStream()
-        .filter(x -> x.hasCode() && x.getCode().hasCoding())
-        .filter(x -> isCodeInCodesystem(x.getCode().getCoding(), loincCodes, LOINC))
-        .filter(x -> !(x.hasValueCodeableConcept() || x.hasInterpretation())).map(Resource::getId)
-        .collect(Collectors.toSet());
+    Set<String> observationsWithoutResult =
+        labObservations.parallelStream()
+            .filter(x -> x.hasCode() && x.getCode().hasCoding())
+            .filter(x -> isCodeInCodesystem(x.getCode().getCoding(), loincCodes, LOINC))
+            .filter(x -> !(x.hasValueCodeableConcept() || x.hasInterpretation()))
+            .map(Resource::getId)
+            .collect(Collectors.toSet());
 
-    observationsWithoutResult.forEach(x -> log.warn("The observation resource with id " + x
-        + " that describes a covid/influenza pcr finding doesn't contain a valueCodeableConcept"
-        + " or an expected interpretation coding."));
+    observationsWithoutResult.forEach(
+        x ->
+            log.warn(
+                "The observation resource with id {} that describes a covid/influenza pcr finding doesn't contain a valueCodeableConcept or an expected interpretation coding.",
+                x));
 
     // Adding the ones with positive value and then the ones with positive interpretation code.
-    positiveEncounterIds = getCaseIdsByObsValue(positiveObservations, POSITIVE);
+    positiveEncounterIds =
+        getCaseIdsByObsValue(positiveObservations, POSITIVE, qualitativeLabCodesSettings);
     positiveEncounterIds.addAll(getCaseIdsByObsInterpretation(positiveObservations, POSITIVE));
 
     return positiveEncounterIds;
   }
-
 }

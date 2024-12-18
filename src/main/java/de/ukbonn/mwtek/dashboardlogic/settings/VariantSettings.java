@@ -24,7 +24,6 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 
-
 /**
  * Configuration class to dynamically respond to emerging covid variants.
  *
@@ -39,18 +38,12 @@ public class VariantSettings {
    * they are not known and/or there is no LOINC code. Specification of the written Greek letter
    * that is read from the display-free text field.
    */
-  @Getter
-  @Setter
-  private Set<String> otherVoc = new HashSet<>();
-
+  @Getter @Setter private Set<String> otherVoc = new HashSet<>();
 
   /**
    * Variants of Interests (VOI) that are not yet supported by the Dashboard at release time because
    * they are not known and/or there is no LOINC code. Specification of the written Greek letter
    * read from the display free text field.
    */
-  @Getter
-  @Setter
-  private Set<String> nonVoc = new HashSet<>();
-
+  @Getter @Setter private Set<String> nonVoc = new HashSet<>();
 }

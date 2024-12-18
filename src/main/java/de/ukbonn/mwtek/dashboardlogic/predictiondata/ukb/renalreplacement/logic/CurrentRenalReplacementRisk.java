@@ -47,10 +47,10 @@ public class CurrentRenalReplacementRisk {
       Map<RenalReplacementRiskParameters, List<CoreBaseDataItem>> mapModelParameter) {
     List<Double> resultList = new ArrayList<>();
     long periodTo = DateTools.dateToUnixTime(new Date());
-    long periodFrom = periodTo - ValueOperations.dayInSeconds; //24 hours period
+    long periodFrom = periodTo - ValueOperations.dayInSeconds; // 24 hours period
     Double bodyWeight;
 
-    //Get all the encounters
+    // Get all the encounters
     List<CoreBaseDataItem> encounters = mapModelParameter.get(ENCOUNTER);
 
     log.debug("Number of cases before filtering = " + encounters.size());
@@ -59,9 +59,14 @@ public class CurrentRenalReplacementRisk {
     Consider only the encounters that has not been ended and has started at least 24 hours earlier
     and has value 1.0 which represents currently in ICU
     */
-    encounters = encounters.stream().filter(o -> o.dateTo() == null &&
-        DateTools.dateToUnixTime(o.dateFrom()) <= periodFrom &&
-        o.value() == 1.0).toList();
+    encounters =
+        encounters.stream()
+            .filter(
+                o ->
+                    o.dateTo() == null
+                        && DateTools.dateToUnixTime(o.dateFrom()) <= periodFrom
+                        && o.value() == 1.0)
+            .toList();
 
     log.debug("Number of cases after filtering = " + encounters.size());
 
@@ -70,9 +75,11 @@ public class CurrentRenalReplacementRisk {
       log.trace(START_CALCULATION_FOR_CASE_ID + caseId);
 
       // Getting CVVH
-      List<CoreBaseDataItem> cvvh = mapModelParameter.get(START_REPLACEMENT).stream()
-          .filter(o -> o.hisCaseId().equals(caseId)).toList();
-      //Doing calculation only if there is no CVVH against this caseId
+      List<CoreBaseDataItem> cvvh =
+          mapModelParameter.get(START_REPLACEMENT).stream()
+              .filter(o -> o.hisCaseId().equals(caseId))
+              .toList();
+      // Doing calculation only if there is no CVVH against this caseId
       if (cvvh.size() > 0) {
         log.trace("CVVH found for caseId: " + caseId);
         log.trace(END_CALCULATION_FOR_CASE_ID + caseId);
@@ -80,12 +87,15 @@ public class CurrentRenalReplacementRisk {
       }
 
       // Getting CREATININE values
-      List<CoreBaseDataItem> items = mapModelParameter.get(CREATININE).stream()
-          .filter(o -> o.hisCaseId().equals(caseId)).toList();
-      Double currentCreatinine = ValueOperations.getLatestValueInPeriod(items, periodFrom,
-          periodTo);
+      List<CoreBaseDataItem> items =
+          mapModelParameter.get(CREATININE).stream()
+              .filter(o -> o.hisCaseId().equals(caseId))
+              .toList();
+      Double currentCreatinine =
+          ValueOperations.getLatestValueInPeriod(items, periodFrom, periodTo);
       Double firstCreatinine = ValueOperations.getFirstValueInPeriod(items);
-      //If null value is found then risk can't be calculated. So skipping further steps for this case.
+      // If null value is found then risk can't be calculated. So skipping further steps for this
+      // case.
       if (currentCreatinine == null || firstCreatinine == null) {
         log.trace("Missing Creatinine for caseId: " + caseId);
         log.trace(END_CALCULATION_FOR_CASE_ID + caseId);
@@ -93,10 +103,11 @@ public class CurrentRenalReplacementRisk {
       }
 
       // Getting UREA values
-      items = mapModelParameter.get(UREA).stream().filter(o -> o.hisCaseId().equals(caseId))
-          .toList();
+      items =
+          mapModelParameter.get(UREA).stream().filter(o -> o.hisCaseId().equals(caseId)).toList();
       Double currentUrea = ValueOperations.getLatestValueInPeriod(items, periodFrom, periodTo);
-      //If null value is found then risk can't be calculated. So skipping further steps for this case.
+      // If null value is found then risk can't be calculated. So skipping further steps for this
+      // case.
       if (currentUrea == null) {
         log.trace("Missing Urea for caseId: " + caseId);
         log.trace(END_CALCULATION_FOR_CASE_ID + caseId);
@@ -104,20 +115,26 @@ public class CurrentRenalReplacementRisk {
       }
 
       // Getting LACTATE values
-      items = mapModelParameter.get(LACTATE).stream().filter(o -> o.hisCaseId().equals(caseId))
-          .toList();
+      items =
+          mapModelParameter.get(LACTATE).stream()
+              .filter(o -> o.hisCaseId().equals(caseId))
+              .toList();
       Double currentLactate = ValueOperations.getLatestValueInPeriod(items, periodFrom, periodTo);
-      //If null value is found then risk can't be calculated. So skipping further steps for this case.
+      // If null value is found then risk can't be calculated. So skipping further steps for this
+      // case.
       if (currentLactate == null) {
         log.trace("Missing Lactate for caseId: " + caseId);
         log.trace(END_CALCULATION_FOR_CASE_ID + caseId);
         continue;
       }
 
-      //Getting BODY_WEIGHT
-      items = mapModelParameter.get(BODY_WEIGHT).stream().filter(o -> o.hisCaseId().equals(caseId))
-          .toList();
-      //If no bodyWeight is found then risk can't be calculated. So skipping further steps for this case.
+      // Getting BODY_WEIGHT
+      items =
+          mapModelParameter.get(BODY_WEIGHT).stream()
+              .filter(o -> o.hisCaseId().equals(caseId))
+              .toList();
+      // If no bodyWeight is found then risk can't be calculated. So skipping further steps for this
+      // case.
       if (items.isEmpty()) {
         log.trace("Missing Body weight for caseId: " + caseId);
         log.trace(END_CALCULATION_FOR_CASE_ID + caseId);
@@ -127,36 +144,53 @@ public class CurrentRenalReplacementRisk {
       }
 
       // Getting URINE_OUTPUT values
-      items = mapModelParameter.get(URINE_OUTPUT).stream().filter(o -> o.hisCaseId().equals(caseId))
-          .toList();
-      Double meanUrineOutput = ValueOperations.getMeanUrineValueInPeriod(items, bodyWeight,
-          periodFrom, periodTo);
-      //If null value is found then risk can't be calculated. So skipping further steps for this case.
+      items =
+          mapModelParameter.get(URINE_OUTPUT).stream()
+              .filter(o -> o.hisCaseId().equals(caseId))
+              .toList();
+      Double meanUrineOutput =
+          ValueOperations.getMeanUrineValueInPeriod(items, bodyWeight, periodFrom, periodTo);
+      // If null value is found then risk can't be calculated. So skipping further steps for this
+      // case.
       if (meanUrineOutput == null) {
         log.trace("Missing Urine for caseId: " + caseId);
         log.trace(END_CALCULATION_FOR_CASE_ID + caseId);
         continue;
       }
 
-      //Calculating discriminant value
-      Double risk = ValueOperations.getDiscriminantValue(currentCreatinine, firstCreatinine,
-          currentUrea,
-          currentLactate, meanUrineOutput);
+      // Calculating discriminant value
+      Double risk =
+          ValueOperations.getDiscriminantValue(
+              currentCreatinine, firstCreatinine, currentUrea, currentLactate, meanUrineOutput);
       if (risk != null) {
         if (Double.isInfinite(risk)) {
           log.error("risk is infinite for caseId " + caseId);
         } else if (risk < -20.0 || risk > 50.0) {
           log.error(
-              logRiskData("Outlier found", periodTo, periodFrom, caseId, firstCreatinine,
+              logRiskData(
+                  "Outlier found",
+                  periodTo,
+                  periodFrom,
+                  caseId,
+                  firstCreatinine,
                   currentCreatinine,
-                  currentUrea, currentLactate,
-                  meanUrineOutput, risk));
+                  currentUrea,
+                  currentLactate,
+                  meanUrineOutput,
+                  risk));
         }
         log.trace(
-            logRiskData("Risk", periodTo, periodFrom, caseId, firstCreatinine,
+            logRiskData(
+                "Risk",
+                periodTo,
+                periodFrom,
+                caseId,
+                firstCreatinine,
                 currentCreatinine,
-                currentUrea, currentLactate,
-                meanUrineOutput, risk));
+                currentUrea,
+                currentLactate,
+                meanUrineOutput,
+                risk));
         resultList.add(risk);
       }
       log.trace(END_CALCULATION_FOR_CASE_ID + caseId);

@@ -24,6 +24,4 @@ import lombok.extern.slf4j.Slf4j;
  * as in the covid-19 context are used, but this might be in the future.
  */
 @Slf4j
-public class InfluenzaHandlingLogic extends DiseaseResultFunctionality {
-
-}
+public class InfluenzaHandlingLogic extends DiseaseResultFunctionality {}

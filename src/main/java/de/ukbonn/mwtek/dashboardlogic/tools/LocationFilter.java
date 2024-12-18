@@ -22,14 +22,14 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/**
- * Various auxiliary methods that affect the location resources.
- */
+/** Various auxiliary methods that affect the location resources. */
 public class LocationFilter {
 
   public static List<UkbLocation> getIcuLocations(List<UkbLocation> locations) {
-    return locations.stream().filter(x -> !x.getType().isEmpty())
-        .filter(UkbLocation::isLocationWard).filter(UkbLocation::isLocationIcu)
+    return locations.stream()
+        .filter(x -> !x.getType().isEmpty())
+        .filter(UkbLocation::isLocationWard)
+        .filter(UkbLocation::isLocationIcu)
         .toList();
   }
 

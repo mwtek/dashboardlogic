@@ -21,7 +21,7 @@ package de.ukbonn.mwtek.dashboardlogic.logic.cumulative;
 import de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues;
 import de.ukbonn.mwtek.dashboardlogic.enums.DataItemContext;
 import de.ukbonn.mwtek.dashboardlogic.examples.InputCodeSettingsExampleData;
-import de.ukbonn.mwtek.dashboardlogic.logic.DashboardDataItemLogics;
+import de.ukbonn.mwtek.dashboardlogic.logic.DashboardData;
 import de.ukbonn.mwtek.dashboardlogic.logic.cumulative.results.CumulativeResult;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbObservation;
 import java.util.ArrayList;
@@ -35,25 +35,41 @@ import org.junit.jupiter.api.Test;
 public class CumulativeResultTests {
 
   @Test
-  @DisplayName("Ensuring that the cumulative.results data item is able to handle empty fields in "
-      + "the observation resource.")
+  @DisplayName(
+      "Ensuring that the cumulative.results data item is able to handle empty fields in "
+          + "the observation resource.")
   void testCumulativeResults() {
 
     // Initialization of the input list
     List<UkbObservation> observations = new ArrayList<>();
 
-    DashboardDataItemLogics.initializeData(InputCodeSettingsExampleData.getExampleData(), null,
-        null, observations, null, null, DataItemContext.COVID);
+    DashboardData dashboardData =
+        new DashboardData()
+            .initializeData(
+                InputCodeSettingsExampleData.getExampleData(),
+                null,
+                new ArrayList<>(),
+                null,
+                observations,
+                null,
+                null,
+                null,
+                DataItemContext.COVID);
 
     // Add an observation without a value, since this field is not mandatory
-    Enumeration<ObservationStatus> observationStatus = new Enumeration<>(
-        new ObservationStatusEnumFactory());
+    Enumeration<ObservationStatus> observationStatus =
+        new Enumeration<>(new ObservationStatusEnumFactory());
     observationStatus.setValue(ObservationStatus.FINAL);
-    UkbObservation observationWithoutValue = new UkbObservation("pid", "caseid",
-        observationStatus, null);
+    UkbObservation observationWithoutValue =
+        new UkbObservation("pid", "caseid", observationStatus, null);
     observations.add(observationWithoutValue);
 
-    new CumulativeResult().getObservationsByResult(DashboardLogicFixedValues.POSITIVE,
-        DataItemContext.COVID);
+    new CumulativeResult()
+        .getObservationsByResult(
+            DashboardLogicFixedValues.POSITIVE,
+            DataItemContext.COVID,
+            dashboardData.getObservations(),
+            dashboardData.getInputCodeSettings(),
+            dashboardData.getQualitativeLabCodesSettings());
   }
 }

@@ -21,7 +21,4 @@ import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
 import java.util.HashMap;
 import java.util.List;
 
-public class FacilityEncounterToIcuSupplyContactsMap extends HashMap<String, List<UkbEncounter>> {
-
-}
-
+public class FacilityEncounterToIcuSupplyContactsMap extends HashMap<String, List<UkbEncounter>> {}

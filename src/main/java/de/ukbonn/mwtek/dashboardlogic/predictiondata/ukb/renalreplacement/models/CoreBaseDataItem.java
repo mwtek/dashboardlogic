@@ -21,15 +21,19 @@ package de.ukbonn.mwtek.dashboardlogic.predictiondata.ukb.renalreplacement.model
 import de.ukbonn.mwtek.utilities.generic.time.DateTools;
 import java.util.Date;
 
-public record CoreBaseDataItem(String hisCaseId, String episodeId, Double value, Date dateFrom,
-                               Date dateTo,
-                               String debugKey) implements Comparable<CoreBaseDataItem> {
+public record CoreBaseDataItem(
+    String hisCaseId, String episodeId, Double value, Date dateFrom, Date dateTo, String debugKey)
+    implements Comparable<CoreBaseDataItem> {
 
   @Override
   public String toString() {
-    return hisCaseId + ";" + episodeId + ";" + value + ";"
-        + DateTools.dateToUnixTime(
-        dateFrom)
+    return hisCaseId
+        + ";"
+        + episodeId
+        + ";"
+        + value
+        + ";"
+        + DateTools.dateToUnixTime(dateFrom)
         + ";"
         + DateTools.dateToUnixTime(dateTo);
   }

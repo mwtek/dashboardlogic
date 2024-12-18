@@ -28,8 +28,9 @@ import org.junit.jupiter.api.Test;
 public class CoronaResultFunctionalityTests {
 
   @Test
-  @DisplayName("Ensuring that an omitted encounter reference in a given procedure resource is not"
-      + " throwing a NPE.")
+  @DisplayName(
+      "Ensuring that an omitted encounter reference in a given procedure resource is not"
+          + " throwing a NPE.")
   void testProceduresWithoutCaseReference() {
 
     // Initialization of the input list
@@ -42,9 +43,8 @@ public class CoronaResultFunctionalityTests {
 
     procedures.add(activeEcmoProcedure);
 
-//    CoronaResultFunctionality.createCurrentIcuMap(
-//        EncounterExampleData.getExampleList(), null, LocationExampleData.getExampleList(),
-//        procedures, InputCodeSettingsExampleData.getExampleData());
+    //    CoronaResultFunctionality.createCurrentIcuMap(
+    //        EncounterExampleData.getExampleList(), null, LocationExampleData.getExampleList(),
+    //        procedures, InputCodeSettingsExampleData.getExampleData());
   }
-
 }

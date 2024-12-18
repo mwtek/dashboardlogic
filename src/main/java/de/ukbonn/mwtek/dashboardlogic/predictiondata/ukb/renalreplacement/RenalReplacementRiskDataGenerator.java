@@ -70,10 +70,9 @@ public class RenalReplacementRiskDataGenerator {
     cumulativeRenalReplacement.setData(
         CumulativeRenalReplacementRiskROC.createData(mapModelParameter));
     diseaseDataItems.add(cumulativeRenalReplacement);
-    TimerTools.stopTimerAndLog(timerRoc,
-        "Calculation of cumulative renal replacement risk ROC curve ");
+    TimerTools.stopTimerAndLog(
+        timerRoc, "Calculation of cumulative renal replacement risk ROC curve ");
 
     return diseaseDataItems;
   }
-
 }

@@ -24,6 +24,7 @@ import de.ukbonn.mwtek.dashboardlogic.enums.Gender;
 import de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels;
 import de.ukbonn.mwtek.dashboardlogic.models.DiseaseDataItem;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
+import de.ukbonn.mwtek.utilities.fhir.resources.UkbPatient;
 import de.ukbonn.mwtek.utilities.generic.time.TimerTools;
 import java.time.Instant;
 import java.util.List;
@@ -31,13 +32,12 @@ import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * This class is used for generating the data items
- * {@link DiseaseDataItem cumulative.inpatient.gender and cumulative.outpatient.gender}.
+ * This class is used for generating the data items {@link DiseaseDataItem
+ * cumulative.inpatient.gender and cumulative.outpatient.gender}.
  *
  * @author <a href="mailto:david.meyers@ukbonn.de">David Meyers</a>
  * @author <a href="mailto:berke_enes.dincel@ukbonn.de">Berke Enes Dincel</a>
  */
-
 @Slf4j
 public class CumulativeGenderByClass extends CumulativeGender {
 
@@ -46,29 +46,35 @@ public class CumulativeGenderByClass extends CumulativeGender {
    * method filters encounters based on the provided case class and counts the number of patients of
    * a specific gender within those encounters.
    *
-   * @param gender         The gender type (e.g. "male") to be counted.
+   * @param gender The gender type (e.g. "male") to be counted.
    * @param encounterClass The case class (e.g. {@link TreatmentLevels#INPATIENT}) to be counted.
    * @return Number of patients per gender and case status.
    */
-  public static Number getGenderCountByCaseClass(Gender gender, TreatmentLevels encounterClass) {
-    log.debug("Started getGenderCountByCaseClass for class: " + encounterClass + " and gender: "
-        + gender);
+  public static Number getGenderCountByCaseClass(
+      List<UkbEncounter> ukbEncounters,
+      List<UkbPatient> ukbPatients,
+      Gender gender,
+      TreatmentLevels encounterClass) {
+    log.debug(
+        "Started getGenderCountByCaseClass for class: {} and gender: {}", encounterClass, gender);
     Instant startTimer = TimerTools.startTimer();
 
     // Filter encounters based on the provided case class
-    List<UkbEncounter> filteredEncounterList = getFacilityContactEncounters().parallelStream()
-        .filter(encounter -> {
-          if (encounterClass == OUTPATIENT) {
-            return encounter.isCaseClassOutpatient();
-          } else if (encounterClass == INPATIENT) {
-            return encounter.isCaseClassInpatient();
-          }
-          return false;
-        })
-        .collect(Collectors.toList());
+    List<UkbEncounter> filteredEncounterList =
+        ukbEncounters.parallelStream()
+            .filter(
+                encounter -> {
+                  if (encounterClass == OUTPATIENT) {
+                    return encounter.isCaseClassOutpatient();
+                  } else if (encounterClass == INPATIENT) {
+                    return encounter.isCaseClassInpatient();
+                  }
+                  return false;
+                })
+            .collect(Collectors.toList());
 
     // Calculate the count of patients of the specified gender within the filtered encounters
-    Number genderCount = getGenderCount(filteredEncounterList, gender);
+    Number genderCount = getGenderCount(filteredEncounterList, ukbPatients, gender);
 
     TimerTools.stopTimerAndLog(startTimer, "Finished getGenderCountByCaseClass");
     return genderCount;

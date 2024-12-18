@@ -19,12 +19,16 @@ package de.ukbonn.mwtek.dashboardlogic.logic.timeline;
 
 import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.POSITIVE;
 import static de.ukbonn.mwtek.dashboardlogic.logic.CoronaResultFunctionality.getDatesOutputList;
+import static de.ukbonn.mwtek.dashboardlogic.logic.DiseaseResultFunctionality.getKickOffDateInSeconds;
 
-import de.ukbonn.mwtek.dashboardlogic.enums.CoronaDashboardConstants;
+import de.ukbonn.mwtek.dashboardlogic.DashboardDataItemLogic;
 import de.ukbonn.mwtek.dashboardlogic.enums.DataItemContext;
-import de.ukbonn.mwtek.dashboardlogic.logic.DashboardDataItemLogics;
+import de.ukbonn.mwtek.dashboardlogic.enums.NumDashboardConstants;
+import de.ukbonn.mwtek.dashboardlogic.enums.NumDashboardConstants.Covid;
 import de.ukbonn.mwtek.dashboardlogic.models.DiseaseDataItem;
 import de.ukbonn.mwtek.dashboardlogic.models.TimestampedListPair;
+import de.ukbonn.mwtek.dashboardlogic.settings.InputCodeSettings;
+import de.ukbonn.mwtek.dashboardlogic.settings.QualitativeLabCodesSettings;
 import de.ukbonn.mwtek.dashboardlogic.tools.ObservationFilter;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbObservation;
 import de.ukbonn.mwtek.utilities.generic.time.DateTools;
@@ -44,7 +48,7 @@ import lombok.extern.slf4j.Slf4j;
  * @author <a href="mailto:berke_enes.dincel@ukbonn.de">Berke Enes Dincel</a>
  */
 @Slf4j
-public class TimelineTests extends DashboardDataItemLogics implements TimelineFunctionalities {
+public class TimelineTests extends DashboardDataItemLogic implements TimelineFunctionalities {
 
   private Set<UkbObservation> diseasePositiveObservations;
 
@@ -55,16 +59,19 @@ public class TimelineTests extends DashboardDataItemLogics implements TimelineFu
    * @return ListNumberPair with all tests held from the qualifying date up to today
    */
   public TimestampedListPair createTimelineTestsMap(
-      DataItemContext dataItemContext) {
+      DataItemContext dataItemContext,
+      List<UkbObservation> observations,
+      InputCodeSettings inputCodeSettings) {
     log.debug("started createTimelineTestsMap");
     Instant startTimer = TimerTools.startTimer();
-    Map<Long, Long> valueDateMap = getDateMapWithoutValues();
+    Map<Long, Long> valueDateMap = getDateMapWithoutValues(dataItemContext);
     List<Long> valueList;
 
     // Checking the loinc pcr codes in the observation to detect pcr findings.
     if (diseasePositiveObservations == null) {
-      diseasePositiveObservations = ObservationFilter.getObservationsByContext(
-          getObservations(), getInputCodeSettings(), dataItemContext);
+      diseasePositiveObservations =
+          ObservationFilter.getObservationsByContext(
+              observations, inputCodeSettings, dataItemContext);
     }
 
     long endUnixTime = DateTools.getCurrentUnixTime();
@@ -74,28 +81,32 @@ public class TimelineTests extends DashboardDataItemLogics implements TimelineFu
         diseasePositiveObservations.parallelStream()
             .filter(UkbObservation::hasEffectiveDateTimeType)
             .map(UkbObservation::getEffectiveDateTimeType)
-            .map(x -> DateTools.dateToUnixTime(x.getValue())).toList();
+            .map(x -> DateTools.dateToUnixTime(x.getValue()))
+            .toList();
 
-    labEffectiveDates.parallelStream().forEach(effective -> {
-      // Reset of the starting date
-      long tempDate = CoronaDashboardConstants.QUALIFYING_DATE;
-      // If a value was found once in a time window, can be cancelled
-      Boolean labValueFound = false;
+    labEffectiveDates.parallelStream()
+        .forEach(
+            effective -> {
+              // Reset of the starting date
+              long tempDate = getKickOffDateInSeconds(dataItemContext);
 
-      while (tempDate <= endUnixTime && !labValueFound) {
-        labValueFound = addLabTestToTimeline(effective, tempDate, valueDateMap);
+              // If a value was found once in a time window, can be cancelled
+              Boolean labValueFound = false;
 
-        // check the next day
-        tempDate += CoronaDashboardConstants.DAY_IN_SECONDS; // add one day
-      }
-    });
+              while (tempDate <= endUnixTime && !labValueFound) {
+                labValueFound = addLabTestToTimeline(effective, tempDate, valueDateMap);
+
+                // check the next day
+                tempDate += NumDashboardConstants.DAY_IN_SECONDS; // add one day
+              }
+            });
 
     // order them by key ascending (just needed if we want to parallelize it; the first tries
     // were not really promising tho because of too many write/read ops probably block each other)
     valueList = divideMapValuesToLists(valueDateMap);
 
     TimerTools.stopTimerAndLog(startTimer, "finished createTimelineTestsMap");
-    return new TimestampedListPair(getDatesOutputList(), valueList);
+    return new TimestampedListPair(getDatesOutputList(dataItemContext), valueList);
   }
 
   /**
@@ -104,19 +115,24 @@ public class TimelineTests extends DashboardDataItemLogics implements TimelineFu
    *
    * @return ListNumberPair with all positive labor results up until today
    */
-  public TimestampedListPair createTimelineTestPositiveMap(DataItemContext dataItemContext) {
+  public TimestampedListPair createTimelineTestPositiveMap(
+      DataItemContext dataItemContext,
+      List<UkbObservation> observations,
+      InputCodeSettings inputCodeSettings,
+      QualitativeLabCodesSettings qualitativeLabCodesSettings) {
     log.debug("started createTimelineTestPositiveMap");
     Instant startTimer = TimerTools.startTimer();
-    Map<Long, Long> valueDateMap = getDateMapWithoutValues();
+    Map<Long, Long> valueDateMap = getDateMapWithoutValues(dataItemContext);
     List<Long> valueList;
     long currentUnixTime = DateTools.getCurrentUnixTime();
     if (diseasePositiveObservations == null) {
-      diseasePositiveObservations = ObservationFilter.getObservationsByContext(getObservations(),
-          getInputCodeSettings(), dataItemContext);
+      diseasePositiveObservations =
+          ObservationFilter.getObservationsByContext(
+              observations, inputCodeSettings, dataItemContext);
     }
 
     if (diseasePositiveObservations == null) {
-      log.warn("No positive observations found for data item context: " + dataItemContext);
+      log.warn("No positive observations found for data item context: {}", dataItemContext);
       return null;
     }
 
@@ -124,67 +140,74 @@ public class TimelineTests extends DashboardDataItemLogics implements TimelineFu
     // and reduce it to the effective dates of the funding's to make the data retrieval more
     // efficient
     // 1) Detection by Observation value.
-    List<Long> labEffectiveDatesOfPositives = new ArrayList<>(
-        ObservationFilter.getObservationsByValue(
-                diseasePositiveObservations, POSITIVE).parallelStream()
-            .filter(UkbObservation::hasEffectiveDateTimeType)
-            // Caution with using getEffectiveDateTimeType since the default (if its null) will
-            // be a date object of the current time.
-            .map(UkbObservation::getEffectiveDateTimeType)
-            .map(x -> DateTools.dateToUnixTime(x.getValue())).toList());
+    List<Long> labEffectiveDatesOfPositives =
+        new ArrayList<>(
+            ObservationFilter.getObservationsByValue(
+                    diseasePositiveObservations, POSITIVE, qualitativeLabCodesSettings)
+                .parallelStream()
+                .filter(UkbObservation::hasEffectiveDateTimeType)
+                // Caution with using getEffectiveDateTimeType since the default (if its null) will
+                // be a date object of the current time.
+                .map(UkbObservation::getEffectiveDateTimeType)
+                .map(x -> DateTools.dateToUnixTime(x.getValue()))
+                .toList());
 
     // 2) Detection by Observation interpretation.
     labEffectiveDatesOfPositives.addAll(
         ObservationFilter.getObservationsByInterpretation(diseasePositiveObservations, POSITIVE)
-            .parallelStream().filter(UkbObservation::hasEffectiveDateTimeType)
+            .parallelStream()
+            .filter(UkbObservation::hasEffectiveDateTimeType)
             // Caution with using getEffectiveDateTimeType since the default (if its null) will
             // be a date object of the current time.
             .map(UkbObservation::getEffectiveDateTimeType)
-            .map(x -> DateTools.dateToUnixTime(x.getValue())).toList());
+            .map(x -> DateTools.dateToUnixTime(x.getValue()))
+            .toList());
 
     try {
-      labEffectiveDatesOfPositives.parallelStream().forEach(labEffective -> {
-        Boolean obsFound = false;
-        long checkingDateUnix = CoronaDashboardConstants.QUALIFYING_DATE;
-        while (checkingDateUnix <= currentUnixTime && !obsFound) {
-          obsFound = addLabTestToTimeline(labEffective, checkingDateUnix, valueDateMap);
-          checkingDateUnix += CoronaDashboardConstants.DAY_IN_SECONDS; // add one day
-        }
-      });
+      labEffectiveDatesOfPositives.parallelStream()
+          .forEach(
+              labEffective -> {
+                Boolean obsFound = false;
+                long checkingDateUnix = Covid.QUALIFYING_DATE_AS_LONG;
+                while (checkingDateUnix <= currentUnixTime && !obsFound) {
+                  obsFound = addLabTestToTimeline(labEffective, checkingDateUnix, valueDateMap);
+                  checkingDateUnix += NumDashboardConstants.DAY_IN_SECONDS; // add one day
+                }
+              });
     } catch (Exception ex) {
       log.error("Error while running createTimelineTestPositiveMap", ex);
     }
     valueList = divideMapValuesToLists(valueDateMap);
     TimerTools.stopTimerAndLog(startTimer, "finished createTimelineTestPositiveMap");
-    return new TimestampedListPair(getDatesOutputList(), valueList);
+    return new TimestampedListPair(getDatesOutputList(dataItemContext), valueList);
   }
 
   /**
    * Initializes a map that holds a list with all the midnight timestamps in the relevant time
-   * period and initializes them with a sum value 0.
+   * period and initializes them with sum value 0.
    */
-  private static Map<Long, Long> getDateMapWithoutValues() {
+  private static Map<Long, Long> getDateMapWithoutValues(DataItemContext dataItemContext) {
     Map<Long, Long> valueDateMap = new ConcurrentHashMap<>();
-    for (int i = 0; i < getDatesOutputList().size(); i++) {
-      valueDateMap.put(getDatesOutputList().get(i), 0L);
+    for (int i = 0; i < getDatesOutputList(dataItemContext).size(); i++) {
+      valueDateMap.put(getDatesOutputList(dataItemContext).get(i), 0L);
     }
     return valueDateMap;
   }
 
   /**
-   * Check whether a laboratory result belongs to the supplied date
-   * {@literal [Interval: day <-> day+24h]} and later incrementing if so.
+   * Check whether a laboratory result belongs to the supplied date {@literal [Interval: day <->
+   * day+24h]} and later incrementing if so.
    *
-   * @param labFundDate  Date of the laboratory result
+   * @param labFundDate Date of the laboratory result
    * @param tempDateUnix Current day [unix time] which is checked and incremented if the reporting
-   *                     date fits into the corresponding time window [day + 24 hours]
-   * @param resultMap    Map that maps a frequency value to a date (unix time)
+   *     date fits into the corresponding time window [day + 24 hours]
+   * @param resultMap Map that maps a frequency value to a date (unix time)
    * @return Status information on whether the time of the laboratory test was within the reference
-   * range and the resultMap was incremented at this point.
+   *     range and the resultMap was incremented at this point.
    */
-  private static Boolean addLabTestToTimeline(Long labFundDate, long tempDateUnix,
-      Map<Long, Long> resultMap) {
-    long increasedUnix = tempDateUnix + CoronaDashboardConstants.DAY_IN_SECONDS - 1;
+  private static Boolean addLabTestToTimeline(
+      Long labFundDate, long tempDateUnix, Map<Long, Long> resultMap) {
+    long increasedUnix = tempDateUnix + NumDashboardConstants.DAY_IN_SECONDS - 1;
     boolean obsFound = false;
 
     // if the labResult day is after the checked date and if the difference

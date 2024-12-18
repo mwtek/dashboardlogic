@@ -33,10 +33,13 @@ public class ProcedureExampleData {
 
   public static UkbProcedure getActiveEcmoProcedure() {
 
-    UkbProcedure ecmoProcedure = new UkbProcedure("123",
-        EncounterExampleData.ENCOUNTER_ID_INPATIENT, ProcedureStatus.INPROGRESS,
-        new CodeableConcept().addCoding(new Coding("systemTBD", "265764009", null)),
-        new Period().setStart(DateTools.getCurrentDateTime()));
+    UkbProcedure ecmoProcedure =
+        new UkbProcedure(
+            "123",
+            EncounterExampleData.ENCOUNTER_ID_INPATIENT,
+            ProcedureStatus.INPROGRESS,
+            new CodeableConcept().addCoding(new Coding("systemTBD", "265764009", null)),
+            new Period().setStart(DateTools.getCurrentDateTime()));
 
     return ecmoProcedure;
   }
@@ -47,5 +50,4 @@ public class ProcedureExampleData {
 
     return procedures;
   }
-
 }

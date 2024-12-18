@@ -20,8 +20,8 @@ package de.ukbonn.mwtek.dashboardlogic.logic.cumulative.gender;
 
 import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.POSITIVE_RESULT;
 
+import de.ukbonn.mwtek.dashboardlogic.DashboardDataItemLogic;
 import de.ukbonn.mwtek.dashboardlogic.enums.Gender;
-import de.ukbonn.mwtek.dashboardlogic.logic.DashboardDataItemLogics;
 import de.ukbonn.mwtek.dashboardlogic.models.DiseaseDataItem;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbPatient;
@@ -38,36 +38,40 @@ import lombok.extern.slf4j.Slf4j;
  * @author <a href="mailto:david.meyers@ukbonn.de">David Meyers</a>
  * @author <a href="mailto:berke_enes.dincel@ukbonn.de">Berke Enes Dincel</a>
  */
-
 @Slf4j
-public class CumulativeGender extends DashboardDataItemLogics {
+public class CumulativeGender extends DashboardDataItemLogic {
 
   /**
    * Count number of gender of the diesease-positive patients
-   * <p>
-   * called by "cumulative.gender"
+   *
+   * <p>called by "cumulative.gender"
    *
    * @param filteredEncounters A list with {@link UkbEncounter} resources
-   * @param gender             The gender type (e.g. male) to be counted
+   * @param gender The gender type (e.g. male) to be counted
    * @return Frequency of gender searched across all patients who are covid positive.
    */
-  public static Number getGenderCount(List<UkbEncounter> filteredEncounters,
-      Gender gender) {
+  public static Number getGenderCount(
+      List<UkbEncounter> filteredEncounters, List<UkbPatient> patients, Gender gender) {
     log.debug("Started genderCounting for gender: " + gender);
     Instant startTimer = TimerTools.startTimer();
 
     // get all the pids from the positive marked encounters
-    Set<String> positivePids = filteredEncounters.parallelStream()
-        .filter(x -> x.hasExtension(POSITIVE_RESULT.getValue()))
-        .map(UkbEncounter::getPatientId).collect(Collectors.toSet());
+    Set<String> positivePids =
+        filteredEncounters.parallelStream()
+            .filter(x -> x.hasExtension(POSITIVE_RESULT.getValue()))
+            .map(UkbEncounter::getPatientId)
+            .collect(Collectors.toSet());
 
     // collect all the positive patient ids
-    Set<String> resultSet = getPatients().parallelStream()
-        .filter(x -> x.hasGender() && x.getGender().toCode().equalsIgnoreCase(gender.getValue()))
-        .map(UkbPatient::getId).filter(positivePids::contains).collect(Collectors.toSet());
+    Set<String> resultSet =
+        patients.parallelStream()
+            .filter(
+                x -> x.hasGender() && x.getGender().toCode().equalsIgnoreCase(gender.getValue()))
+            .map(UkbPatient::getId)
+            .filter(positivePids::contains)
+            .collect(Collectors.toSet());
 
     TimerTools.stopTimerAndLog(startTimer, "Finished genderCounting");
     return resultSet.size();
   }
-
 }

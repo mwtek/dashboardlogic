@@ -60,5 +60,4 @@ public class TimestampedListPair {
   public int getIndexByTimestamp(long timestamp) {
     return TimelineTools.getIndexByTimestamp(timestamp, date);
   }
-
 }

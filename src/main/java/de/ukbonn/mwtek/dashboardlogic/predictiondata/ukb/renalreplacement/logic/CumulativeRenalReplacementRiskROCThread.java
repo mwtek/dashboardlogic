@@ -51,7 +51,8 @@ public class CumulativeRenalReplacementRiskROCThread implements Runnable {
 
   public CumulativeRenalReplacementRiskROCThread(
       Map<RenalReplacementRiskParameters, List<CoreBaseDataItem>> mapModelParameter,
-      List<CoreBaseDataItem> encounters, Long responseStartingTimestamp,
+      List<CoreBaseDataItem> encounters,
+      Long responseStartingTimestamp,
       BlockingQueue<List<ROCItem>> rocItemsBlockingQueue) {
     this.mapModelParameter = mapModelParameter;
     this.encounters = encounters;
@@ -66,52 +67,56 @@ public class CumulativeRenalReplacementRiskROCThread implements Runnable {
 
     List<ROCItem> rocItems = new ArrayList<>();
 
-    Map<String, List<CoreBaseDataItem>> ureaByCaseId = mapModelParameter.get(UREA).stream()
-        .collect(Collectors.groupingBy(CoreBaseDataItem::hisCaseId));
+    Map<String, List<CoreBaseDataItem>> ureaByCaseId =
+        mapModelParameter.get(UREA).stream()
+            .collect(Collectors.groupingBy(CoreBaseDataItem::hisCaseId));
 
-    Map<String, List<CoreBaseDataItem>> lactatesByCaseId = mapModelParameter.get(LACTATE).stream()
-        .collect(Collectors.groupingBy(CoreBaseDataItem::hisCaseId));
+    Map<String, List<CoreBaseDataItem>> lactatesByCaseId =
+        mapModelParameter.get(LACTATE).stream()
+            .collect(Collectors.groupingBy(CoreBaseDataItem::hisCaseId));
 
-    Map<String, List<CoreBaseDataItem>> urineOutputsByCaseId = mapModelParameter.get(URINE_OUTPUT)
-        .stream()
-        .collect(Collectors.groupingBy(CoreBaseDataItem::hisCaseId));
+    Map<String, List<CoreBaseDataItem>> urineOutputsByCaseId =
+        mapModelParameter.get(URINE_OUTPUT).stream()
+            .collect(Collectors.groupingBy(CoreBaseDataItem::hisCaseId));
 
-    Map<String, List<CoreBaseDataItem>> renalReplacementsByCaseId = mapModelParameter.get(
-            START_REPLACEMENT)
-        .stream()
-        .collect(Collectors.groupingBy(CoreBaseDataItem::hisCaseId));
+    Map<String, List<CoreBaseDataItem>> renalReplacementsByCaseId =
+        mapModelParameter.get(START_REPLACEMENT).stream()
+            .collect(Collectors.groupingBy(CoreBaseDataItem::hisCaseId));
 
-    Map<String, List<CoreBaseDataItem>> bodyWeightByCaseId = mapModelParameter.get(BODY_WEIGHT)
-        .stream()
-        .collect(Collectors.groupingBy(CoreBaseDataItem::hisCaseId));
+    Map<String, List<CoreBaseDataItem>> bodyWeightByCaseId =
+        mapModelParameter.get(BODY_WEIGHT).stream()
+            .collect(Collectors.groupingBy(CoreBaseDataItem::hisCaseId));
 
-    Map<String, List<CoreBaseDataItem>> creatineByCaseIds = mapModelParameter.get(CREATININE)
-        .stream()
-        .collect(Collectors.groupingBy(CoreBaseDataItem::hisCaseId));
+    Map<String, List<CoreBaseDataItem>> creatineByCaseIds =
+        mapModelParameter.get(CREATININE).stream()
+            .collect(Collectors.groupingBy(CoreBaseDataItem::hisCaseId));
 
     for (CoreBaseDataItem encounter : this.encounters) {
       String caseId = encounter.hisCaseId();
       log.trace("START: calculation for caseId: " + caseId);
 
-      List<CoreBaseDataItem> currentCvvhItems = renalReplacementsByCaseId.getOrDefault(caseId,
-          null);
-      List<CoreBaseDataItem> currentUrineOutputItems = urineOutputsByCaseId.getOrDefault(caseId,
-          null);
+      List<CoreBaseDataItem> currentCvvhItems =
+          renalReplacementsByCaseId.getOrDefault(caseId, null);
+      List<CoreBaseDataItem> currentUrineOutputItems =
+          urineOutputsByCaseId.getOrDefault(caseId, null);
       List<CoreBaseDataItem> currentLactateItems = lactatesByCaseId.getOrDefault(caseId, null);
       List<CoreBaseDataItem> currentUreaItems = ureaByCaseId.getOrDefault(caseId, null);
       List<CoreBaseDataItem> currentBodyWeightItems = bodyWeightByCaseId.getOrDefault(caseId, null);
       List<CoreBaseDataItem> currentCreatineItems = creatineByCaseIds.getOrDefault(caseId, null);
 
-      //Getting the first ever recorded Creatinine for this case. Dependent on case. Not on episodes.
+      // Getting the first ever recorded Creatinine for this case. Dependent on case. Not on
+      // episodes.
       Double firstCreatinine = ValueOperations.getFirstValueInPeriod(currentCreatineItems);
-      //If null value is found then risk can't be calculated. So skipping further steps for this case.
+      // If null value is found then risk can't be calculated. So skipping further steps for this
+      // case.
       if (firstCreatinine == null) {
         log.trace("Missing Creatinine for caseId: " + caseId);
         log.trace("END: calculation for caseId: " + caseId);
         continue;
       }
 
-      //If no bodyWeight is found then risk can't be calculated. So skipping further steps for this case.
+      // If no bodyWeight is found then risk can't be calculated. So skipping further steps for this
+      // case.
       if (currentBodyWeightItems == null || currentBodyWeightItems.isEmpty()) {
         log.trace("Missing Body weight for caseId: " + caseId);
         log.trace("END: calculation for caseId: " + caseId);
@@ -121,7 +126,8 @@ public class CumulativeRenalReplacementRiskROCThread implements Runnable {
       }
 
       if (currentCvvhItems != null && !currentCvvhItems.isEmpty()) {
-        //For renal replacement risk, we are going from 72h earlier than first CVVH till case start date
+        // For renal replacement risk, we are going from 72h earlier than first CVVH till case start
+        // date
         // Getting first CVVH
         var firstCVVH = Collections.min(currentCvvhItems);
 
@@ -130,45 +136,76 @@ public class CumulativeRenalReplacementRiskROCThread implements Runnable {
             DateTools.dateToUnixTime(firstCVVH.dateFrom()) - (3 * ValueOperations.dayInSeconds);
         // startTimestamp is the dateFrom of encounter
         Long startTimestamp = DateTools.dateToUnixTime(encounter.dateFrom());
-        //If encounter start date is older than the timestamp from where we start generating data then update startTimestamp to that timestamp to save calculation time
+        // If encounter start date is older than the timestamp from where we start generating data
+        // then update startTimestamp to that timestamp to save calculation time
         if (startTimestamp < this.responseStartingTimestamp) {
           startTimestamp = this.responseStartingTimestamp;
         }
 
-        //Going backward from endTimestamp till startTimestamp
+        // Going backward from endTimestamp till startTimestamp
         periodTo = endTimestamp;
         periodFrom = endTimestamp - ValueOperations.dayInSeconds;
 
         boolean isFirstROCItem = true;
         while (periodTo > startTimestamp) {
-          //Calculating renal replacement risk
-          Double currentCreatinine = ValueOperations.getClosestValueToMid(currentCreatineItems,
-              periodFrom,
-              periodTo);
-          Double currentUrea = ValueOperations.getClosestValueToMid(currentUreaItems,
-              periodFrom, periodTo);
-          Double currentLactate = ValueOperations.getLatestValueInPeriod(currentLactateItems,
-              periodFrom,
-              periodTo);
-          Double meanUrineOutput = ValueOperations.getMeanUrineValueInPeriod(
-              currentUrineOutputItems,
-              bodyWeight, periodFrom, periodTo);
-          Double risk = ValueOperations.getDiscriminantValue(currentCreatinine, firstCreatinine,
-              currentUrea, currentLactate, meanUrineOutput);
+          // Calculating renal replacement risk
+          Double currentCreatinine =
+              ValueOperations.getClosestValueToMid(currentCreatineItems, periodFrom, periodTo);
+          Double currentUrea =
+              ValueOperations.getClosestValueToMid(currentUreaItems, periodFrom, periodTo);
+          Double currentLactate =
+              ValueOperations.getLatestValueInPeriod(currentLactateItems, periodFrom, periodTo);
+          Double meanUrineOutput =
+              ValueOperations.getMeanUrineValueInPeriod(
+                  currentUrineOutputItems, bodyWeight, periodFrom, periodTo);
+          Double risk =
+              ValueOperations.getDiscriminantValue(
+                  currentCreatinine, firstCreatinine, currentUrea, currentLactate, meanUrineOutput);
 
-          //If the risk is not null then add it as a ROC item
+          // If the risk is not null then add it as a ROC item
           if (risk != null) {
             if (Double.isInfinite(risk)) {
-              log.error(String.format("Risk is %s for %s", "infinite",
-                  createLogMessage(caseId, risk, periodFrom, periodTo, currentCreatinine,
-                      firstCreatinine, currentUrea, currentLactate, meanUrineOutput)));
+              log.error(
+                  String.format(
+                      "Risk is %s for %s",
+                      "infinite",
+                      createLogMessage(
+                          caseId,
+                          risk,
+                          periodFrom,
+                          periodTo,
+                          currentCreatinine,
+                          firstCreatinine,
+                          currentUrea,
+                          currentLactate,
+                          meanUrineOutput)));
             } else if (risk < OUTLIER_BOTTOM || risk > OUTLIER_TOP) {
-              log.error(String.format("Outlier found for caseId %s for %s", caseId,
-                  createLogMessage(caseId, risk, periodFrom, periodTo, currentCreatinine,
-                      firstCreatinine, currentUrea, currentLactate, meanUrineOutput)));
+              log.error(
+                  String.format(
+                      "Outlier found for caseId %s for %s",
+                      caseId,
+                      createLogMessage(
+                          caseId,
+                          risk,
+                          periodFrom,
+                          periodTo,
+                          currentCreatinine,
+                          firstCreatinine,
+                          currentUrea,
+                          currentLactate,
+                          meanUrineOutput)));
             }
-            log.trace(createLogMessage(caseId, risk, periodFrom, periodTo, currentCreatinine,
-                firstCreatinine, currentUrea, currentLactate, meanUrineOutput));
+            log.trace(
+                createLogMessage(
+                    caseId,
+                    risk,
+                    periodFrom,
+                    periodTo,
+                    currentCreatinine,
+                    firstCreatinine,
+                    currentUrea,
+                    currentLactate,
+                    meanUrineOutput));
 
             ROCItem rocItem;
             if (isFirstROCItem) {
@@ -179,84 +216,134 @@ public class CumulativeRenalReplacementRiskROCThread implements Runnable {
             }
             rocItems.add(rocItem);
           } else {
-            log.trace("Risk is null for caseId " + caseId
-                + ". periodFrom = " + periodFrom
-                + ", periodTo = " + periodTo);
+            log.trace(
+                "Risk is null for caseId "
+                    + caseId
+                    + ". periodFrom = "
+                    + periodFrom
+                    + ", periodTo = "
+                    + periodTo);
           }
 
-          //Going to previous 24 hours period
+          // Going to previous 24 hours period
           periodTo = periodFrom - 1;
           periodFrom = periodTo - ValueOperations.dayInSeconds;
         }
       }
-      //If there is no CVHH for a case then look for admission date
+      // If there is no CVHH for a case then look for admission date
       else {
         // Getting Episodes
-        List<CoreBaseDataItem> episodes = this.mapModelParameter.get(EPISODES).stream()
-            .filter(o -> o.hisCaseId().equals(caseId)).toList();
+        List<CoreBaseDataItem> episodes =
+            this.mapModelParameter.get(EPISODES).stream()
+                .filter(o -> o.hisCaseId().equals(caseId))
+                .toList();
         for (CoreBaseDataItem episode : episodes) {
-          //Getting episode start and end timestamps
+          // Getting episode start and end timestamps
           Long admissionTimestamp = DateTools.dateToUnixTime(episode.dateFrom());
           Long releaseTimestamp = DateTools.dateToUnixTime(episode.dateTo());
 
-          //For ROC curves we are considering released cases only. If encounter.dateTo()!=null but episode.dateTo()==null that means still open episode for a released case.
+          // For ROC curves we are considering released cases only. If encounter.dateTo()!=null but
+          // episode.dateTo()==null that means still open episode for a released case.
           if (releaseTimestamp == null) {
-            log.debug("releaseTimestamp is null for episode " + episode.toString() + " in caseId="
-                + caseId);
+            log.debug(
+                "releaseTimestamp is null for episode "
+                    + episode.toString()
+                    + " in caseId="
+                    + caseId);
             continue;
           }
 
-          //If admissionTimestamp is older than the timestamp from where we start generating data then update releaseTimestamp to that timestamp to save calculation time
+          // If admissionTimestamp is older than the timestamp from where we start generating data
+          // then update releaseTimestamp to that timestamp to save calculation time
           if (admissionTimestamp < this.responseStartingTimestamp) {
             admissionTimestamp = this.responseStartingTimestamp;
           }
 
-          //Going froward from admissionTimestamp till releaseTimestamp
+          // Going froward from admissionTimestamp till releaseTimestamp
           periodFrom = admissionTimestamp;
           periodTo = periodFrom + ValueOperations.dayInSeconds;
           while (periodTo < releaseTimestamp) {
-            //Calculating renal replacement risk
-            Double currentCreatinine = ValueOperations.getClosestValueToMid(
-                currentCreatineItems,
-                periodFrom, periodTo);
-            Double currentUrea = ValueOperations.getClosestValueToMid(currentUreaItems,
-                periodFrom,
-                periodTo);
-            Double currentLactate = ValueOperations.getLatestValueInPeriod(currentLactateItems,
-                periodFrom,
-                periodTo);
-            Double meanUrineOutput = ValueOperations.getMeanUrineValueInPeriod(
-                currentUrineOutputItems,
-                bodyWeight, periodFrom, periodTo);
-            Double risk = ValueOperations.getDiscriminantValue(currentCreatinine, firstCreatinine,
-                currentUrea, currentLactate, meanUrineOutput);
+            // Calculating renal replacement risk
+            Double currentCreatinine =
+                ValueOperations.getClosestValueToMid(currentCreatineItems, periodFrom, periodTo);
+            Double currentUrea =
+                ValueOperations.getClosestValueToMid(currentUreaItems, periodFrom, periodTo);
+            Double currentLactate =
+                ValueOperations.getLatestValueInPeriod(currentLactateItems, periodFrom, periodTo);
+            Double meanUrineOutput =
+                ValueOperations.getMeanUrineValueInPeriod(
+                    currentUrineOutputItems, bodyWeight, periodFrom, periodTo);
+            Double risk =
+                ValueOperations.getDiscriminantValue(
+                    currentCreatinine,
+                    firstCreatinine,
+                    currentUrea,
+                    currentLactate,
+                    meanUrineOutput);
 
-            //If the risk is not null then add it to the list in timestampToRenalReplacementRiskMap based on maxTimestamp as key
+            // If the risk is not null then add it to the list in timestampToRenalReplacementRiskMap
+            // based on maxTimestamp as key
             if (risk != null) {
               if (Double.isInfinite(risk)) {
-                log.error(String.format("Risk is infinite for %s",
-                    createLogMessage(caseId, risk, periodFrom, periodTo, currentCreatinine,
-                        firstCreatinine, currentUrea, currentLactate, meanUrineOutput)));
+                log.error(
+                    String.format(
+                        "Risk is infinite for %s",
+                        createLogMessage(
+                            caseId,
+                            risk,
+                            periodFrom,
+                            periodTo,
+                            currentCreatinine,
+                            firstCreatinine,
+                            currentUrea,
+                            currentLactate,
+                            meanUrineOutput)));
               } else if (risk < OUTLIER_BOTTOM || risk > OUTLIER_TOP) {
-                log.error(String.format("Outlier found for caseId %s for %s", caseId,
-                    createLogMessage(caseId, risk, periodFrom, periodTo, currentCreatinine,
-                        firstCreatinine, currentUrea, currentLactate, meanUrineOutput)));
+                log.error(
+                    String.format(
+                        "Outlier found for caseId %s for %s",
+                        caseId,
+                        createLogMessage(
+                            caseId,
+                            risk,
+                            periodFrom,
+                            periodTo,
+                            currentCreatinine,
+                            firstCreatinine,
+                            currentUrea,
+                            currentLactate,
+                            meanUrineOutput)));
               }
 
-              log.trace(String.format("Risk = %s for %s", risk,
-                  createLogMessage(caseId, risk, periodFrom, periodTo, currentCreatinine,
-                      firstCreatinine, currentUrea, currentLactate, meanUrineOutput)));
+              log.trace(
+                  String.format(
+                      "Risk = %s for %s",
+                      risk,
+                      createLogMessage(
+                          caseId,
+                          risk,
+                          periodFrom,
+                          periodTo,
+                          currentCreatinine,
+                          firstCreatinine,
+                          currentUrea,
+                          currentLactate,
+                          meanUrineOutput)));
 
               ROCItem rocItem = new ROCItem(risk, 0);
               rocItems.add(rocItem);
 
             } else {
-              log.trace("Risk is null for caseId " + caseId
-                  + ". periodFrom = " + periodFrom
-                  + ", periodTo = " + periodTo);
+              log.trace(
+                  "Risk is null for caseId "
+                      + caseId
+                      + ". periodFrom = "
+                      + periodFrom
+                      + ", periodTo = "
+                      + periodTo);
             }
 
-            //Going to next 24 hours period
+            // Going to next 24 hours period
             periodFrom = periodTo + 1;
             periodTo = periodFrom + ValueOperations.dayInSeconds;
           }
@@ -266,24 +353,40 @@ public class CumulativeRenalReplacementRiskROCThread implements Runnable {
     }
 
     try {
-      //Providing data back to main thread
+      // Providing data back to main thread
       this.rocItemsBlockingQueue.put(rocItems);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     }
   }
 
-  private static String createLogMessage(String caseId, double risk, double periodFrom,
-      double periodTo, double currentCreatinine, double firstCreatinine, double currentUrea,
-      double currentLactate, double meanUrineOutput) {
-    return "caseId " + caseId
-        + ". Risk=" + risk
-        + ", periodFrom = " + periodFrom
-        + ", periodTo = " + periodTo
-        + ", currentCreatinine=" + currentCreatinine
-        + ", firstCreatinine=" + firstCreatinine
-        + ", currentUrea=" + currentUrea
-        + ", currentLactate=" + currentLactate
-        + ", meanUrineOutput=" + meanUrineOutput;
+  private static String createLogMessage(
+      String caseId,
+      double risk,
+      double periodFrom,
+      double periodTo,
+      double currentCreatinine,
+      double firstCreatinine,
+      double currentUrea,
+      double currentLactate,
+      double meanUrineOutput) {
+    return "caseId "
+        + caseId
+        + ". Risk="
+        + risk
+        + ", periodFrom = "
+        + periodFrom
+        + ", periodTo = "
+        + periodTo
+        + ", currentCreatinine="
+        + currentCreatinine
+        + ", firstCreatinine="
+        + firstCreatinine
+        + ", currentUrea="
+        + currentUrea
+        + ", currentLactate="
+        + currentLactate
+        + ", meanUrineOutput="
+        + meanUrineOutput;
   }
 }

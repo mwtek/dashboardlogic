@@ -28,17 +28,14 @@ public enum TreatmentLevels {
   ICU_ECMO("ICU_with_ecmo"),
   NORMAL_WARD("Normal_ward"),
 
-
   // Internal usages for list management
   INPATIENT("Stationary"),
   OUTPATIENT("Outpatient"),
   ALL("All");
-
 
   private final String value;
 
   TreatmentLevels(String value) {
     this.value = value;
   }
-
 }

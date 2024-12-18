@@ -51,14 +51,13 @@ import org.hl7.fhir.r4.model.Address;
 @Slf4j
 public class CoronaResultFunctionality extends DiseaseResultFunctionality {
 
-
   /**
    * Creation of a cross table listing the current patients at the UKB site according to current
    * level of care and place of residence in Bonn or outside Bonn.
    *
    * @param mapCumulativeMaxTreatments Map with the current inpatient c19 positive cases and their
-   *                                   maxtreatment level
-   * @param listPatient                List with the patient data for the given encounter
+   *     maxtreatment level
+   * @param listPatient List with the patient data for the given encounter
    * @return List with the crosstab states and their values
    */
   public static List<String[]> generateCrosstabList(
@@ -80,9 +79,10 @@ public class CoronaResultFunctionality extends DiseaseResultFunctionality {
     for (UkbPatient patient : listPatient) {
       try {
         Address address = patient.getAddressFirstRep();
-        mapIsBonnPatient.put(patient.getId(),
-            address.getCity() != null && address.getCity()
-                .equals(DashboardLogicFixedValues.CITY_BONN.getValue()));
+        mapIsBonnPatient.put(
+            patient.getId(),
+            address.getCity() != null
+                && address.getCity().equals(DashboardLogicFixedValues.CITY_BONN.getValue()));
       } catch (Exception e) {
         log.warn("Patient: " + patient.getId() + " got no address/city");
       }
@@ -145,28 +145,28 @@ public class CoronaResultFunctionality extends DiseaseResultFunctionality {
    * by treatment level when run through.
    *
    * @param mapCurrentTreatmentlevelCasenrs {@link
-   *                                        DataItemGenerator#getMapCurrentTreatmentlevelCasenrs()
-   *                                        Map} with the current case/encounter ids by treatment
-   *                                        level.
-   * @param exportDirectory                 The directory to export to (e.g.:
-   *                                        "C:\currentTreatmentlevelExport").
-   * @param fileBaseName                    The base file name of the generated file (e.g.:
-   *                                        "Caseids_inpatient_covid19_patients").
+   *     DataItemGenerator#getMapCurrentTreatmentlevelCasenrs() Map} with the current case/encounter
+   *     ids by treatment level.
+   * @param exportDirectory The directory to export to (e.g.: "C:\currentTreatmentlevelExport").
+   * @param fileBaseName The base file name of the generated file (e.g.:
+   *     "Caseids_inpatient_covid19_patients").
    */
   @SuppressWarnings("unused")
   public static void generateCurrentTreatmentLevelList(
-      Map<String, List<String>> mapCurrentTreatmentlevelCasenrs, String exportDirectory,
+      Map<String, List<String>> mapCurrentTreatmentlevelCasenrs,
+      String exportDirectory,
       String fileBaseName) {
 
-    CoronaTreatmentLevelExport treatmentLevelExport = new CoronaTreatmentLevelExport(
-        mapCurrentTreatmentlevelCasenrs.get(NORMAL_WARD.getValue()),
-        mapCurrentTreatmentlevelCasenrs.get(ICU.getValue()),
-        mapCurrentTreatmentlevelCasenrs.get(ICU_VENTILATION.getValue()),
-        mapCurrentTreatmentlevelCasenrs.get(ICU_ECMO.getValue()));
+    CoronaTreatmentLevelExport treatmentLevelExport =
+        new CoronaTreatmentLevelExport(
+            mapCurrentTreatmentlevelCasenrs.get(NORMAL_WARD.getValue()),
+            mapCurrentTreatmentlevelCasenrs.get(ICU.getValue()),
+            mapCurrentTreatmentlevelCasenrs.get(ICU_VENTILATION.getValue()),
+            mapCurrentTreatmentlevelCasenrs.get(ICU_ECMO.getValue()));
 
     String currentDate = new SimpleDateFormat("yyyy-MM-dd-HHmm").format(new Date());
-    try (PrintWriter out = new PrintWriter(
-        exportDirectory + "\\" + fileBaseName + "_" + currentDate + ".csv")) {
+    try (PrintWriter out =
+        new PrintWriter(exportDirectory + "\\" + fileBaseName + "_" + currentDate + ".csv")) {
       out.println(treatmentLevelExport.toCsv());
     } catch (FileNotFoundException fnf) {
       log.error(
@@ -179,14 +179,13 @@ public class CoronaResultFunctionality extends DiseaseResultFunctionality {
   /**
    * Increase the passed covid variant frequency by one.
    *
-   * @param variantMap  Map that assigns the variant names, their (current) frequency.
+   * @param variantMap Map that assigns the variant names, their (current) frequency.
    * @param variantName Name of the variant (As defined in the ValueSet of the corresponding Data
-   *                    item).
+   *     item).
    */
   public static void incrementVariantCount(Map<String, Integer> variantMap, String variantName) {
     // Merge has the advantage that the fields with the numbers in the map do not have to be
     // initialized and the map is called only once.
     variantMap.merge(variantName, 1, Integer::sum);
   }
-
 }

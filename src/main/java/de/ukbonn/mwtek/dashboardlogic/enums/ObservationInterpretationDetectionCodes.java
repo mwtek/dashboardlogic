@@ -24,7 +24,7 @@ import java.util.List;
 
 /**
  * Java representation of the <a
- * href="https://simplifier.net/packages/hl7.fhir.r4.core/4.0.1/files/78998"> MII value set for
+ * href="https://simplifier.net/packages/hl7.fhir.r4.core/4.0.1/files/78998">MII value set for
  * qualitative lab results</a>.
  */
 public enum ObservationInterpretationDetectionCodes {
@@ -75,23 +75,17 @@ public enum ObservationInterpretationDetectionCodes {
     return obsInterpretationCode;
   }
 
-  /**
-   * Group with all codes that declare a laboratory finding as "positive".
-   */
+  /** Group with all codes that declare a laboratory finding as "positive". */
   public static List<String> getPositiveCodes() {
     return Arrays.asList(POSITIVE_CODE.getValue(), DETECTED_CODE.getValue());
   }
 
-  /**
-   * Group with all codes that declare a laboratory finding as "negative".
-   */
+  /** Group with all codes that declare a laboratory finding as "negative". */
   public static List<String> getNegativeCodes() {
     return Arrays.asList(NEGATIVE_CODE.getValue(), NOT_DETECTED_CODE.getValue());
   }
 
-  /**
-   * Group with all codes that declare a laboratory finding as "borderline/indeterminate".
-   */
+  /** Group with all codes that declare a laboratory finding as "borderline/indeterminate". */
   public static List<String> getBorderlineCodes() {
     return Arrays.asList(INDETERMINATE_RESULT_CODE.getValue(), EQUIVOCAL_CODE.getValue());
   }

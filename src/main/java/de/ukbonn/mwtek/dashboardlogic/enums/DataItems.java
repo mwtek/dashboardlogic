@@ -27,11 +27,11 @@ public class DataItems {
 
   public static final String CURRENT_TREATMENTLEVEL = "current.treatmentlevel";
   public static final String CURRENT_MAXTREATMENTLEVEL = "current.maxtreatmentlevel";
-  public static final String CASENRS = "casenrs";
+  public static final String DEBUG = "debug";
   public static final String CURRENT_AGE_MAXTREATMENTLEVEL_NORMAL_WARD =
       "current.age.maxtreatmentlevel.normal_ward";
-  public static final String CURRENT_AGE_MAXTREATMENTLEVEL_ICU = "current.age.maxtreatmentlevel"
-      + ".icu";
+  public static final String CURRENT_AGE_MAXTREATMENTLEVEL_ICU =
+      "current.age.maxtreatmentlevel.icu";
   public static final String CURRENT_AGE_MAXTREATMENTLEVEL_ICU_UNDIFFERENTIATED =
       "current.age.maxtreatmentlevel.icu_undifferentiated";
   public static final String CURRENT_AGE_MAXTREATMENTLEVEL_ICU_WITH_VENTILATION =
@@ -45,8 +45,8 @@ public class DataItems {
   public static final String CUMULATIVE_MAXTREATMENTLEVEL = "cumulative.maxtreatmentlevel";
   public static final String CUMULATIVE_AGE_MAXTREATMENTLEVEL_NORMAL_WARD =
       "cumulative.age.maxtreatmentlevel.normal_ward";
-  public static final String CUMULATIVE_AGE_MAXTREATMENTLEVEL_OUTPATIENT = "cumulative.age"
-      + ".maxtreatmentlevel.outpatient";
+  public static final String CUMULATIVE_AGE_MAXTREATMENTLEVEL_OUTPATIENT =
+      "cumulative.age" + ".maxtreatmentlevel.outpatient";
   public static final String CUMULATIVE_AGE_MAXTREATMENTLEVEL_ICU =
       "cumulative.age.maxtreatmentlevel.icu";
   public static final String CUMULATIVE_AGE_MAXTREATMENTLEVEL_ICU_UNDIFFERENTIATED =
@@ -66,8 +66,8 @@ public class DataItems {
   public static final String CUMULATIVE_INPATIENT_AGE = "cumulative.inpatient.age";
   public static final String CUMULATIVE_OUTPATIENT_AGE = "cumulative.outpatient.age";
   public static final String CUMULATIVE_LENGTHOFSTAY_ICU = "cumulative.lengthofstay.icu";
-  public static final String CUMULATIVE_LENGTHOFSTAY_ICU_ALIVE = "cumulative.lengthofstay.icu"
-      + ".alive";
+  public static final String CUMULATIVE_LENGTHOFSTAY_ICU_ALIVE =
+      "cumulative.lengthofstay.icu" + ".alive";
   public static final String CUMULATIVE_LENGTHOFSTAY_ICU_DEAD = "cumulative.lengthofstay.icu.dead";
   public static final String CUMULATIVE_LENGTHOFSTAY_HOSPITAL = "cumulative.lengthofstay.hospital";
   public static final String CUMULATIVE_LENGTHOFSTAY_HOSPITAL_ALIVE =
@@ -81,4 +81,17 @@ public class DataItems {
   // The prefix for the influenza data items
   public static final String INFLUENZA_PREFIX = "infl.";
 
+  // The prefix for the kids radar data items
+  public static final String KIDS_RADAR_PREFIX = "kira.";
+
+  public static final String KIDS_RADAR_PREFIX_KJP = KIDS_RADAR_PREFIX + "kjp.";
+
+  public static final String KIDS_RADAR_PREFIX_RSV = KIDS_RADAR_PREFIX + "rsv.";
+
+  // Kids radar related items
+  public static final String CUMULATIVE_DIAGS_ZIPCODE = "cumulative.diags.zipcode";
+  public static final String CUMULATIVE_DIAGS_GENDER = "cumulative.diags.gender";
+  public static final String CUMULATIVE_DIAGS_AGE = "cumulative.diags.age";
+  public static final String CUMULATIVE_LENGTHOFSTAY = "cumulative.diags.lengthofstay";
+  public static final String TIMELINE_DIAGS_OCCURRENCE = "timeline.diags.occurrence";
 }

@@ -18,5 +18,9 @@
 package de.ukbonn.mwtek.dashboardlogic.enums;
 
 public enum DataItemContext {
-  COVID, INFLUENZA
+  COVID,
+  INFLUENZA,
+  KIDS_RADAR,
+  KIDS_RADAR_KJP,
+  KIDS_RADAR_RSV
 }

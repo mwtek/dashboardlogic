@@ -27,9 +27,9 @@ import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.OUTPATIENT;
 import static de.ukbonn.mwtek.dashboardlogic.logic.CoronaResultFunctionality.checkAgeGroup;
 import static de.ukbonn.mwtek.dashboardlogic.logic.DiseaseResultFunctionality.calculateAge;
 
+import de.ukbonn.mwtek.dashboardlogic.DashboardDataItemLogic;
 import de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels;
 import de.ukbonn.mwtek.dashboardlogic.logic.CoronaResultFunctionality;
-import de.ukbonn.mwtek.dashboardlogic.logic.DashboardDataItemLogics;
 import de.ukbonn.mwtek.dashboardlogic.models.DiseaseDataItem;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbPatient;
@@ -47,18 +47,16 @@ import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * This class is used for generating the data item
- * {@link DiseaseDataItem cumulative.maxtreatmentlevel.age.* subitems}
+ * This class is used for generating the data item {@link DiseaseDataItem
+ * cumulative.maxtreatmentlevel.age.* subitems}
  *
  * @author <a href="mailto:david.meyers@ukbonn.de">David Meyers</a>
  * @author <a href="mailto:berke_enes.dincel@ukbonn.de">Berke Enes Dincel</a>
  */
-
 @Slf4j
-public class CumulativeMaxTreatmentLevelAge extends DashboardDataItemLogics {
+public class CumulativeMaxTreatmentLevelAge extends DashboardDataItemLogic {
 
-  public CumulativeMaxTreatmentLevelAge() {
-  }
+  public CumulativeMaxTreatmentLevelAge() {}
 
   private Set<String> outpatientPatientIds;
   private Set<String> inpatientPatientIds;
@@ -73,6 +71,7 @@ public class CumulativeMaxTreatmentLevelAge extends DashboardDataItemLogics {
   public List<Integer> createMaxTreatmentLevelAgeMap(
       Map<TreatmentLevels, List<UkbEncounter>> mapPositiveEncounterByClass,
       Map<TreatmentLevels, List<UkbEncounter>> mapIcuOverall,
+      List<UkbPatient> patients,
       TreatmentLevels treatmentLevel) {
     log.debug("started createMaxTreatmentLevelAgeMap");
     Instant startTimer = TimerTools.startTimer();
@@ -96,13 +95,15 @@ public class CumulativeMaxTreatmentLevelAge extends DashboardDataItemLogics {
       encountersOverall.addAll(mapIcuOverall.get(ICU_VENTILATION));
       encountersOverall.addAll(mapIcuOverall.get(ICU_ECMO));
 
-      encountersOverall.parallelStream().forEach(encounter -> {
-        // Identify when the positive cases were first recorded.
-        CoronaResultFunctionality.assignFirstAdmissionDateToPid(encounter, pidAdmissionMap);
-      });
+      encountersOverall.parallelStream()
+          .forEach(
+              encounter -> {
+                // Identify when the positive cases were first recorded.
+                CoronaResultFunctionality.assignFirstAdmissionDateToPid(encounter, pidAdmissionMap);
+              });
       // Creating a map to index patients by their ID
-      patientMap = getPatients().stream()
-          .collect(Collectors.toMap(UkbPatient::getId, Function.identity()));
+      patientMap =
+          patients.stream().collect(Collectors.toMap(UkbPatient::getId, Function.identity()));
       initialized = true;
     }
 
@@ -174,13 +175,13 @@ public class CumulativeMaxTreatmentLevelAge extends DashboardDataItemLogics {
   private static Set<String> getPatientIds(
       Map<TreatmentLevels, List<UkbEncounter>> mapPositiveEncounterByClass,
       TreatmentLevels treatmentLevel) {
-    return mapPositiveEncounterByClass.get(treatmentLevel)
-        .stream()
-        .map(UkbEncounter::getPatientId).collect(Collectors.toSet());
+    return mapPositiveEncounterByClass.get(treatmentLevel).stream()
+        .map(UkbEncounter::getPatientId)
+        .collect(Collectors.toSet());
   }
 
-  private void addCohortAgeToList(UkbPatient patient, Date validAdmissionDate,
-      List<Integer> resultList) {
+  private void addCohortAgeToList(
+      UkbPatient patient, Date validAdmissionDate, List<Integer> resultList) {
     if (patient.hasBirthDate()) {
       int age = calculateAge(patient.getBirthDate(), validAdmissionDate);
       resultList.add(checkAgeGroup(age));

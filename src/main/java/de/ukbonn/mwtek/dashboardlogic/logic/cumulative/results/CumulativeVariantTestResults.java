@@ -22,11 +22,12 @@ import static de.ukbonn.mwtek.dashboardlogic.logic.CoronaResultFunctionality.isC
 import static de.ukbonn.mwtek.dashboardlogic.tools.StringHelper.isAnyMatchSetWithString;
 import static de.ukbonn.mwtek.utilities.enums.TerminologySystems.LOINC;
 
+import de.ukbonn.mwtek.dashboardlogic.DashboardDataItemLogic;
 import de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues;
-import de.ukbonn.mwtek.dashboardlogic.logic.DashboardDataItemLogics;
 import de.ukbonn.mwtek.dashboardlogic.models.DiseaseDataItem;
 import de.ukbonn.mwtek.dashboardlogic.settings.InputCodeSettings;
 import de.ukbonn.mwtek.dashboardlogic.settings.VariantSettings;
+import de.ukbonn.mwtek.utilities.fhir.resources.UkbObservation;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,14 +37,14 @@ import org.hl7.fhir.r4.model.Coding;
 import org.hl7.fhir.r4.model.Observation;
 
 /**
- * This class is used for generating the data item
- * {@link DiseaseDataItem cumulative.varianttestresults}.
+ * This class is used for generating the data item {@link DiseaseDataItem
+ * cumulative.varianttestresults}.
  *
  * @author <a href="mailto:david.meyers@ukbonn.de">David Meyers</a>
  * @author <a href="mailto:berke_enes.dincel@ukbonn.de">Berke Enes Dincel</a>
  */
 @Slf4j
-public class CumulativeVariantTestResults extends DashboardDataItemLogics {
+public class CumulativeVariantTestResults extends DashboardDataItemLogic {
 
   List<Coding> variantCodings;
   VariantSettings variantSettings;
@@ -52,13 +53,15 @@ public class CumulativeVariantTestResults extends DashboardDataItemLogics {
    * Creation of a map that assigns the supported Covid-19 variants the frequency of their
    * occurrence at the site. Currently, only LOINC encodings are supported.
    *
-   * @param variantSettings   The local configuration to extend the query logic with additional
-   *                          covid-19 variants that are not yet known at the time of release.
+   * @param variantSettings The local configuration to extend the query logic with additional
+   *     covid-19 variants that are not yet known at the time of release.
    * @param inputCodeSettings The configuration of the parameterizable codes such as the observation
-   *                          codes or procedure codes.
+   *     codes or procedure codes.
    * @return Map with frequencies per covid variant.
    */
-  public Map<String, Integer> createVariantTestResultMap(VariantSettings variantSettings,
+  public Map<String, Integer> createVariantTestResultMap(
+      List<UkbObservation> observations,
+      VariantSettings variantSettings,
       InputCodeSettings inputCodeSettings) {
     this.variantSettings = variantSettings;
     Map<String, Integer> variantMap = new LinkedHashMap<>();
@@ -68,12 +71,17 @@ public class CumulativeVariantTestResults extends DashboardDataItemLogics {
 
     // Get all the coding-entries that contain loinc information
     try {
-      variantCodings = getVariantObservations().parallelStream()
-          .filter(x -> isCodingValid(x.getCode(), LOINC,
-              observationVariantLoincCodes))
-          .map(Observation::getValueCodeableConcept).filter(CodeableConcept::hasCoding).flatMap(
-              x -> x.getCoding().stream().filter(Coding::hasSystem)
-                  .filter(y -> y.getSystem().equals(LOINC))).toList();
+      variantCodings =
+          observations.parallelStream()
+              .filter(x -> isCodingValid(x.getCode(), LOINC, observationVariantLoincCodes))
+              .map(Observation::getValueCodeableConcept)
+              .filter(CodeableConcept::hasCoding)
+              .flatMap(
+                  x ->
+                      x.getCoding().stream()
+                          .filter(Coding::hasSystem)
+                          .filter(y -> y.getSystem().equals(LOINC)))
+              .toList();
 
       for (Coding variantCoding : variantCodings) {
         readCodingAndIncrementVariantMap(variantCoding, variantMap);
@@ -85,7 +93,7 @@ public class CumulativeVariantTestResults extends DashboardDataItemLogics {
   }
 
   private void initializeVariantMap(Map<String, Integer> variantMap) {
-    // Initialization the map with the value set from the data set description 
+    // Initialization the map with the value set from the data set description
     if (variantMap.isEmpty()) {
       variantMap.put(DashboardLogicFixedValues.VARIANT_ALPHA, 0);
       variantMap.put(DashboardLogicFixedValues.VARIANT_BETA, 0);
@@ -102,12 +110,11 @@ public class CumulativeVariantTestResults extends DashboardDataItemLogics {
    * Reads the given LOINC variant code and increments the entry in the overall map.
    *
    * @param variantCoding {@link CodeableConcept#getCoding() CodeableConcept.coding} that contains
-   *                      the LOINC code for covid variants from
-   *                      {@link Observation#getValueCodeableConcept()}.
-   * @param variantMap    Map that counts the frequencies per covid variant.
+   *     the LOINC code for covid variants from {@link Observation#getValueCodeableConcept()}.
+   * @param variantMap Map that counts the frequencies per covid variant.
    */
-  private void readCodingAndIncrementVariantMap(Coding variantCoding,
-      Map<String, Integer> variantMap) {
+  private void readCodingAndIncrementVariantMap(
+      Coding variantCoding, Map<String, Integer> variantMap) {
 
     if (variantMap.isEmpty()) {
       initializeVariantMap(variantMap);
@@ -116,16 +123,16 @@ public class CumulativeVariantTestResults extends DashboardDataItemLogics {
     // Counting the frequency of LOINC variant codes and then trying to get more information from
     // the display name about variants that cannot be coded via LOINC.
     switch (variantCoding.getCode()) {
-      case DashboardLogicFixedValues.VARIANT_ALPHA_LOINC -> incrementVariantCount(variantMap,
-          DashboardLogicFixedValues.VARIANT_ALPHA);
-      case DashboardLogicFixedValues.VARIANT_BETA_LOINC -> incrementVariantCount(variantMap,
-          DashboardLogicFixedValues.VARIANT_BETA);
-      case DashboardLogicFixedValues.VARIANT_DELTA_LOINC -> incrementVariantCount(variantMap,
-          DashboardLogicFixedValues.VARIANT_DELTA);
-      case DashboardLogicFixedValues.VARIANT_GAMMA_LOINC -> incrementVariantCount(variantMap,
-          DashboardLogicFixedValues.VARIANT_GAMMA);
-      case DashboardLogicFixedValues.VARIANT_OMICRON_LOINC -> incrementVariantCount(variantMap,
-          DashboardLogicFixedValues.VARIANT_OMICRON);
+      case DashboardLogicFixedValues.VARIANT_ALPHA_LOINC ->
+          incrementVariantCount(variantMap, DashboardLogicFixedValues.VARIANT_ALPHA);
+      case DashboardLogicFixedValues.VARIANT_BETA_LOINC ->
+          incrementVariantCount(variantMap, DashboardLogicFixedValues.VARIANT_BETA);
+      case DashboardLogicFixedValues.VARIANT_DELTA_LOINC ->
+          incrementVariantCount(variantMap, DashboardLogicFixedValues.VARIANT_DELTA);
+      case DashboardLogicFixedValues.VARIANT_GAMMA_LOINC ->
+          incrementVariantCount(variantMap, DashboardLogicFixedValues.VARIANT_GAMMA);
+      case DashboardLogicFixedValues.VARIANT_OMICRON_LOINC ->
+          incrementVariantCount(variantMap, DashboardLogicFixedValues.VARIANT_OMICRON);
 
       // If the value is not handled or is not part of the Loinc system, count it as "Unknown"
       // unless other variants can be determined via the display name.
@@ -141,13 +148,12 @@ public class CumulativeVariantTestResults extends DashboardDataItemLogics {
           incrementVariantCount(variantMap, DashboardLogicFixedValues.VARIANT_UNKNOWN);
           // The log message got commented out since it could contain patient data and fills the
           // logs heavily. If there is an urgent need comment it in again.
-//          log.debug(
-//              "No support for covid-19 variant with loinc code: " + variantCoding.getCode()
-//                  + " and display: " + variantCoding.getDisplay());
+          //          log.debug(
+          //              "No support for covid-19 variant with loinc code: " +
+          // variantCoding.getCode()
+          //                  + " and display: " + variantCoding.getDisplay());
         }
       }
     }
   }
-
 }
-

@@ -26,20 +26,25 @@ import lombok.Getter;
 public class InputCodeSettingsExampleData {
 
   @Getter
-  private static final List<String> observationPcrLoincCodes = ImmutableList.of("94306-8",
-      "96763-8",
-      "94640-0");
+  private static final List<String> observationPcrLoincCodes =
+      ImmutableList.of("94306-8", "96763-8", "94640-0");
 
   @Getter
-  private static final List<String> observationVariantLoincCodes = ImmutableList.of("96741-4",
-      "96895-8");
+  private static final List<String> observationVariantLoincCodes =
+      ImmutableList.of("96741-4", "96895-8");
 
-  @Getter
-  private static final List<String> conditionIcdCodes = ImmutableList.of("U07.1", "U07.2");
+  @Getter private static final List<String> conditionIcdCodes = ImmutableList.of("U07.1");
 
   public static InputCodeSettings getExampleData() {
-    return new InputCodeSettings(observationPcrLoincCodes, observationVariantLoincCodes,
-        conditionIcdCodes, null, null, null, null);
+    return new InputCodeSettings(
+        observationPcrLoincCodes,
+        observationVariantLoincCodes,
+        conditionIcdCodes,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null);
   }
-
 }

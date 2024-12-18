@@ -20,5 +20,13 @@
 
 package de.ukbonn.mwtek.dashboardlogic.predictiondata.ukb.renalreplacement.enums;
 
-public enum RenalReplacementRiskParameters {ENCOUNTER, START_REPLACEMENT, BODY_WEIGHT, URINE_OUTPUT, CREATININE, LACTATE, UREA, EPISODES}
-
+public enum RenalReplacementRiskParameters {
+  ENCOUNTER,
+  START_REPLACEMENT,
+  BODY_WEIGHT,
+  URINE_OUTPUT,
+  CREATININE,
+  LACTATE,
+  UREA,
+  EPISODES
+}

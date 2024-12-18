@@ -39,19 +39,25 @@ public class LocationExampleData {
 
     List<Identifier> identifierIcuLocation = new ArrayList<>();
     identifierIcuLocation.add(new Identifier().setValue(ICU_LOCATION_ID));
-    UkbLocation icuLocation = new UkbLocation(identifierIcuLocation,
-        new CodeableConcept().addCoding(
-            new Coding(LocationPhysicalType.WA.getSystem(), LocationPhysicalType.WA.toCode(),
-                LocationPhysicalType.WA.getDisplay())));
+    UkbLocation icuLocation =
+        new UkbLocation(
+            identifierIcuLocation,
+            new CodeableConcept()
+                .addCoding(
+                    new Coding(
+                        LocationPhysicalType.WA.getSystem(),
+                        LocationPhysicalType.WA.toCode(),
+                        LocationPhysicalType.WA.getDisplay())));
     icuLocation.addType(new CodeableConcept().addCoding(new Coding(null, ICU.getValue(), null)));
     icuLocation.setId(ICU_LOCATION_ID);
 
     // Location without .physicalType and .type
     List<Identifier> identifierNonValidLocation = new ArrayList<>();
     identifierNonValidLocation.add(new Identifier().setValue(NON_VALID_LOCATION_ID));
-    UkbLocation nonValidLocation = new UkbLocation(identifierNonValidLocation,
-        new CodeableConcept().addCoding(
-            new Coding(null, null, null)));
+    UkbLocation nonValidLocation =
+        new UkbLocation(
+            identifierNonValidLocation,
+            new CodeableConcept().addCoding(new Coding(null, null, null)));
     nonValidLocation.addType(new CodeableConcept().addCoding(new Coding(null, null, null)));
     nonValidLocation.setId(NON_VALID_LOCATION_ID);
 
@@ -60,5 +66,4 @@ public class LocationExampleData {
 
     return locationExamples;
   }
-
 }

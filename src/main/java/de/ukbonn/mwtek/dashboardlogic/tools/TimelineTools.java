@@ -17,6 +17,14 @@
  */
 package de.ukbonn.mwtek.dashboardlogic.tools;
 
+import static de.ukbonn.mwtek.dashboardlogic.enums.NumDashboardConstants.YEAR_FORMAT;
+import static de.ukbonn.mwtek.dashboardlogic.enums.NumDashboardConstants.YEAR_MONTH_FORMAT;
+
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.List;
 import java.util.OptionalInt;
 import java.util.stream.IntStream;
@@ -27,13 +35,39 @@ public class TimelineTools {
    * Retrieves the index corresponding to the given timestamp.
    *
    * @param timestamp The timestamp to search for
-   * @param dates     The list with all the midnight timestamps used in the timeline.
+   * @param dates The list with all the midnight timestamps used in the timeline.
    * @return The index corresponding to the given timestamp, or -1 if not found
    */
   public static int getIndexByTimestamp(long timestamp, List<? extends Number> dates) {
-    OptionalInt indexOptional = IntStream.range(0, dates.size())
-        .filter(i -> dates.get(i).equals(timestamp))
-        .findFirst();
+    OptionalInt indexOptional =
+        IntStream.range(0, dates.size()).filter(i -> dates.get(i).equals(timestamp)).findFirst();
     return indexOptional.orElse(-1);
+  }
+
+  public static List<String> generateDateList(Date startDate, String pattern) {
+    List<String> dateList = new ArrayList<>();
+    DateTimeFormatter formatter = DateTimeFormatter.ofPattern(pattern);
+
+    // Convert Date to LocalDate
+    Calendar calendar = Calendar.getInstance();
+    calendar.setTime(startDate);
+    LocalDate start =
+        LocalDate.of(calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH) + 1, 1);
+
+    // Current date, setting to the first day of the current month
+    LocalDate end = LocalDate.now().withDayOfMonth(1);
+
+    while (!start.isAfter(end)) {
+      dateList.add(start.format(formatter));
+      if (pattern.equals(YEAR_FORMAT)) {
+        start = start.plusYears(1);
+      } else if (pattern.equals(YEAR_MONTH_FORMAT)) {
+        start = start.plusMonths(1);
+      } else {
+        throw new IllegalArgumentException("Unsupported pattern: " + pattern);
+      }
+    }
+
+    return dateList;
   }
 }

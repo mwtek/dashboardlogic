@@ -23,8 +23,11 @@ import java.util.List;
  * Export model for file generation that reports case/encounter ids of active cases separated by
  * treatment level.
  */
-public record CoronaTreatmentLevelExport(List<String> casesNormalWard, List<String> casesIcu,
-                                         List<String> casesIcuVent, List<String> casesEcmo) {
+public record CoronaTreatmentLevelExport(
+    List<String> casesNormalWard,
+    List<String> casesIcu,
+    List<String> casesIcuVent,
+    List<String> casesEcmo) {
 
   private static final String deliminator = ";";
   public static final String SUFFIX_FACILITY_CONTACT = "-000000-EK";
@@ -62,4 +65,3 @@ public record CoronaTreatmentLevelExport(List<String> casesNormalWard, List<Stri
     return sb.toString();
   }
 }
-

@@ -23,15 +23,15 @@ import java.util.List;
 
 public class RenalReplacementRiskParameterCodes {
 
-  public final static String LOINC_CODE_CREATININE_SERUM_OR_PLASMA = "2160-0";
-  public final static String LOINC_CODE_LACTATE_IN_ARTERIAL_BLOOD = "2518-9";
-  public final static String LOINC_CODE_LACTATE_IN_VENOUS_BLOOD = "2519-7";
-  public final static String LOINC_CODE_LACTATE_IN_MIXED_VENOUS_BLOOD = "19240-1";
-  public final static String LOINC_CODE_LACTATE_IN_CAPILLARY_BLOOD = "19239-3";
-  public final static String LOINC_CODE_LACTATE_IN_BLOOD = "32693-4";
-  public final static String LOINC_CODE_UREA_IN_SERUM_OR_PLASMA = "3091-6";
-  public final static String LOINC_CODE_URINE_OUTPUT = "9187-6";
-  public final static String LOINC_CODE_BODY_WEIGHT = "29463-7";
+  public static final String LOINC_CODE_CREATININE_SERUM_OR_PLASMA = "2160-0";
+  public static final String LOINC_CODE_LACTATE_IN_ARTERIAL_BLOOD = "2518-9";
+  public static final String LOINC_CODE_LACTATE_IN_VENOUS_BLOOD = "2519-7";
+  public static final String LOINC_CODE_LACTATE_IN_MIXED_VENOUS_BLOOD = "19240-1";
+  public static final String LOINC_CODE_LACTATE_IN_CAPILLARY_BLOOD = "19239-3";
+  public static final String LOINC_CODE_LACTATE_IN_BLOOD = "32693-4";
+  public static final String LOINC_CODE_UREA_IN_SERUM_OR_PLASMA = "3091-6";
+  public static final String LOINC_CODE_URINE_OUTPUT = "9187-6";
+  public static final String LOINC_CODE_BODY_WEIGHT = "29463-7";
 
   /*
   "Continuous renal replacement therapy (procedure)"
@@ -46,22 +46,25 @@ public class RenalReplacementRiskParameterCodes {
   /*
   The loinc codes that are forced in the model description for the non pdms items.
    */
-  public final static List<String> VALID_LOINC_CODES_HIS = Arrays.asList(
-      LOINC_CODE_CREATININE_SERUM_OR_PLASMA,
-      LOINC_CODE_LACTATE_IN_ARTERIAL_BLOOD, LOINC_CODE_LACTATE_IN_VENOUS_BLOOD,
-      LOINC_CODE_LACTATE_IN_MIXED_VENOUS_BLOOD, LOINC_CODE_LACTATE_IN_CAPILLARY_BLOOD,
-      LOINC_CODE_LACTATE_IN_BLOOD, LOINC_CODE_UREA_IN_SERUM_OR_PLASMA);
-
-  /*
-The snomed codes that are forced in the model description for the pdms items.
- */
-  public final static List<String> VALID_LOINC_CODES_PDMS = Arrays.asList(
-      LOINC_CODE_URINE_OUTPUT, LOINC_CODE_BODY_WEIGHT);
+  public static final List<String> VALID_LOINC_CODES_HIS =
+      Arrays.asList(
+          LOINC_CODE_CREATININE_SERUM_OR_PLASMA,
+          LOINC_CODE_LACTATE_IN_ARTERIAL_BLOOD,
+          LOINC_CODE_LACTATE_IN_VENOUS_BLOOD,
+          LOINC_CODE_LACTATE_IN_MIXED_VENOUS_BLOOD,
+          LOINC_CODE_LACTATE_IN_CAPILLARY_BLOOD,
+          LOINC_CODE_LACTATE_IN_BLOOD,
+          LOINC_CODE_UREA_IN_SERUM_OR_PLASMA);
 
   /*
   The snomed codes that are forced in the model description for the pdms items.
    */
-  public final static List<String> VALID_SNOMED_CODES_PDMS = Arrays.asList(
-      SNOMED_CODE_CONTINUOUS_THERAPY, SNOMED_CODE_INTERMITTENT_HEMODIALYSIS);
+  public static final List<String> VALID_LOINC_CODES_PDMS =
+      Arrays.asList(LOINC_CODE_URINE_OUTPUT, LOINC_CODE_BODY_WEIGHT);
 
+  /*
+  The snomed codes that are forced in the model description for the pdms items.
+   */
+  public static final List<String> VALID_SNOMED_CODES_PDMS =
+      Arrays.asList(SNOMED_CODE_CONTINUOUS_THERAPY, SNOMED_CODE_INTERMITTENT_HEMODIALYSIS);
 }

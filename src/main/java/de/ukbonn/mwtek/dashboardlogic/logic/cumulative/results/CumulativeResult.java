@@ -17,6 +17,7 @@
  */
 package de.ukbonn.mwtek.dashboardlogic.logic.cumulative.results;
 
+import static de.ukbonn.mwtek.dashboardlogic.DashboardDataItemLogic.getObservationsYoungerKickoffDate;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.BORDERLINE;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.NEGATIVE;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.POSITIVE;
@@ -24,12 +25,16 @@ import static de.ukbonn.mwtek.dashboardlogic.tools.ObservationFilter.getObservat
 import static de.ukbonn.mwtek.dashboardlogic.tools.ObservationFilter.getObservationsByInterpretation;
 import static de.ukbonn.mwtek.dashboardlogic.tools.ObservationFilter.getObservationsByValue;
 
+import de.ukbonn.mwtek.dashboardlogic.DashboardDataItemLogic;
 import de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues;
 import de.ukbonn.mwtek.dashboardlogic.enums.DataItemContext;
-import de.ukbonn.mwtek.dashboardlogic.logic.DashboardDataItemLogics;
 import de.ukbonn.mwtek.dashboardlogic.models.DiseaseDataItem;
+import de.ukbonn.mwtek.dashboardlogic.settings.InputCodeSettings;
+import de.ukbonn.mwtek.dashboardlogic.settings.QualitativeLabCodesSettings;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbObservation;
+import java.util.Collection;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
 
@@ -40,7 +45,7 @@ import lombok.extern.slf4j.Slf4j;
  * @author <a href="mailto:berke_enes.dincel@ukbonn.de">Berke Enes Dincel</a>
  */
 @Slf4j
-public class CumulativeResult extends DashboardDataItemLogics {
+public class CumulativeResult extends DashboardDataItemLogic {
 
   private Set<UkbObservation> observationsByContext;
 
@@ -49,34 +54,45 @@ public class CumulativeResult extends DashboardDataItemLogics {
    * pre-hospital, posthospital, day-care or full inpatient case in connection with the test
    * depending on the laboratory result.
    *
-   * @param labResult The laboratory result to be filtered for (e.g.
-   *                  {@link DashboardLogicFixedValues#POSITIVE}).
+   * @param labResult The laboratory result to be filtered for (e.g. {@link
+   *     DashboardLogicFixedValues#POSITIVE}).
    * @return Get tests of all patients for whom an outpatient, pre-hospital, posthospital, partial
-   * hospitalization or full hospitalization case related to the test exists.
+   *     hospitalization or full hospitalization case related to the test exists.
    */
-  public Set<UkbObservation> getObservationsByResult(DashboardLogicFixedValues labResult,
-      DataItemContext dataItemContext) {
+  public Set<UkbObservation> getObservationsByResult(
+      DashboardLogicFixedValues labResult,
+      DataItemContext dataItemContext,
+      Collection<UkbObservation> observations,
+      InputCodeSettings inputCodeSettings,
+      QualitativeLabCodesSettings qualitativeLabCodesSettings) {
     Set<UkbObservation> listObs = new HashSet<>();
+    // Just observations that are younger than the kick-off date are relevant
+    List<UkbObservation> validObservations =
+        getObservationsYoungerKickoffDate(dataItemContext, observations);
 
     // Initial filtering of the needed observations
     if (observationsByContext == null) {
-      observationsByContext = getObservationsByContext(getObservations(),
-          getInputCodeSettings(), dataItemContext);
+      observationsByContext =
+          getObservationsByContext(validObservations, inputCodeSettings, dataItemContext);
     }
 
     // Check Observation.value if present, otherwise Observation.interpretation
     if (observationsByContext != null) {
       switch (labResult) {
         case POSITIVE -> {
-          listObs = getObservationsByValue(observationsByContext, POSITIVE);
+          listObs =
+              getObservationsByValue(observationsByContext, POSITIVE, qualitativeLabCodesSettings);
           listObs.addAll(getObservationsByInterpretation(observationsByContext, POSITIVE));
         } // case
         case BORDERLINE -> {
-          listObs = getObservationsByValue(observationsByContext, BORDERLINE);
+          listObs =
+              getObservationsByValue(
+                  observationsByContext, BORDERLINE, qualitativeLabCodesSettings);
           listObs.addAll(getObservationsByInterpretation(observationsByContext, BORDERLINE));
         } // case
         case NEGATIVE -> {
-          listObs = getObservationsByValue(observationsByContext, NEGATIVE);
+          listObs =
+              getObservationsByValue(observationsByContext, NEGATIVE, qualitativeLabCodesSettings);
           listObs.addAll(getObservationsByInterpretation(observationsByContext, NEGATIVE));
         } // case
         default -> {
@@ -84,9 +100,8 @@ public class CumulativeResult extends DashboardDataItemLogics {
         }
       }
     } else {
-      log.warn("No " + dataItemContext + " observations have been found");
+      log.warn("No {} observations have been found", dataItemContext);
     }
     return listObs;
   }
-
 }

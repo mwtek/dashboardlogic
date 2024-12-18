@@ -25,9 +25,8 @@ package de.ukbonn.mwtek.dashboardlogic.predictiondata.ukb.renalreplacement.enums
  */
 public class RenalReplacementRiskDataItems {
 
-  public static final String CURRENT_RENAL_REPLACEMENT_RISK =
-      "current.renalreplacementrisk";
-  public static final String TIMELINE_RENAL_REPLACEMENT_RISK =
-      "timeline.renalreplacementrisk";
-  public static final String CUMULATIVE_RENAL_REPLACEMENT_RISK_ROC = "cumulative.renalreplacementrisk.roc";
+  public static final String CURRENT_RENAL_REPLACEMENT_RISK = "current.renalreplacementrisk";
+  public static final String TIMELINE_RENAL_REPLACEMENT_RISK = "timeline.renalreplacementrisk";
+  public static final String CUMULATIVE_RENAL_REPLACEMENT_RISK_ROC =
+      "cumulative.renalreplacementrisk.roc";
 }

@@ -298,13 +298,14 @@ public class DiseaseResultFunctionality {
                     }
                   } else {
                     log.warn(
-                        "No department reference found for 'Encounter.versorgungsstellenkontakt' with"
-                            + " id {}",
+                        "No department reference found for 'Encounter.versorgungsstellenkontakt'"
+                            + " with id {}",
                         supplyContact.getId());
                   }
                 } else {
                   log.warn(
-                      "No partOf identifier found for 'Encounter.versorgungsstellenkontakt' with id {}",
+                      "No partOf identifier found for 'Encounter.versorgungsstellenkontakt' with id"
+                          + " {}",
                       supplyContact.getId());
                 }
               } else {

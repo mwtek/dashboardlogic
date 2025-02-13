@@ -23,7 +23,6 @@ import static de.ukbonn.mwtek.dashboardlogic.logic.DiseaseResultFunctionality.ca
 
 import de.ukbonn.mwtek.dashboardlogic.DashboardDataItemLogic;
 import de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels;
-import de.ukbonn.mwtek.dashboardlogic.enums.VitalStatus;
 import de.ukbonn.mwtek.dashboardlogic.logic.CoronaResultFunctionality;
 import de.ukbonn.mwtek.dashboardlogic.models.DiseaseDataItem;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
@@ -38,12 +37,12 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
-import org.hl7.fhir.r4.model.Coding;
 
 /**
  * This class is used for generating the data items {@link DiseaseDataItem cumulative.age} including
- * the sub items (*.alive, *.dead).
+ * the subitems (*.alive, *.dead).
  *
  * @author <a href="mailto:david.meyers@ukbonn.de">David Meyers</a>
  * @author <a href="mailto:berke_enes.dincel@ukbonn.de">Berke Enes Dincel</a>
@@ -63,7 +62,10 @@ public class CumulativeAge extends DashboardDataItemLogic {
       List<UkbEncounter> facilityEncounters,
       List<UkbPatient> patients,
       TreatmentLevels encounterClass) {
-    log.debug("started getAgeDistributionsByCaseClass");
+    log.debug(
+        "Started getAgeDistributionsByCaseClass for encounterClass: {} with {} encounters",
+        encounterClass,
+        facilityEncounters.size());
     Instant startTimer = TimerTools.startTimer();
     List<Integer> resultList = new ArrayList<>();
     Set<String> pidSet = new HashSet<>();
@@ -71,16 +73,16 @@ public class CumulativeAge extends DashboardDataItemLogic {
     Set<String> ambulantPidSet = new HashSet<>();
 
     // get the age of each patient at the admission date from the first disease-positive case
-    List<UkbEncounter> listEncounterPositive =
+    List<UkbEncounter> encountersPositive =
         facilityEncounters.parallelStream()
             .filter(x -> x.hasExtension(POSITIVE_RESULT.getValue()))
             .toList();
 
-    Map<TreatmentLevels, List<UkbEncounter>> mapEncounterAll = new HashMap<>();
-    mapEncounterAll.put(TreatmentLevels.ALL, facilityEncounters);
-    Map<String, Date> pidAgeMap = createPidAgeMap(VitalStatus.ALL, mapEncounterAll);
+    Map<TreatmentLevels, List<UkbEncounter>> mapEncounterPos =
+        Map.of(TreatmentLevels.ALL, encountersPositive);
+    Map<String, Date> pidAgeMap = createPidAgeMap(mapEncounterPos);
 
-    for (UkbEncounter encounter : listEncounterPositive) {
+    for (UkbEncounter encounter : encountersPositive) {
       if (encounter.isCaseClassInpatient()) {
         stationaryPidSet.add(encounter.getPatientId());
       } else if (encounter.isCaseClassOutpatient()
@@ -89,20 +91,20 @@ public class CumulativeAge extends DashboardDataItemLogic {
       }
     }
 
-    switch (encounterClass) {
-      case INPATIENT -> pidSet.addAll(stationaryPidSet);
-      case OUTPATIENT -> pidSet.addAll(ambulantPidSet);
-      case ALL -> {
-        pidSet.addAll(stationaryPidSet);
-        pidSet.addAll(ambulantPidSet);
-      }
+    if (encounterClass == TreatmentLevels.ALL) {
+      pidSet.addAll(stationaryPidSet);
+      pidSet.addAll(ambulantPidSet);
+    } else {
+      pidSet.addAll(
+          encounterClass == TreatmentLevels.INPATIENT ? stationaryPidSet : ambulantPidSet);
     }
 
     // calculates age
     for (UkbPatient patient : patients) {
       if (pidSet.contains(patient.getId())) {
-        if (patient.hasBirthDate() && pidAgeMap.get(patient.getId()) != null) {
-          resultList.add(calculateAge(patient.getBirthDate(), pidAgeMap.get(patient.getId())));
+        Date admissionDate = pidAgeMap.get(patient.getId());
+        if (patient.hasBirthDate() && admissionDate != null) {
+          resultList.add(calculateAge(patient.getBirthDate(), admissionDate));
         } else {
           log.warn("Could not find a birthday in the resource of patient {}", patient.getId());
         }
@@ -115,132 +117,57 @@ public class CumulativeAge extends DashboardDataItemLogic {
   }
 
   /**
-   * Calculate age of patients who fulfill the searched criteria
-   *
-   * <p>called by <code>cumulative.age.alive</code> and <code>.dead</code>
-   *
-   * @param vitalStatus The vital-status of a patient (e.g. {@link VitalStatus#ALIVE})
-   * @param mapPositiveEncounterByClass Map with the c19-positive encounters separated by CaseClass
-   * @return List with the ages of the c19-positive patients for the respective {@link VitalStatus}
-   */
-  @Deprecated
-  public List<Integer> getAgeCountByVitalStatus(
-      List<UkbPatient> patients,
-      VitalStatus vitalStatus,
-      Map<TreatmentLevels, List<UkbEncounter>> mapPositiveEncounterByClass) {
-    log.debug("started getAgeCountByVitalStatus [vitalStatus: {}]", vitalStatus);
-    Instant startTime = TimerTools.startTimer();
-
-    List<Integer> resultList = new ArrayList<>();
-
-    Map<String, Date> pidAgeMap = createPidAgeMap(vitalStatus, mapPositiveEncounterByClass);
-    // calculate age
-    for (UkbPatient patient : patients) {
-      if (pidAgeMap.containsKey(patient.getId())) {
-        if (patient.hasBirthDate() && pidAgeMap.get(patient.getId()) != null) {
-          resultList.add(calculateAge(patient.getBirthDate(), pidAgeMap.get(patient.getId())));
-        } else {
-          log.warn(
-              "Could not find a birthday in the resource or the resource itself in the pidAgeMap "
-                  + "for the patient "
-                  + patient.getId());
-        }
-      }
-    }
-    // order ascending regarding the specification
-    TimerTools.stopTimerAndLog(startTime, "finished getAgeCountByVitalStatus");
-    return createCohortAgeList(resultList);
-  }
-
-  /**
    * Create a map that identifies the first admission date of a patient's first positive Covid case
    * and assigns it to the PID. This is the reference point for calculating the age.
    *
-   * @param vitalStatus The vital-status of a patient (e.g. {@link VitalStatus#ALIVE})
    * @param mapPositiveEncounterByClass Map with all positive encounters, grouped by case class
    * @return Map that assigns the admission date of the patient's first c19 positive case to a pid
    */
   private static Map<String, Date> createPidAgeMap(
-      VitalStatus vitalStatus,
       Map<TreatmentLevels, List<UkbEncounter>> mapPositiveEncounterByClass) {
-    Map<String, Date> pidMap = new HashMap<>();
-    for (Map.Entry<TreatmentLevels, List<UkbEncounter>> entry :
-        mapPositiveEncounterByClass.entrySet()) {
-      List<UkbEncounter> tempEncounterListByClass = entry.getValue();
-      for (UkbEncounter encounter : tempEncounterListByClass) {
-        String currentPid = encounter.getPatientId();
-        // get the coding of the encounter if he is discharged
-        List<Coding> dischargeCoding =
-            encounter.getHospitalization().getDischargeDisposition().getCoding();
 
-        switch (vitalStatus) {
-          // The split between live and dead cohorts is no longer needed and has been deprecated.
-          case ALIVE -> {
-            // Check dischargeCoding whether it is empty or does not have "07" as code
-            // add pid to set and map id criteria are fulfilled
-            if (!encounter.isPatientDeceased()) {
-              pidMap.put(currentPid, checkIfEncounterHasEarlierCase(pidMap, encounter));
-            }
-          }
-          case DEAD -> {
-            // Same here just reversed
-            if (!dischargeCoding.isEmpty()) {
-              if (encounter.isPatientDeceased()) {
-                pidMap.put(currentPid, checkIfEncounterHasEarlierCase(pidMap, encounter));
-              }
-            }
-          }
-          case ALL -> pidMap.put(currentPid, checkIfEncounterHasEarlierCase(pidMap, encounter));
-        }
+    Map<String, Date> pidMap = new HashMap<>();
+    for (var entry : mapPositiveEncounterByClass.entrySet()) {
+      for (UkbEncounter encounter : entry.getValue()) {
+        pidMap.compute(
+            encounter.getPatientId(),
+            (pid, existingDate) -> getEarlierAdmissionDate(existingDate, encounter));
       }
     }
     return pidMap;
   }
 
   /**
-   * If a patient got multiple positive covid cases, we need to calculate the age dependent on the
-   * age compared to the admission date of his first case
+   * Compares an existing admission date with a new encounter and returns the earlier one.
    *
-   * @param pidMap Map that links a pid to an admission date (not ensuring it is the oldest date)
-   * @param encounter Encounter against which the previous admission date is checked
-   * @return Admission date of the oldest of the two encounter examined
+   * @param existingDate The existing earliest admission date for the patient.
+   * @param encounter The new encounter to compare.
+   * @return The earlier of the two dates.
    */
-  private static Date checkIfEncounterHasEarlierCase(
-      Map<String, Date> pidMap, UkbEncounter encounter) {
-    String pid = encounter.getPatientId();
-    if (encounter.isPeriodStartExistent()) {
-      Date admissionDateEncounter = encounter.getPeriod().getStart();
-      Date admissionDateExisting = null;
-
-      // pid already existing in map
-      if (pidMap.containsKey(pid)) {
-        admissionDateExisting = pidMap.get(pid);
-      }
-
-      // if no admission date is already connected to the pid -> get the one from the actual
-      // encounter,
-      // otherwise compare the dates and get the earlier one
-      if (admissionDateExisting == null) {
-        return admissionDateEncounter;
-      } else {
-        if (admissionDateEncounter.before(admissionDateExisting)) {
-          return admissionDateEncounter;
-        } else {
-          return admissionDateExisting;
-        }
-      }
-    } else {
-      return pidMap.get(pid) != null ? pidMap.get(pid) : null;
+  private static Date getEarlierAdmissionDate(Date existingDate, UkbEncounter encounter) {
+    if (!encounter.isPeriodStartExistent()) {
+      return existingDate; // Keep the existing date if no period start exists
     }
+    Date newAdmissionDate = encounter.getPeriod().getStart();
+    return (existingDate == null || newAdmissionDate.before(existingDate))
+        ? newAdmissionDate
+        : existingDate;
   }
 
+  /**
+   * Converts a list of patient ages into their corresponding age groups and returns the sorted list
+   * of cohort ages.
+   *
+   * @param resultList a list of individual patient ages; can be empty but should not be null
+   * @return a sorted list of cohort age groups; returns an empty list if input is null or empty
+   */
   private static List<Integer> createCohortAgeList(List<Integer> resultList) {
-    List<Integer> cohortAgeList = new ArrayList<>();
-    for (int age : resultList) {
-      int cohortAge = CoronaResultFunctionality.checkAgeGroup(age);
-      cohortAgeList.add(cohortAge);
+    if (resultList == null || resultList.isEmpty()) {
+      return Collections.emptyList();
     }
-    Collections.sort(cohortAgeList);
-    return cohortAgeList;
+    return resultList.stream()
+        .map(CoronaResultFunctionality::checkAgeGroup)
+        .sorted()
+        .collect(Collectors.toList());
   }
 }

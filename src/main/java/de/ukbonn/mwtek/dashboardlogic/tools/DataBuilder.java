@@ -18,7 +18,6 @@
 
 package de.ukbonn.mwtek.dashboardlogic.tools;
 
-
 import de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues;
 import de.ukbonn.mwtek.dashboardlogic.enums.DataItemContext;
 import de.ukbonn.mwtek.dashboardlogic.enums.Gender;

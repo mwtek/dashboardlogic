@@ -329,7 +329,9 @@ public class DiseaseDetectionManagement {
     observationsWithoutResult.forEach(
         x ->
             log.warn(
-                "The observation resource with id {} that describes a covid/influenza pcr finding doesn't contain a valueCodeableConcept or an expected interpretation coding.",
+                "The observation resource with id {} that describes a covid/influenza pcr finding"
+                    + " doesn't contain a valueCodeableConcept or an expected interpretation"
+                    + " coding.",
                 x));
 
     // Adding the ones with positive value and then the ones with positive interpretation code.

@@ -40,7 +40,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class EncounterFilter {
 
-  /** Determines whether the passed encounter instance has a covid-positive flag. */
+  /** Determines whether the passed encounter instance has a disease-positive flag. */
   public static boolean isDiseasePositive(UkbEncounter encounter) {
     return encounter.hasExtension(POSITIVE_RESULT.getValue());
   }
@@ -81,49 +81,41 @@ public class EncounterFilter {
         .collect(Collectors.toSet());
   }
 
-  /**
-   * Filters a list of encounters to return only those associated with patients who are 19 years old
-   * or younger at the time of the encounter.
-   *
-   * <p>This method uses the birthdays of patients to calculate their age based on the encounter
-   * start date. If a patient's birthday is not available, the encounter will not be included in the
-   * returned list.
-   *
-   * @param encounters The list of encounters to filter.
-   * @param patients The list of patients whose birthdays are necessary.
-   * @param upperAgeBorder Upper age border (including)
-   * @return A list of encounters where the patient's age is 19 years or less.
-   */
   public static List<UkbEncounter> filterEncounterByAge(
       List<UkbEncounter> encounters, List<UkbPatient> patients, int upperAgeBorder) {
 
-    // Generate a key value map for the patients for fast access in the encounter loop
+    // Create a map for quick patient lookup, only including patients with a birthdate
     Map<String, UkbPatient> patientMap =
         patients.stream()
             .filter(UkbPatient::hasBirthDate)
             .collect(Collectors.toMap(UkbPatient::getId, patient -> patient));
 
-    // Filter encounters by age
+    // Filter encounters based on patient age
     return encounters.parallelStream()
         .filter(
             encounter -> {
-              // Find patient by ID
               UkbPatient patient = patientMap.get(encounter.getPatientId());
-              Date birthDate = patient.hasBirthDate() ? patient.getBirthDate() : null;
-
-              if (birthDate != null) {
-                int age =
-                    DateTools.calcYearsBetweenDates(encounter.getPeriod().getStart(), birthDate);
-                log.trace(
-                    "Age of {} and admission date {} is: {}",
-                    encounter.getId(),
-                    encounter.getPeriod().getStart(),
-                    age);
-                return age <= upperAgeBorder;
-              } else {
-                log.warn("No birthdate found for patient {}", patient.getId());
+              if (patient == null) {
+                log.warn("No patient found for encounter ID {}", encounter.getId());
+                return false;
               }
-              return false;
+              Date birthDate = patient.getBirthDate();
+              if (birthDate == null) {
+                log.warn(
+                    "Patient ID {} has no birth date, skipping encounter {}",
+                    patient.getId(),
+                    encounter.getId());
+                return false;
+              }
+              int age =
+                  DateTools.calcYearsBetweenDates(encounter.getPeriod().getStart(), birthDate);
+              log.trace(
+                  "Encounter ID {}: Patient age on {} is {}",
+                  encounter.getId(),
+                  encounter.getPeriod().getStart(),
+                  age);
+
+              return age <= upperAgeBorder;
             })
         .collect(Collectors.toList());
   }
@@ -151,16 +143,61 @@ public class EncounterFilter {
     return coreCaseDataByEncounterIdMap.get(encounter.getId()).getAgeAtAdmission() < upperAgeBorder;
   }
 
+  /**
+   * Filters the list of {@code UkbEncounter} objects to return only inpatient facility encounters.
+   *
+   * <p>An encounter is considered an inpatient facility encounter if it meets the following
+   * criteria:
+   *
+   * <ul>
+   *   <li>It is a facility contact ({@code isFacilityContact()} returns {@code true}).
+   *   <li>It is not an outpatient case ({@code isCaseClassOutpatient()} returns {@code false}).
+   *   <li>It is not semi-stationary ({@code isSemiStationary()} returns {@code false}).
+   * </ul>
+   *
+   * Additionally, the method adds a positive extension to each selected encounter.
+   *
+   * @param ukbEncounters the list of encounters to filter
+   * @return a list of inpatient facility encounters with the positive extension applied
+   */
   public static List<UkbEncounter> getInpatientFacilityEncounters(
       List<UkbEncounter> ukbEncounters) {
     return ukbEncounters.parallelStream()
         .filter(UkbEncounter::isFacilityContact)
-        .filter(x -> !x.isCaseClassOutpatient())
-        .filter(x -> !x.isSemiStationary())
-        .peek(
-            x ->
-                x.addExtension(
-                    POSITIVE_EXTENSION)) // Add an extension to be able to use former methods
-        .toList();
+        .filter(EncounterFilter::isNotOutpatient)
+        .filter(EncounterFilter::isNotSemiStationary)
+        .map(EncounterFilter::addPositiveExtension)
+        .collect(Collectors.toList());
+  }
+
+  /**
+   * Checks whether an encounter is not classified as an outpatient case.
+   *
+   * @param encounter the encounter to check
+   * @return {@code true} if the encounter is not an outpatient case, otherwise {@code false}
+   */
+  private static boolean isNotOutpatient(UkbEncounter encounter) {
+    return !encounter.isCaseClassOutpatient();
+  }
+
+  /**
+   * Checks whether an encounter is not semi-stationary.
+   *
+   * @param encounter the encounter to check
+   * @return {@code true} if the encounter is not semi-stationary, otherwise {@code false}
+   */
+  private static boolean isNotSemiStationary(UkbEncounter encounter) {
+    return !encounter.isSemiStationary();
+  }
+
+  /**
+   * Adds a positive extension to the given encounter.
+   *
+   * @param encounter the encounter to modify
+   * @return the modified encounter with the positive extension added
+   */
+  private static UkbEncounter addPositiveExtension(UkbEncounter encounter) {
+    encounter.addExtension(POSITIVE_EXTENSION);
+    return encounter;
   }
 }

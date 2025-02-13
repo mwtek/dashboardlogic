@@ -24,7 +24,6 @@ import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.ICU_VENTILATI
 import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.NORMAL_WARD;
 import static de.ukbonn.mwtek.dashboardlogic.tools.EncounterFilter.getPositiveCurrentlyOnIcuWardEncounters;
 import static de.ukbonn.mwtek.utilities.enums.TerminologySystems.SNOMED;
-import static de.ukbonn.mwtek.utilities.fhir.misc.FhirCodingTools.getCodeOfFirstCoding;
 
 import de.ukbonn.mwtek.dashboardlogic.DashboardDataItemLogic;
 import de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels;
@@ -35,13 +34,11 @@ import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbLocation;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbProcedure;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
-import org.hl7.fhir.r4.model.Procedure.ProcedureStatus;
 
 /**
  * This class is used for generating the data item {@link DiseaseDataItem current.treatmentlevel}.
@@ -56,8 +53,8 @@ public class CurrentTreatmentLevel extends DashboardDataItemLogic {
    * This method is used to calculate the current treatment level for the icu encounters, used in
    * the data item 'current.treatmentlevel'.
    *
-   * @param mapCurrentIcu A list of all current inpatient c19-positive cases separated by treatment
-   *     level.
+   * @param mapCurrentIcu A list of all current inpatient disease-positive cases separated by
+   *     treatment level.
    * @param icuTreatmentLevel The icu treatment level for which the encounter is to be retrieved
    *     (e.g. {@link TreatmentLevels#ICU}).
    * @return Returns a list of ongoing icu encounter.
@@ -164,64 +161,6 @@ public class CurrentTreatmentLevel extends DashboardDataItemLogic {
   }
 
   /**
-   * Filters encounters from a given level that are not present in provided higher level encounter
-   * lists.
-   *
-   * @param encounters The set of encounters to filter.
-   * @param higherLevel1 The list of encounters from the first higher treatment level.
-   * @param higherLevel2 The list of encounters from the second higher treatment level.
-   * @return A list of encounters that are not present in the higher level encounter lists.
-   */
-  private List<UkbEncounter> filterEncountersNotInHigherLevels(
-      Set<UkbEncounter> encounters,
-      List<UkbEncounter> higherLevel1,
-      List<UkbEncounter> higherLevel2) {
-    return encounters.stream()
-        .filter(
-            encounter ->
-                !higherLevel1.contains(encounter)
-                    && (higherLevel2.isEmpty() || !higherLevel2.contains(encounter)))
-        .collect(Collectors.toList());
-  }
-
-  /**
-   * Filters encounters from a given level that are actively receiving a specific procedure based on
-   * provided codes.
-   *
-   * @param encounters The set of encounters to filter.
-   * @param procedureCodes A list of procedure codes to identify active procedures.
-   * @return A list of encounters with active procedures (based on codes) that are not present in
-   *     the higher level list.
-   */
-  private Set<UkbEncounter> filterActiveEncountersWithProcedure(
-      Set<UkbEncounter> encounters, List<UkbProcedure> icuProcedures, List<String> procedureCodes) {
-    return encounters.stream()
-        .filter(encounter -> hasActiveIcuProcedure(icuProcedures, encounter, procedureCodes))
-        .collect(Collectors.toSet());
-  }
-
-  /**
-   * Simple check whether the icu procedure is ongoing or already finished
-   *
-   * @param listIcu The procedures which contain information on whether they are ventilation or
-   *     ecmo.
-   * @param encounter The Encounter to be inspected.
-   * @param procedureCodes The procedure code(s) that is/are going to be checked.
-   * @return true or false whether the ventilation or ecmo procedure is still ongoing or not.
-   */
-  private static boolean hasActiveIcuProcedure(
-      List<UkbProcedure> listIcu, UkbEncounter encounter, List<String> procedureCodes) {
-    List<UkbProcedure> proceduresCurrentEncounter =
-        listIcu.stream()
-            .filter(x -> x.getCaseId().equals(encounter.getId()))
-            .filter(x -> x.hasStatus() && x.getStatus().equals(ProcedureStatus.INPROGRESS))
-            .filter(x -> x.hasCode() && x.getCode().hasCoding())
-            .filter(x -> procedureCodes.contains(getCodeOfFirstCoding(x.getCode().getCoding())))
-            .toList();
-    return !proceduresCurrentEncounter.isEmpty();
-  }
-
-  /**
    * Creates a map that associates each treatment level with a list of case numbers. This map is
    * useful for debugging purposes and internal reports at the UKB.
    *
@@ -242,34 +181,24 @@ public class CurrentTreatmentLevel extends DashboardDataItemLogic {
       List<UkbEncounter> ecmoEncounters) {
 
     // Lists to store case numbers for different treatment levels
-    List<String> stationaryCaseNrs = new ArrayList<>();
-    List<String> icuCaseNrs = new ArrayList<>();
-    List<String> ventCaseNrs = new ArrayList<>();
-    List<String> ecmoCaseNrs = new ArrayList<>();
+    List<String> stationaryCaseNrs =
+        standardWardEncounters.stream()
+            .filter(
+                encounter ->
+                    encounter.isCaseClassInpatient()
+                        && encounter.hasExtension(POSITIVE_RESULT.getValue()))
+            .map(UkbEncounter::getId)
+            .toList();
+
+    List<String> icuCaseNrs = icuEncounters.stream().map(UkbEncounter::getId).toList();
+    List<String> ventCaseNrs = ventEncounters.stream().map(UkbEncounter::getId).toList();
+    List<String> ecmoCaseNrs = ecmoEncounters.stream().map(UkbEncounter::getId).toList();
 
     // Result map to connect treatment levels with case numbers
-    Map<String, List<String>> resultCurrentTreatmentCaseNrs = new LinkedHashMap<>();
-
-    // Creating a list with the subset for all positive stationary (needed in age calculations)
-    standardWardEncounters.forEach(
-        encounter -> {
-          if (encounter.isCaseClassInpatient()
-              && encounter.hasExtension(POSITIVE_RESULT.getValue())) {
-            stationaryCaseNrs.add(encounter.getId());
-          }
-        });
-
-    // Adding case numbers to the respective lists for each treatment level
-    icuEncounters.forEach(encounter -> icuCaseNrs.add(encounter.getId()));
-    ventEncounters.forEach(encounter -> ventCaseNrs.add(encounter.getId()));
-    ecmoEncounters.forEach(encounter -> ecmoCaseNrs.add(encounter.getId()));
-
-    // Putting lists into the result map with treatment levels as keys
-    resultCurrentTreatmentCaseNrs.put(NORMAL_WARD.getValue(), stationaryCaseNrs);
-    resultCurrentTreatmentCaseNrs.put(ICU.getValue(), icuCaseNrs);
-    resultCurrentTreatmentCaseNrs.put(ICU_VENTILATION.getValue(), ventCaseNrs);
-    resultCurrentTreatmentCaseNrs.put(ICU_ECMO.getValue(), ecmoCaseNrs);
-
-    return resultCurrentTreatmentCaseNrs;
+    return Map.of(
+        NORMAL_WARD.getValue(), stationaryCaseNrs,
+        ICU.getValue(), icuCaseNrs,
+        ICU_VENTILATION.getValue(), ventCaseNrs,
+        ICU_ECMO.getValue(), ecmoCaseNrs);
   }
 }

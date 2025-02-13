@@ -187,11 +187,11 @@ public class KidsRadarDataItemGenerator extends DataItemGenerator {
             facilityContactsFilteredByAge, // no merging for rsv patients
             patientsFiltered,
             inputCodeSettings.getKidsRadarConditionRsvIcdCodes());
-    // Merge these lists for overall patient filterings
+    // Merge these lists for overall patient filtering
     Map<String, CoreCaseData> coreCaseDataAll =
         mergeCoreCaseDataLists(coreCaseDataByKjpDiagnosis, coreCaseDataByRsvDiagnosis);
 
-    // Now the 18+ admissions are unnecessary anymore, so we filter them
+    // Now the 18+ admissions aren't necessary anymore, so we filter them
     int patientSizeBefore = patientsFiltered.size();
     patientsFiltered = removeEntriesByAge(coreCaseDataAll, patientsFiltered);
     log.debug(

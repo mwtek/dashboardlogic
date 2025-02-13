@@ -31,6 +31,7 @@ import de.ukbonn.mwtek.utilities.generic.time.DateTools;
 import de.ukbonn.mwtek.utilities.generic.time.TimerTools;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -60,6 +61,14 @@ public class CumulativeLengthOfStayHospital extends DashboardDataItemLogic {
   public static Map<String, Map<Long, Set<String>>> createMapDaysHospitalList(
       List<UkbEncounter> facilityEncounters) {
     log.debug("started createMapDaysHospitalList");
+    // If there are no location resources existing, it's impossible to calculate icu stay lengths
+    if (facilityEncounters == null) {
+      log.warn(
+          "No facility contact encounters provided. Unable to proceed with the "
+              + "generation of the hospital length of stay list.");
+      return Collections.emptyMap();
+    }
+
     Instant startTimer = TimerTools.startTimer();
     // Filter encounters to include only inpatient cases with positive disease status
     Map<String, Map<Long, Set<String>>> mapResult =
@@ -75,10 +84,19 @@ public class CumulativeLengthOfStayHospital extends DashboardDataItemLogic {
                     Collectors.groupingBy(
                         e -> {
                           // Calculate the number of days of the encounter
-                          return DateTools.calcLengthOfStayBetweenDates(
-                              e.getPeriod().getStart(), e.getPeriod().getEnd());
+                          long daysBetween =
+                              DateTools.calcLengthOfStayBetweenDates(
+                                  e.getPeriod().getStart(), e.getPeriod().getEnd());
+                          if (daysBetween < 0) {
+                            log.warn(
+                                "Encounter with id {} got negative length of stay [{} days]",
+                                e.getId(),
+                                daysBetween);
+                          }
+                          return daysBetween;
                         },
                         Collectors.mapping(UkbEncounter::getId, Collectors.toSet()))));
+
     // Stop the timer and log the finish message
     TimerTools.stopTimerAndLog(startTimer, "finished createMapDaysHospitalList");
     return mapResult;

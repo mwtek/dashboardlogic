@@ -34,6 +34,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -69,9 +70,16 @@ public class CumulativeLengthOfStayIcu extends DashboardDataItemLogic {
     log.debug("started createIcuLengthOfStayList");
     Instant startTimer = TimerTools.startTimer();
     Map<String, Map<Long, Set<String>>> mapResult = new HashMap<>();
-    // If there are no location resources existing, its impossible to calculate icu stay lengths
+    // If there are no location resources existing, it's impossible to calculate icu stay lengths
     if (locations == null) {
-      return null;
+      log.warn("No locations provided, cannot calculate ICU stay lengths");
+      return Collections.emptyMap();
+    }
+    if (icuSupplyContactEncounters == null) {
+      log.warn(
+          "No ICU supply contact encounters provided. Unable to proceed with icu "
+              + "length of stays list generation.");
+      return Collections.emptyMap();
     }
 
     // Determination of the location IDs of all intensive care units. Only the wards are considered,

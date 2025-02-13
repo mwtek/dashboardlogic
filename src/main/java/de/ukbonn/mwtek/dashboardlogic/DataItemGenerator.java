@@ -201,7 +201,8 @@ public class DataItemGenerator {
       Map<String, Boolean> mapExcludeDataItems,
       Boolean debug,
       VariantSettings variantSettings,
-      InputCodeSettings inputCodeSettings, QualitativeLabCodesSettings qualitativeLabCodesSettings,
+      InputCodeSettings inputCodeSettings,
+      QualitativeLabCodesSettings qualitativeLabCodesSettings,
       DataItemContext dataItemContext,
       Boolean usePartOfInsteadOfIdentifier) {
     List<DiseaseDataItem> currentDataList = new ArrayList<>();
@@ -260,7 +261,12 @@ public class DataItemGenerator {
     }
     // Marking encounter resources as positive via setting of extensions
     DiseaseDetectionManagement.flagEncounters(
-        encounters, conditions, observations, inputCodeSettings,qualitativeLabCodesSettings, dataItemContext);
+        encounters,
+        conditions,
+        observations,
+        inputCodeSettings,
+        qualitativeLabCodesSettings,
+        dataItemContext);
 
     Map<TreatmentLevels, List<UkbEncounter>> mapPositiveEncounterByClass =
         createEncounterMapByClass(facilityContactEncounters);
@@ -290,7 +296,8 @@ public class DataItemGenerator {
     DashboardData dbData =
         new DashboardData()
             .initializeData(
-                inputCodeSettings,qualitativeLabCodesSettings,
+                inputCodeSettings,
+                qualitativeLabCodesSettings,
                 encounters,
                 patients,
                 observations,
@@ -631,10 +638,9 @@ public class DataItemGenerator {
               cumulativeAgeLabel,
               ITEMTYPE_LIST,
               CumulativeAge.getAgeDistributionsByCaseClass(
-                      dbData.getFacilityContactEncounters(),
-                      dbData.getPatients(),
-                      TreatmentLevels.ALL)
-                  .toArray()));
+                  dbData.getFacilityContactEncounters(),
+                  dbData.getPatients(),
+                  TreatmentLevels.ALL)));
     }
 
     // cumulative.maxtreatmentlevel
@@ -932,8 +938,7 @@ public class DataItemGenerator {
               new DataBuilder()
                   .dbData(dbData)
                   .treatmentLevel(INPATIENT)
-                  .buildAgeDistributionByCaseClass()
-                  .toArray()));
+                  .buildAgeDistributionByCaseClass()));
     }
 
     // cumulative outpatient age
@@ -947,8 +952,7 @@ public class DataItemGenerator {
               new DataBuilder()
                   .dbData(dbData)
                   .treatmentLevel(OUTPATIENT)
-                  .buildAgeDistributionByCaseClass()
-                  .toArray()));
+                  .buildAgeDistributionByCaseClass()));
     }
 
     // timeline deaths
@@ -1025,9 +1029,9 @@ public class DataItemGenerator {
     // cumulative.lengthofstay.icu
     String cumulativeLengthOfStayIcuLabel =
         determineLabel(dataItemContext, CUMULATIVE_LENGTHOFSTAY_ICU);
+    Map<String, Map<Long, Set<String>>> mapIcuLengthList =
+        createIcuLengthOfStayList(icuSupplyContactEncounters, dbData.getLocations());
     if (isItemNotExcluded(mapExcludeDataItems, cumulativeLengthOfStayIcuLabel, false)) {
-      Map<String, Map<Long, Set<String>>> mapIcuLengthList =
-          createIcuLengthOfStayList(icuSupplyContactEncounters, dbData.getLocations());
       createCumulativeLengthOfStayIcuData(
           cumulativeLengthOfStayIcuLabel,
           mapIcuDiseasePositiveOverall,
@@ -1035,40 +1039,39 @@ public class DataItemGenerator {
           null,
           currentDataList,
           mapIcuLengthList);
+    }
+    // list with all lengths of icu stays (in h)
+    String cumulativeLengthOfStayIcuAliveLabel =
+        determineLabel(dataItemContext, CUMULATIVE_LENGTHOFSTAY_ICU_ALIVE);
+    if (isItemNotExcluded(mapExcludeDataItems, cumulativeLengthOfStayIcuAliveLabel, false)) {
+      createCumulativeLengthOfStayIcuData(
+          cumulativeLengthOfStayIcuAliveLabel,
+          mapIcuDiseasePositiveOverall,
+          debug,
+          ALIVE,
+          currentDataList,
+          mapIcuLengthList);
+    }
 
-      // list with all lengths of icu stays (in h)
-      String cumulativeLengthOfStayIcuAliveLabel =
-          determineLabel(dataItemContext, CUMULATIVE_LENGTHOFSTAY_ICU_ALIVE);
-      if (isItemNotExcluded(mapExcludeDataItems, cumulativeLengthOfStayIcuAliveLabel, false)) {
-        createCumulativeLengthOfStayIcuData(
-            cumulativeLengthOfStayIcuAliveLabel,
-            mapIcuDiseasePositiveOverall,
-            debug,
-            ALIVE,
-            currentDataList,
-            mapIcuLengthList);
-      }
-
-      // list with all lengths of icu stays (in h)
-      String cumulativeLengthOfStayIcuDeadLabel =
-          determineLabel(dataItemContext, CUMULATIVE_LENGTHOFSTAY_ICU_DEAD);
-      if (isItemNotExcluded(mapExcludeDataItems, cumulativeLengthOfStayIcuDeadLabel, false)) {
-        createCumulativeLengthOfStayIcuData(
-            cumulativeLengthOfStayIcuDeadLabel,
-            mapIcuDiseasePositiveOverall,
-            debug,
-            DEAD,
-            currentDataList,
-            mapIcuLengthList);
-      }
+    // list with all lengths of icu stays (in h)
+    String cumulativeLengthOfStayIcuDeadLabel =
+        determineLabel(dataItemContext, CUMULATIVE_LENGTHOFSTAY_ICU_DEAD);
+    if (isItemNotExcluded(mapExcludeDataItems, cumulativeLengthOfStayIcuDeadLabel, false)) {
+      createCumulativeLengthOfStayIcuData(
+          cumulativeLengthOfStayIcuDeadLabel,
+          mapIcuDiseasePositiveOverall,
+          debug,
+          DEAD,
+          currentDataList,
+          mapIcuLengthList);
     }
 
     // cumulative length of stays
     String cumulativeLengthOfStayHospitalLabel =
         determineLabel(dataItemContext, CUMULATIVE_LENGTHOFSTAY_HOSPITAL);
+    Map<String, Map<Long, Set<String>>> mapDays =
+        createMapDaysHospitalList(dbData.getFacilityContactEncounters());
     if (isItemNotExcluded(mapExcludeDataItems, cumulativeLengthOfStayHospitalLabel, false)) {
-      Map<String, Map<Long, Set<String>>> mapDays =
-          createMapDaysHospitalList(dbData.getFacilityContactEncounters());
       createCumulativeLengthOfStayHospitalData(
           dbData.getFacilityContactEncounters(),
           cumulativeLengthOfStayHospitalLabel,
@@ -1076,30 +1079,30 @@ public class DataItemGenerator {
           debug,
           null,
           currentDataList);
-      // cumulative length of stays ALIVE
-      String cumulativeLengthOfStayHospitalAliveLabel =
-          determineLabel(dataItemContext, CUMULATIVE_LENGTHOFSTAY_HOSPITAL_ALIVE);
-      if (isItemNotExcluded(mapExcludeDataItems, cumulativeLengthOfStayHospitalAliveLabel, false)) {
-        createCumulativeLengthOfStayHospitalData(
-            dbData.getFacilityContactEncounters(),
-            cumulativeLengthOfStayHospitalAliveLabel,
-            mapDays,
-            debug,
-            ALIVE,
-            currentDataList);
-      }
-      // cumulative.lengthofstay.dead
-      String cumulativeLengthOfStayHospitalDeadLabel =
-          determineLabel(dataItemContext, CUMULATIVE_LENGTHOFSTAY_HOSPITAL_DEAD);
-      if (isItemNotExcluded(mapExcludeDataItems, cumulativeLengthOfStayHospitalDeadLabel, false)) {
-        createCumulativeLengthOfStayHospitalData(
-            dbData.getFacilityContactEncounters(),
-            cumulativeLengthOfStayHospitalDeadLabel,
-            mapDays,
-            debug,
-            DEAD,
-            currentDataList);
-      }
+    }
+    // cumulative length of stays ALIVE
+    String cumulativeLengthOfStayHospitalAliveLabel =
+        determineLabel(dataItemContext, CUMULATIVE_LENGTHOFSTAY_HOSPITAL_ALIVE);
+    if (isItemNotExcluded(mapExcludeDataItems, cumulativeLengthOfStayHospitalAliveLabel, false)) {
+      createCumulativeLengthOfStayHospitalData(
+          dbData.getFacilityContactEncounters(),
+          cumulativeLengthOfStayHospitalAliveLabel,
+          mapDays,
+          debug,
+          ALIVE,
+          currentDataList);
+    }
+    // cumulative.lengthofstay.dead
+    String cumulativeLengthOfStayHospitalDeadLabel =
+        determineLabel(dataItemContext, CUMULATIVE_LENGTHOFSTAY_HOSPITAL_DEAD);
+    if (isItemNotExcluded(mapExcludeDataItems, cumulativeLengthOfStayHospitalDeadLabel, false)) {
+      createCumulativeLengthOfStayHospitalData(
+          dbData.getFacilityContactEncounters(),
+          cumulativeLengthOfStayHospitalDeadLabel,
+          mapDays,
+          debug,
+          DEAD,
+          currentDataList);
     }
 
     // Handling of items that restricted to covid-19 context

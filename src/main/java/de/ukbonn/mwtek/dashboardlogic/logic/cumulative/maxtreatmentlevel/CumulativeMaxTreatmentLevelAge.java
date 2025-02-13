@@ -38,12 +38,14 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -73,103 +75,115 @@ public class CumulativeMaxTreatmentLevelAge extends DashboardDataItemLogic {
       Map<TreatmentLevels, List<UkbEncounter>> mapIcuOverall,
       List<UkbPatient> patients,
       TreatmentLevels treatmentLevel) {
-    log.debug("started createMaxTreatmentLevelAgeMap");
+
+    log.debug("Started createMaxTreatmentLevelAgeMap");
     Instant startTimer = TimerTools.startTimer();
 
-    // Since this method is called more than once and the base lists doesnt change these ones
-    // will get initialized once
-    if (!initialized) {
-      pidAdmissionMap = new ConcurrentHashMap<>();
-      encountersOverall = ConcurrentHashMap.newKeySet();
-      // Reducing the complexity of the records to the pid, since the calculation is done across
-      // cases.
-      outpatientPatientIds = getPatientIds(mapPositiveEncounterByClass, OUTPATIENT);
-      inpatientPatientIds = getPatientIds(mapPositiveEncounterByClass, INPATIENT);
-      icuPatientIds = getPatientIds(mapIcuOverall, ICU);
-      icuVentPatientIds = getPatientIds(mapIcuOverall, ICU_VENTILATION);
-      ecmoPatientIds = getPatientIds(mapIcuOverall, ICU_ECMO);
-
-      encountersOverall.addAll(mapPositiveEncounterByClass.get(OUTPATIENT));
-      encountersOverall.addAll(mapPositiveEncounterByClass.get(INPATIENT));
-      encountersOverall.addAll(mapIcuOverall.get(ICU));
-      encountersOverall.addAll(mapIcuOverall.get(ICU_VENTILATION));
-      encountersOverall.addAll(mapIcuOverall.get(ICU_ECMO));
-
-      encountersOverall.parallelStream()
-          .forEach(
-              encounter -> {
-                // Identify when the positive cases were first recorded.
-                CoronaResultFunctionality.assignFirstAdmissionDateToPid(encounter, pidAdmissionMap);
-              });
-      // Creating a map to index patients by their ID
-      patientMap =
-          patients.stream().collect(Collectors.toMap(UkbPatient::getId, Function.identity()));
-      initialized = true;
-    }
+    initializeIfNeeded(mapPositiveEncounterByClass, mapIcuOverall, patients);
 
     List<Integer> resultList = new ArrayList<>();
 
     for (Map.Entry<String, UkbEncounter> entry : pidAdmissionMap.entrySet()) {
       UkbPatient patient = patientMap.get(entry.getKey());
 
-      // Skip entry if the current patient is not found
       if (patient == null) {
-        log.error("Unable to find patient with ID: " + entry.getKey());
+        log.debug("Skipping unknown patient with ID: " + entry.getKey());
         continue;
       }
 
-      // Skip entry if the patient has no birthdate assigned
       if (!patient.hasBirthDate()) {
-        log.warn("No birthdate found for patient with ID: " + patient.getId());
+        log.warn("No birthdate for patient ID: " + patient.getId());
         continue;
       }
 
       UkbEncounter encounter = entry.getValue();
-      Date validAdmissionDate = encounter.getPeriod().getStart();
+      Date validAdmissionDate =
+          encounter.getPeriod() != null ? encounter.getPeriod().getStart() : null;
 
-      boolean isOutpatient = outpatientPatientIds.contains(patient.getId());
-      boolean isNormal = inpatientPatientIds.contains(patient.getId());
-      boolean isIcu = icuPatientIds.contains(patient.getId());
-      boolean isVent = icuVentPatientIds.contains(patient.getId());
-      boolean isEcmo = ecmoPatientIds.contains(patient.getId());
-
-      boolean higherLevelFound = false;
-      // Figure out if there is a higher treatment level; if so: dont count it to the age chart
-      switch (treatmentLevel) {
-        case OUTPATIENT -> {
-          higherLevelFound = isNormal || isIcu || isVent || isEcmo;
-        }
-        case NORMAL_WARD -> {
-          higherLevelFound = isIcu || isVent || isEcmo;
-        }
-        case ICU -> {
-          higherLevelFound = isVent || isEcmo;
-        }
-        case ICU_VENTILATION -> {
-          higherLevelFound = isEcmo;
-        }
+      if (validAdmissionDate == null) {
+        log.error("No admission date for patient ID: " + patient.getId());
+        continue;
       }
 
-      if (encounter.isPeriodStartExistent()) {
-        // Depending on the treatment level and patient type, add patient's age to resultList
-        if (isOutpatient && treatmentLevel == OUTPATIENT && !higherLevelFound) {
-          addCohortAgeToList(patient, validAdmissionDate, resultList);
-        } else if (isNormal && treatmentLevel == NORMAL_WARD && !higherLevelFound) {
-          addCohortAgeToList(patient, validAdmissionDate, resultList);
-        } else if (isIcu && treatmentLevel == ICU && !higherLevelFound) {
-          addCohortAgeToList(patient, validAdmissionDate, resultList);
-        } else if (isVent && treatmentLevel == ICU_VENTILATION && !higherLevelFound) {
-          addCohortAgeToList(patient, validAdmissionDate, resultList);
-        } else if (isEcmo && treatmentLevel == ICU_ECMO) {
-          addCohortAgeToList(patient, validAdmissionDate, resultList);
-        }
-      } else {
-        log.error("No admission date found for encounter of patient with ID: " + patient.getId());
+      if (!hasHigherTreatmentLevel(patient.getId(), treatmentLevel)) {
+        addPatientIfEligible(patient, validAdmissionDate, resultList, treatmentLevel);
       }
     }
+
     Collections.sort(resultList);
-    TimerTools.stopTimerAndLog(startTimer, "finished createMaxTreatmentLevelAgeMap");
+    TimerTools.stopTimerAndLog(startTimer, "Finished createMaxTreatmentLevelAgeMap");
     return resultList;
+  }
+
+  private void initializeIfNeeded(
+      Map<TreatmentLevels, List<UkbEncounter>> mapPositiveEncounterByClass,
+      Map<TreatmentLevels, List<UkbEncounter>> mapIcuOverall,
+      List<UkbPatient> patients) {
+    if (!initialized) {
+      pidAdmissionMap = new ConcurrentHashMap<>();
+      encountersOverall = new HashSet<>();
+
+      outpatientPatientIds = getPatientIds(mapPositiveEncounterByClass, OUTPATIENT);
+      inpatientPatientIds = getPatientIds(mapPositiveEncounterByClass, INPATIENT);
+      icuPatientIds = getPatientIds(mapIcuOverall, ICU);
+      icuVentPatientIds = getPatientIds(mapIcuOverall, ICU_VENTILATION);
+      ecmoPatientIds = getPatientIds(mapIcuOverall, ICU_ECMO);
+
+      Stream.of(
+              mapPositiveEncounterByClass.getOrDefault(OUTPATIENT, Collections.emptyList()),
+              mapPositiveEncounterByClass.getOrDefault(INPATIENT, Collections.emptyList()),
+              mapIcuOverall.getOrDefault(ICU, Collections.emptyList()),
+              mapIcuOverall.getOrDefault(ICU_VENTILATION, Collections.emptyList()),
+              mapIcuOverall.getOrDefault(ICU_ECMO, Collections.emptyList()))
+          .forEach(encountersOverall::addAll);
+
+      encountersOverall.forEach(
+          encounter ->
+              CoronaResultFunctionality.assignFirstAdmissionDateToPid(encounter, pidAdmissionMap));
+
+      patientMap =
+          patients.stream().collect(Collectors.toMap(UkbPatient::getId, Function.identity()));
+      initialized = true;
+    }
+  }
+
+  private boolean hasHigherTreatmentLevel(String patientId, TreatmentLevels level) {
+    return switch (level) {
+      case OUTPATIENT ->
+          inpatientPatientIds.contains(patientId)
+              || icuPatientIds.contains(patientId)
+              || icuVentPatientIds.contains(patientId)
+              || ecmoPatientIds.contains(patientId);
+      case NORMAL_WARD ->
+          icuPatientIds.contains(patientId)
+              || icuVentPatientIds.contains(patientId)
+              || ecmoPatientIds.contains(patientId);
+      case ICU -> icuVentPatientIds.contains(patientId) || ecmoPatientIds.contains(patientId);
+      case ICU_VENTILATION -> ecmoPatientIds.contains(patientId);
+      default -> false;
+    };
+  }
+
+  // 5. Kapselung der Patientenprüfung in eine eigene Methode
+  private void addPatientIfEligible(
+      UkbPatient patient,
+      Date admissionDate,
+      List<Integer> resultList,
+      TreatmentLevels treatmentLevel) {
+    boolean isEligible =
+        switch (treatmentLevel) {
+          case INPATIENT -> false;
+          case OUTPATIENT -> outpatientPatientIds.contains(patient.getId());
+          case NORMAL_WARD -> inpatientPatientIds.contains(patient.getId());
+          case ICU -> icuPatientIds.contains(patient.getId());
+          case ICU_VENTILATION -> icuVentPatientIds.contains(patient.getId());
+          case ICU_ECMO -> ecmoPatientIds.contains(patient.getId());
+          case ALL -> false;
+        };
+
+    if (isEligible) {
+      addCohortAgeToList(patient, admissionDate, resultList);
+    }
   }
 
   private static Set<String> getPatientIds(
@@ -180,13 +194,15 @@ public class CumulativeMaxTreatmentLevelAge extends DashboardDataItemLogic {
         .collect(Collectors.toSet());
   }
 
-  private void addCohortAgeToList(
+  private Integer addCohortAgeToList(
       UkbPatient patient, Date validAdmissionDate, List<Integer> resultList) {
     if (patient.hasBirthDate()) {
       int age = calculateAge(patient.getBirthDate(), validAdmissionDate);
       resultList.add(checkAgeGroup(age));
+      return age;
     } else {
       log.warn("Could not find a birthday in the resource of patient " + patient.getId());
     }
+    return null;
   }
 }

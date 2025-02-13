@@ -91,7 +91,7 @@ public class KiraLengthOfStay extends DashboardDataItemLogic implements Timeline
                     if (daysBetween > 1) {
                       lengthOfStaysByScope.add(daysBetween);
                       // Print information about the length of stay
-                      log.debug(
+                      log.trace(
                           "{} days between discharge + admission {} [pid: {}] on scope: {}",
                           daysBetween,
                           dataItem.getFacilityEncounterId(),

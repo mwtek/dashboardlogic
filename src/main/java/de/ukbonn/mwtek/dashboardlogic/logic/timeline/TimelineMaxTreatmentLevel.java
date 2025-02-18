@@ -151,16 +151,17 @@ public class TimelineMaxTreatmentLevel extends DashboardDataItemLogic
                             + DAY_IN_SECONDS
                         >= checkDate)
             .forEach(
-                encounter -> {
-                  //              String encounterId = encounter.getId();
-                  String patientId = encounter.getPatientId();
+                supplyContactEncounter -> {
+                  //              String encounterId = supplyContactEncounter.getId();
+                  String patientId = supplyContactEncounter.getPatientId();
                   // Since a case should just count once a day and the procedure usually references
                   // the facility contact, we need to look via top level resource
-                  String facilityContactId = encounter.getFacilityContactId();
+                  String facilityContactId = supplyContactEncounter.getFacilityContactId();
 
                   // Prevent multiple cases of a patient from being processed at the same time
                   locks.putIfAbsent(patientId, new Object());
-                  long caseStartUnix = DateTools.dateToUnixTime(encounter.getPeriod().getStart());
+                  long caseStartUnix =
+                      DateTools.dateToUnixTime(supplyContactEncounter.getPeriod().getStart());
 
                   synchronized (locks.computeIfAbsent(patientId, k -> new Object())) {
                     boolean isNormalWard =
@@ -171,7 +172,7 @@ public class TimelineMaxTreatmentLevel extends DashboardDataItemLogic
                     boolean isEcmo = mapPrevMaxtreatmentlevel.get(ICU_ECMO).contains(patientId);
                     // if the case is ambulant, check the pids of the previous maxtreatmentlevels
                     // and if none are similar with the current case than note the case as ambulant
-                    if (encounter.isCaseClassOutpatient()) {
+                    if (supplyContactEncounter.isCaseClassOutpatient()) {
 
                       List<String> listMaxStatPidCheck = new ArrayList<>();
                       List<String> listMaxIcuPidCheck = new ArrayList<>();
@@ -195,7 +196,8 @@ public class TimelineMaxTreatmentLevel extends DashboardDataItemLogic
                         listMaxIcuEcmoPidCheck.add(patientId);
                       }
 
-                      // list containing every encounter with a currently higher treatmentlevel than
+                      // list containing every supplyContactEncounter with a currently higher
+                      // treatmentlevel than
                       // 'outpatient'.
                       List<String> listHigherTreatment = new ArrayList<>();
                       listHigherTreatment.addAll(listMaxStatPidCheck);
@@ -211,18 +213,19 @@ public class TimelineMaxTreatmentLevel extends DashboardDataItemLogic
                         }
                       }
                     }
-                    // At this stage it is clear that it is a stationary encounter
-                    else if (encounter.isCaseClassInpatient()) {
-                      if (!encounter.getPeriod().hasEnd()) {
-                        encounter.getPeriod().setEnd(DateTools.getCurrentDateTime());
+                    // At this stage it is clear that it is a stationary supplyContactEncounter
+                    else if (supplyContactEncounter.isCaseClassInpatient()) {
+                      if (!supplyContactEncounter.getPeriod().hasEnd()) {
+                        supplyContactEncounter.getPeriod().setEnd(DateTools.getCurrentDateTime());
                       }
-                      long caseEndUnix = DateTools.dateToUnixTime(encounter.getPeriod().getEnd());
+                      long caseEndUnix =
+                          DateTools.dateToUnixTime(supplyContactEncounter.getPeriod().getEnd());
                       // The admission date needs to be before the start date and the discharge date
                       // needs to be after the date that is going to be checked to get the whole
                       // time span
                       if (caseStartUnix < checkDate && caseEndUnix >= checkDate) {
                         List<Encounter.EncounterLocationComponent> listEncounterHasIcuLocation =
-                            encounter.getLocation().stream()
+                            supplyContactEncounter.getLocation().stream()
                                 .filter(DiseaseResultFunctionality::isLocationReferenceExisting)
                                 .filter(
                                     location ->
@@ -246,19 +249,17 @@ public class TimelineMaxTreatmentLevel extends DashboardDataItemLogic
                             if (listEncounterIcuProcedure.isEmpty()) {
                               encounterStationTypeCheckProcess(
                                   listEncounterHasIcuLocation,
+                                  supplyContactEncounter,
                                   checkDate,
                                   mapPrevMaxtreatmentlevel,
                                   mapNormalWardCaseNrs,
-                                  mapIcuCaseNrs,
-                                  facilityContactId,
-                                  patientId);
+                                  mapIcuCaseNrs);
                             } else {
                               // check and sort if it is a ventilation or ecmo case
                               sortToVentOrEcmoTimeline(
+                                  supplyContactEncounter,
                                   listEncounterIcuProcedure,
                                   listEncounterHasIcuLocation,
-                                  facilityContactId,
-                                  patientId,
                                   false,
                                   false,
                                   checkDate,
@@ -283,10 +284,9 @@ public class TimelineMaxTreatmentLevel extends DashboardDataItemLogic
                             mapPrevMaxtreatmentlevel.get(ICU).add(patientId);
                           } else {
                             sortToVentOrEcmoTimeline(
+                                supplyContactEncounter,
                                 listEncounterIcuProcedure,
                                 listEncounterHasIcuLocation,
-                                facilityContactId,
-                                patientId,
                                 false,
                                 false,
                                 checkDate,
@@ -305,10 +305,9 @@ public class TimelineMaxTreatmentLevel extends DashboardDataItemLogic
                                   .filter(icu -> facilityContactId.equals(icu.getCaseId()))
                                   .toList();
                           sortToVentOrEcmoTimeline(
+                              supplyContactEncounter,
                               listEncounterIcuProcedure,
                               listEncounterHasIcuLocation,
-                              facilityContactId,
-                              patientId,
                               true,
                               false,
                               checkDate,
@@ -326,7 +325,7 @@ public class TimelineMaxTreatmentLevel extends DashboardDataItemLogic
                         }
                       } // if date check
                     } // else if Stationary check
-                  } // for loop of positive encounter
+                  } // for loop of positive supplyContactEncounter
                 });
       } catch (Exception ex) {
         log.error("Creation of the max treatmentlevel timeline failed.", ex);
@@ -349,7 +348,6 @@ public class TimelineMaxTreatmentLevel extends DashboardDataItemLogic
    * @param listEncounterIcuProcedures The {@link UkbProcedure} resources, which include information
    *     about ECMO / artificial ventilation periods.
    * @param listEncounterHasIcuLocation List containing all icu locations of an encounter.
-   * @param caseId The id of the Encounter that is supposed to be checked.
    * @param isVent Check if the encounter has any ventilation-related resources attached to it.
    * @param isEcmo Check if the encounter has any ecmo related resources attached to it.
    * @param checkedDate The date [unix time] that is going to be checked.
@@ -363,10 +361,9 @@ public class TimelineMaxTreatmentLevel extends DashboardDataItemLogic
    * @param mapPrevMaxtreatmentlevel A map with the previous maxtreatmentlevel of an encounter.
    */
   private static void sortToVentOrEcmoTimeline(
+      UkbEncounter supplyContactEncounter,
       List<UkbProcedure> listEncounterIcuProcedures,
       List<EncounterLocationComponent> listEncounterHasIcuLocation,
-      String caseId,
-      String casePid,
       Boolean isVent,
       Boolean isEcmo,
       Long checkedDate,
@@ -393,8 +390,8 @@ public class TimelineMaxTreatmentLevel extends DashboardDataItemLogic
                     mapPrevMaxtreatmentlevel,
                     mapIcuVentCaseNrs,
                     procedureCode,
-                    caseId,
-                    casePid,
+                    supplyContactEncounter.getFacilityContactId(),
+                    supplyContactEncounter.getPatientId(),
                     checkedDate,
                     inputCodeSettings);
             isEcmo =
@@ -402,8 +399,8 @@ public class TimelineMaxTreatmentLevel extends DashboardDataItemLogic
                     mapPrevMaxtreatmentlevel,
                     mapIcuEcmoCaseNrs,
                     procedureCode,
-                    caseId,
-                    casePid,
+                    supplyContactEncounter.getFacilityContactId(),
+                    supplyContactEncounter.getPatientId(),
                     checkedDate,
                     inputCodeSettings);
           }
@@ -417,8 +414,8 @@ public class TimelineMaxTreatmentLevel extends DashboardDataItemLogic
                       mapPrevMaxtreatmentlevel,
                       mapIcuVentCaseNrs,
                       procedureCode,
-                      caseId,
-                      casePid,
+                      supplyContactEncounter.getFacilityContactId(),
+                      supplyContactEncounter.getPatientId(),
                       checkedDate,
                       inputCodeSettings);
               isEcmo =
@@ -426,8 +423,8 @@ public class TimelineMaxTreatmentLevel extends DashboardDataItemLogic
                       mapPrevMaxtreatmentlevel,
                       mapIcuEcmoCaseNrs,
                       procedureCode,
-                      caseId,
-                      casePid,
+                      supplyContactEncounter.getFacilityContactId(),
+                      supplyContactEncounter.getPatientId(),
                       checkedDate,
                       inputCodeSettings);
             }
@@ -435,11 +432,9 @@ public class TimelineMaxTreatmentLevel extends DashboardDataItemLogic
         }
       } catch (Exception ex) {
         log.debug(
-            "Unable to retrieve the performedPeriod for Procedure: "
-                + procedure.getId()
-                + " ["
-                + ex.getMessage()
-                + "]");
+            "Unable to retrieve the performedPeriod for Procedure: {} [{}]",
+            procedure.getId(),
+            ex.getMessage());
       }
     }
     // check if the case was added, into the map containing the previous maxtreatmentlevels
@@ -447,65 +442,76 @@ public class TimelineMaxTreatmentLevel extends DashboardDataItemLogic
       // if neither ecmo nor vent was found, then check if case is icu or stationary again
       encounterStationTypeCheckProcess(
           listEncounterHasIcuLocation,
+          supplyContactEncounter,
           checkedDate,
           mapPrevMaxtreatmentlevel,
           mapNormalWardCaseNrs,
-          mapIcuCaseNrs,
-          caseId,
-          casePid);
+          mapIcuCaseNrs);
     } else if (!isEcmo) {
       // purpose is to make sure that the maxtreatmentlevels of the case is still marked correctly,
       // even though the time check does not apply anymore.
-      mapIcuVentCaseNrs.get(checkedDate).add(caseId);
-      mapPrevMaxtreatmentlevel.get(ICU_VENTILATION).add(casePid);
+      mapIcuVentCaseNrs.get(checkedDate).add(supplyContactEncounter.getFacilityContactId());
+      mapPrevMaxtreatmentlevel.get(ICU_VENTILATION).add(supplyContactEncounter.getPatientId());
     }
   }
 
   /**
-   * This process is used to determine, whether an encounter, would be seen as an ICU or as a
-   * stationary encounter
+   * This process is used to determine, whether an supplyContactEncounter, would be seen as an ICU
+   * or as a stationary supplyContactEncounter
    *
-   * @param encountersWithIcuLocation Icu locations of an encounter
+   * @param encountersWithIcuLocation Icu locations of an supplyContactEncounter
    * @param checkedDate The current date that is being checked
    * @param mapPrevMaxtreatmentlevel Map containing all previous maxtreatmentlevels up to the
    *     checked date
    * @param mapStationaryCaseNrs Map containing all case ids of stationary cases, sorted by the date
    * @param mapIcuCaseNrs Map containing all case ids of ICU cases, sorted by the date
-   * @param caseId The id of the encounter that is supposed to be checked
-   * @param casePid Patient id of the patient resource attached to the encounter
    */
   private static void encounterStationTypeCheckProcess(
       List<Encounter.EncounterLocationComponent> encountersWithIcuLocation,
+      UkbEncounter supplyContactEncounter,
       Long checkedDate,
       Map<TreatmentLevels, Set<String>> mapPrevMaxtreatmentlevel,
       Map<Long, Set<String>> mapStationaryCaseNrs,
-      Map<Long, Set<String>> mapIcuCaseNrs,
-      String caseId,
-      String casePid) {
-    List<Encounter.EncounterLocationComponent> listCheckDateLocation = new ArrayList<>();
+      Map<Long, Set<String>> mapIcuCaseNrs) {
+    boolean isInIcu = false;
+
     // iterate through the icu locations
     for (Encounter.EncounterLocationComponent location : encountersWithIcuLocation) {
-      // If there is no start existent, just skip the check
-      if (!location.getPeriod().hasStart()) {
-        return;
+      Period period = getValidPeriod(location, supplyContactEncounter);
+
+      // If there is no valid start date, skip this location
+      if (period == null || !period.hasStart()) {
+        log.warn("No valid period start found for Encounter: {}", supplyContactEncounter.getId());
+        continue;
       }
-      if (!location.getPeriod().hasEnd()) {
-        location.getPeriod().setEnd(DateTools.getCurrentDateTime());
+      // Ensure period.end is set (fallback to current date if missing)
+      if (!period.hasEnd()) {
+        period.setEnd(DateTools.getCurrentDateTime());
       }
-      long locationDateStartUnix = DateTools.dateToUnixTime(location.getPeriod().getStart());
-      long locationDateEndUnix = DateTools.dateToUnixTime(location.getPeriod().getEnd());
+
+      long locationDateStartUnix = DateTools.dateToUnixTime(period.getStart());
+      long locationDateEndUnix = DateTools.dateToUnixTime(period.getEnd());
       // check if checkedDate fits into the time span of the icu location
       if (locationDateStartUnix < checkedDate && locationDateEndUnix >= checkedDate) {
-        listCheckDateLocation.add(location);
+        isInIcu = true;
+        break;
       }
     }
-    // if not currently in icu, then it is still a StationWard case
-    if (listCheckDateLocation.isEmpty()) {
-      mapStationaryCaseNrs.get(checkedDate).add(caseId);
-      mapPrevMaxtreatmentlevel.get(NORMAL_WARD).add(casePid);
+    // If not currently in ICU, assign to normal ward
+    if (isInIcu) {
+      mapIcuCaseNrs
+          .computeIfAbsent(checkedDate, k -> new HashSet<>())
+          .add(supplyContactEncounter.getFacilityContactId());
+      mapPrevMaxtreatmentlevel
+          .computeIfAbsent(TreatmentLevels.ICU, k -> new HashSet<>())
+          .add(supplyContactEncounter.getPatientId());
     } else {
-      mapIcuCaseNrs.get(checkedDate).add(caseId);
-      mapPrevMaxtreatmentlevel.get(ICU).add(casePid);
+      mapStationaryCaseNrs
+          .computeIfAbsent(checkedDate, k -> new HashSet<>())
+          .add(supplyContactEncounter.getFacilityContactId());
+      mapPrevMaxtreatmentlevel
+          .computeIfAbsent(TreatmentLevels.NORMAL_WARD, k -> new HashSet<>())
+          .add(supplyContactEncounter.getPatientId());
     }
   }
 

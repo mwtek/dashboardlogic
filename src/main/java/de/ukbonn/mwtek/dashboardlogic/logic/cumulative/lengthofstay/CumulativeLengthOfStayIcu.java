@@ -33,15 +33,16 @@ import de.ukbonn.mwtek.utilities.generic.time.TimerTools;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.hl7.fhir.r4.model.Encounter;
+import org.hl7.fhir.r4.model.Period;
 
 /**
  * This class is used for generating the data items {@link DiseaseDataItem
@@ -67,81 +68,77 @@ public class CumulativeLengthOfStayIcu extends DashboardDataItemLogic {
   public static Map<String, Map<Long, Set<String>>> createIcuLengthOfStayList(
       List<UkbEncounter> icuSupplyContactEncounters, List<UkbLocation> locations) {
 
-    log.debug("started createIcuLengthOfStayList");
+    log.debug("Started createIcuLengthOfStayList");
     Instant startTimer = TimerTools.startTimer();
-    Map<String, Map<Long, Set<String>>> mapResult = new HashMap<>();
-    // If there are no location resources existing, it's impossible to calculate icu stay lengths
-    if (locations == null) {
-      log.warn("No locations provided, cannot calculate ICU stay lengths");
-      return Collections.emptyMap();
-    }
-    if (icuSupplyContactEncounters == null) {
-      log.warn(
-          "No ICU supply contact encounters provided. Unable to proceed with icu "
-              + "length of stays list generation.");
+
+    // If locations or ICU encounters are missing, return an empty map
+    if (locations == null || icuSupplyContactEncounters == null) {
+      log.warn("Missing data: Locations or ICU encounters are null.");
       return Collections.emptyMap();
     }
 
-    // Determination of the location IDs of all intensive care units. Only the wards are considered,
-    // since in the location components within an Encounter resource, at best ward/room and bed are
-    // listed with identical time periods and the stay should only be evaluated once. The highest of
-    // these hierarchy levels should be sufficient.
+    // Get all ICU location IDs
     Set<String> icuLocationIds = LocationFilter.getIcuLocationIds(locations);
 
-    // Just the positive encounters need to be counted
-    List<UkbEncounter> icuSupplyContactEncountersPositive =
-        icuSupplyContactEncounters.parallelStream()
+    // Filter positive encounters and pre-filter ICU locations
+    Map<String, List<Encounter.EncounterLocationComponent>> encounterLocationMap =
+        icuSupplyContactEncounters.stream()
             .filter(EncounterFilter::isDiseasePositive)
-            .toList();
+            .collect(
+                Collectors.toMap(
+                    UkbEncounter::getId,
+                    encounter ->
+                        encounter.getLocation().stream()
+                            .filter(
+                                loc ->
+                                    isLocationReferenceExisting(loc)
+                                        && icuLocationIds.contains(
+                                            extractIdFromReference(loc.getLocation())))
+                            .toList()));
 
-    // iterate through every encounter and calculates amount of time spent in icu
-    for (UkbEncounter encounter : icuSupplyContactEncountersPositive) {
-      Long hours;
+    Map<String, Map<Long, Set<String>>> mapResult = new HashMap<>();
+    boolean anyLocationPeriodMissing = false;
+
+    for (UkbEncounter encounter : icuSupplyContactEncounters) {
       String pid = encounter.getPatientId();
+      List<Encounter.EncounterLocationComponent> icuLocations =
+          encounterLocationMap.get(encounter.getId());
 
-      // get all the locations that are ICU Locations, by comparing the id with the icu location ids
-      List<Encounter.EncounterLocationComponent> icuEncounterLocations = new ArrayList<>();
-      try {
-        for (Encounter.EncounterLocationComponent location : encounter.getLocation()) {
-          if (isLocationReferenceExisting(location)) {
-            if (icuLocationIds.contains(extractIdFromReference(location.getLocation()))) {
-              icuEncounterLocations.add(location);
-            }
-          } else log.warn("Missing location reference for encounter: {}", encounter.getId());
-        }
-      } catch (Exception ex) {
-        log.error("Error in the createIcuLengthOfStayList generation ", ex);
+      if (icuLocations == null || icuLocations.isEmpty()) {
+        continue; // Skip if no valid ICU locations exist for this encounter
       }
-      // go through each Location and calculate the time the spend in ICU
-      for (Encounter.EncounterLocationComponent location : icuEncounterLocations) {
-        if (location.hasPeriod() && location.getPeriod().hasStart()) {
-          LocalDateTime start =
-              location
-                  .getPeriod()
-                  .getStart()
-                  .toInstant()
-                  .atZone(ZoneId.systemDefault())
-                  .toLocalDateTime();
 
-          if (location.getPeriod().hasStart() && location.getPeriod().hasEnd()) {
-            LocalDateTime end =
-                location
-                    .getPeriod()
-                    .getEnd()
-                    .toInstant()
-                    .atZone(ZoneId.systemDefault())
-                    .toLocalDateTime();
-            hours = calculateDaysInBetweenInHours(start, end);
-            addIcuHours(mapResult, pid, hours, encounter);
-          } else if (!location.getPeriod().hasEnd()) {
-            // Calculate with current Date
-            hours = calculateDaysInBetweenInHours(start, LocalDateTime.now());
-            addIcuHours(mapResult, pid, hours, encounter);
-          }
+      for (Encounter.EncounterLocationComponent location : icuLocations) {
+        boolean locationPeriodMissing = !location.hasPeriod();
+        if (locationPeriodMissing) {
+          anyLocationPeriodMissing = true;
         }
+
+        Period period = getValidPeriod(location, encounter);
+        if (period == null || !period.hasStart()) { // ✅ Added check for period.getStart()
+          log.warn("No valid period start found for Encounter: {}", encounter.getId());
+          continue;
+        }
+
+        LocalDateTime start =
+            period.getStart().toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime();
+        LocalDateTime end =
+            period.hasEnd()
+                ? period.getEnd().toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime()
+                : LocalDateTime.now();
+
+        long hours = calculateDaysInBetweenInHours(start, end);
+
+        addIcuHours(mapResult, pid, hours, encounter);
       }
     }
-    TimerTools.stopTimerAndLog(startTimer, "finished createIcuLengthOfStayList");
+
+    if (anyLocationPeriodMissing) {
+      log.info(
+          "At least one encounter.location.period was null, fallback to encounter.period was used instead.");
+    }
+
+    TimerTools.stopTimerAndLog(startTimer, "Finished createIcuLengthOfStayList");
     return mapResult;
   }
 

@@ -22,13 +22,16 @@ import static de.ukbonn.mwtek.dashboardlogic.logic.DiseaseResultFunctionality.ge
 
 import de.ukbonn.mwtek.dashboardlogic.enums.DataItemContext;
 import de.ukbonn.mwtek.dashboardlogic.enums.KidsRadarDataItemContext;
+import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbObservation;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Collection;
 import java.util.Date;
 import java.util.List;
+import org.hl7.fhir.r4.model.Encounter;
 import org.hl7.fhir.r4.model.Observation;
+import org.hl7.fhir.r4.model.Period;
 
 public class DashboardDataItemLogic {
   public static List<UkbObservation> getObservationsYoungerKickoffDate(
@@ -64,5 +67,15 @@ public class DashboardDataItemLogic {
       case RSV -> chartsLabel = RSV_DIAGNOSES_ALL;
     }
     return chartsLabel;
+  }
+
+  /**
+   * Retrieves the valid period for an ICU stay. Prefers {@link UkbEncounter#getLocation()
+   * Encounter.location.period} , but falls back to {@link UkbEncounter#getPeriod()} if {@link
+   * UkbEncounter#getLocation() * Encounter.location.period} is missing.
+   */
+  protected static Period getValidPeriod(
+      Encounter.EncounterLocationComponent location, UkbEncounter encounter) {
+    return location.hasPeriod() ? location.getPeriod() : encounter.getPeriod();
   }
 }

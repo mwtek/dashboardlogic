@@ -176,7 +176,13 @@ public class DiseaseResultFunctionality {
     // Group ICU supply contacts by official identifier value
     Map<String, List<UkbEncounter>> icuSupplyContactsMap =
         icuSupplyContactEncounters.stream()
-            .filter(UkbEncounter::hasIdentifier)
+            .filter(enc -> {
+              boolean hasValue = enc.hasVisitNumberIdentifierValue();
+              if (!hasValue) {
+                log.warn("Encounter {} has no valid visit number identifier", enc.getId());
+              }
+              return hasValue;
+            })
             .collect(Collectors.groupingBy(UkbEncounter::getVisitNumberIdentifierValue));
 
     List<UkbEncounter> facilityContacts =
@@ -186,6 +192,11 @@ public class DiseaseResultFunctionality {
     for (UkbEncounter facilityContact : facilityContacts) {
       try {
         String visitNumber = facilityContact.getVisitNumberIdentifierValue();
+        // Skipping element if visit number is empty
+        if (visitNumber == null) {
+          log.warn("Facility contact {} has no visit number identifier", facilityContact.getId());
+          continue;
+        }
         // Get supply contacts for the facility contact
         List<UkbEncounter> supplyContacts =
             icuSupplyContactsMap.getOrDefault(visitNumber, Collections.emptyList());

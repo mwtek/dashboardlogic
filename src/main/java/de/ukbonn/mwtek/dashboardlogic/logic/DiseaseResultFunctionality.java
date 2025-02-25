@@ -176,13 +176,14 @@ public class DiseaseResultFunctionality {
     // Group ICU supply contacts by official identifier value
     Map<String, List<UkbEncounter>> icuSupplyContactsMap =
         icuSupplyContactEncounters.stream()
-            .filter(enc -> {
-              boolean hasValue = enc.hasVisitNumberIdentifierValue();
-              if (!hasValue) {
-                log.warn("Encounter {} has no valid visit number identifier", enc.getId());
-              }
-              return hasValue;
-            })
+            .filter(
+                enc -> {
+                  boolean hasValue = enc.hasVisitNumberIdentifierValue();
+                  if (!hasValue) {
+                    log.warn("Encounter {} has no valid visit number identifier", enc.getId());
+                  }
+                  return hasValue;
+                })
             .collect(Collectors.groupingBy(UkbEncounter::getVisitNumberIdentifierValue));
 
     List<UkbEncounter> facilityContacts =

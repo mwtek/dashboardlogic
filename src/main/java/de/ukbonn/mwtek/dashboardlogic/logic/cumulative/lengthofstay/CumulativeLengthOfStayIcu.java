@@ -135,7 +135,8 @@ public class CumulativeLengthOfStayIcu extends DashboardDataItemLogic {
 
     if (anyLocationPeriodMissing) {
       log.info(
-          "At least one encounter.location.period was null, fallback to encounter.period was used instead.");
+          "At least one encounter.location.period was null, fallback to encounter.period was used"
+              + " instead.");
     }
 
     TimerTools.stopTimerAndLog(startTimer, "Finished createIcuLengthOfStayList");

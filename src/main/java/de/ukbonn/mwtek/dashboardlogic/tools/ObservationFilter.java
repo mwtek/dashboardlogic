@@ -163,9 +163,15 @@ public class ObservationFilter {
             x ->
                 isCodeInCodesystem(
                     ((CodeableConcept) x.getValue()).getCoding(),
-                    getObsValueCodeSystem(obsResultType, qualitativeLabCodesSettings),
-                    SNOMED))
+                    getObsValueCodesByResultType(obsResultType, qualitativeLabCodesSettings),
+                    getObsValueCodeSystems(qualitativeLabCodesSettings)))
         .collect(Collectors.toSet());
+  }
+
+  private static Collection<String> getObsValueCodeSystems(
+      QualitativeLabCodesSettings qualitativeLabCodesSettings) {
+    if (qualitativeLabCodesSettings == null) return List.of(SNOMED);
+    else return qualitativeLabCodesSettings.getCodeSystems();
   }
 
   /**
@@ -269,7 +275,7 @@ public class ObservationFilter {
    * Retrieve the value sets for the passed result type for attribute {@link
    * UkbObservation#getValue()}.
    */
-  private static List<String> getObsValueCodeSystem(
+  private static List<String> getObsValueCodesByResultType(
       DashboardLogicFixedValues obsResult,
       QualitativeLabCodesSettings qualitativeLabCodesSettings) {
 

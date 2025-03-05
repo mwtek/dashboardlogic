@@ -43,12 +43,15 @@ import de.ukbonn.mwtek.utilities.generic.time.TimerTools;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.hl7.fhir.r4.model.Encounter;
@@ -128,13 +131,13 @@ public class TimelineMaxTreatmentLevel extends DashboardDataItemLogic
 
     while (currentDate <= currentDayUnix) {
       long checkDate = currentDate;
-      mapAmbulantCaseNr.put(checkDate, new HashSet<>());
-      mapNormalWardCaseNrs.put(checkDate, new HashSet<>());
-      mapIcuCaseNrs.put(checkDate, new HashSet<>());
-      mapIcuVentCaseNrs.put(checkDate, new HashSet<>());
-      mapIcuEcmoCaseNrs.put(checkDate, new HashSet<>());
+      mapAmbulantCaseNr.put(checkDate, ConcurrentHashMap.newKeySet());
+      mapNormalWardCaseNrs.put(checkDate, ConcurrentHashMap.newKeySet());
+      mapIcuCaseNrs.put(checkDate, ConcurrentHashMap.newKeySet());
+      mapIcuVentCaseNrs.put(checkDate, ConcurrentHashMap.newKeySet());
+      mapIcuEcmoCaseNrs.put(checkDate, ConcurrentHashMap.newKeySet());
 
-      Map<String, Object> locks = new ConcurrentHashMap<>();
+      Map<String, ReentrantLock> locks = new ConcurrentHashMap<>();
       // Pre-filtering the encounters to ones that can have intersection with the date that is
       // currently checked
       try {
@@ -158,12 +161,13 @@ public class TimelineMaxTreatmentLevel extends DashboardDataItemLogic
                   // the facility contact, we need to look via top level resource
                   String facilityContactId = supplyContactEncounter.getFacilityContactId();
 
-                  // Prevent multiple cases of a patient from being processed at the same time
-                  locks.putIfAbsent(patientId, new Object());
                   long caseStartUnix =
                       DateTools.dateToUnixTime(supplyContactEncounter.getPeriod().getStart());
 
-                  synchronized (locks.computeIfAbsent(patientId, k -> new Object())) {
+                  // Prevent multiple cases of a patient from being processed at the same time
+                  ReentrantLock lock = locks.computeIfAbsent(patientId, k -> new ReentrantLock());
+                  lock.lock();
+                  try {
                     boolean isNormalWard =
                         mapPrevMaxtreatmentlevel.get(NORMAL_WARD).contains(patientId);
                     boolean isIcu = mapPrevMaxtreatmentlevel.get(ICU).contains(patientId);
@@ -197,9 +201,8 @@ public class TimelineMaxTreatmentLevel extends DashboardDataItemLogic
                       }
 
                       // list containing every supplyContactEncounter with a currently higher
-                      // treatmentlevel than
-                      // 'outpatient'.
-                      List<String> listHigherTreatment = new ArrayList<>();
+                      // treatmentlevel than 'outpatient'.
+                      Set<String> listHigherTreatment = new LinkedHashSet<>();
                       listHigherTreatment.addAll(listMaxStatPidCheck);
                       listHigherTreatment.addAll(listMaxIcuPidCheck);
                       listHigherTreatment.addAll(listMaxIcuVentPidCheck);
@@ -218,13 +221,19 @@ public class TimelineMaxTreatmentLevel extends DashboardDataItemLogic
                       if (!supplyContactEncounter.getPeriod().hasEnd()) {
                         supplyContactEncounter.getPeriod().setEnd(DateTools.getCurrentDateTime());
                       }
-                      long caseEndUnix =
-                          DateTools.dateToUnixTime(supplyContactEncounter.getPeriod().getEnd());
+                      Date endDate = supplyContactEncounter.getPeriod().getEnd();
+                      if (endDate == null) {
+                        throw new IllegalStateException(
+                            "Encounter.period.getEnd is NULL even after setting a value! Encounter"
+                                + " ID: "
+                                + supplyContactEncounter.getId());
+                      }
+                      long caseEndUnix = DateTools.dateToUnixTime(endDate);
                       // The admission date needs to be before the start date and the discharge date
                       // needs to be after the date that is going to be checked to get the whole
                       // time span
                       if (caseStartUnix < checkDate && caseEndUnix >= checkDate) {
-                        List<Encounter.EncounterLocationComponent> listEncounterHasIcuLocation =
+                        List<EncounterLocationComponent> listEncounterHasIcuLocation =
                             supplyContactEncounter.getLocation().stream()
                                 .filter(DiseaseResultFunctionality::isLocationReferenceExisting)
                                 .filter(
@@ -326,6 +335,9 @@ public class TimelineMaxTreatmentLevel extends DashboardDataItemLogic
                       } // if date check
                     } // else if Stationary check
                   } // for loop of positive supplyContactEncounter
+                  finally {
+                    lock.unlock();
+                  }
                 });
       } catch (Exception ex) {
         log.error("Creation of the max treatmentlevel timeline failed.", ex);

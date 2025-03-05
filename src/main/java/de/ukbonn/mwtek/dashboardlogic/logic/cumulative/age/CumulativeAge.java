@@ -53,7 +53,7 @@ public class CumulativeAge extends DashboardDataItemLogic {
   /**
    * Get the ages of all disease-positive patients by a given class
    *
-   * <p>Called by cumulative.age
+   * <p>Used for generating "cumulative.age"
    *
    * @param encounterClass the class of an encounter (e.g. {@link TreatmentLevels#INPATIENT})
    * @return returns list of age of all positive patients, who fulfill the caseStatus criteria

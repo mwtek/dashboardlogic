@@ -17,6 +17,8 @@
  */
 package de.ukbonn.mwtek.dashboardlogic.settings;
 
+import static de.ukbonn.mwtek.utilities.enums.TerminologySystems.SNOMED;
+
 import de.ukbonn.mwtek.dashboardlogic.enums.QualitativeLabResultDefaultCodes;
 import java.util.List;
 import lombok.Data;
@@ -40,12 +42,17 @@ public class QualitativeLabCodesSettings {
   private List<String> positiveCodes;
   private List<String> borderlineCodes;
   private List<String> negativeCodes;
+  private List<String> codeSystems;
 
   public QualitativeLabCodesSettings(
-      List<String> positiveCodes, List<String> borderlineCodes, List<String> negativeCodes) {
+      List<String> positiveCodes,
+      List<String> borderlineCodes,
+      List<String> negativeCodes,
+      List<String> codeSystems) {
     this.positiveCodes = positiveCodes;
     this.borderlineCodes = borderlineCodes;
     this.negativeCodes = negativeCodes;
+    this.codeSystems = codeSystems;
   }
 
   public List<String> getPositiveCodes() {
@@ -61,5 +68,11 @@ public class QualitativeLabCodesSettings {
   public List<String> getNegativeCodes() {
     if (negativeCodes == null) return QualitativeLabResultDefaultCodes.getNegativeCodes();
     return negativeCodes;
+  }
+
+  /** The Default code system to be used is snomed. */
+  public List<String> getCodeSystems() {
+    if (codeSystems == null) return List.of(SNOMED);
+    return codeSystems;
   }
 }

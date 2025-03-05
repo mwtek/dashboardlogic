@@ -22,7 +22,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>de.ukbonn.mwtek</groupId>
   <artifactId>dashboardlogic</artifactId>
-  <version>0.5.4+update.4</version>
+  <version>0.5.4+update.5</version>
   <name>dashboard-logic</name>
   <description>Dashboard Logic</description>
   <properties>
@@ -40,7 +40,7 @@
     <dependency>
       <groupId>de.ukbonn.mwtek</groupId>
       <artifactId>utilities</artifactId>
-      <version>0.5.4+update.4</version>
+      <version>0.5.4+update.5</version>
       <scope>compile</scope>
     </dependency>
     <dependency>

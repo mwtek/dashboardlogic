@@ -21,6 +21,7 @@ package de.ukbonn.mwtek.dashboardlogic.logic.cumulative.maxtreatmentlevel;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.TWELVE_DAYS_LOGIC;
 import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.ICU;
 import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.ICU_ECMO;
+import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.ICU_UNDIFF;
 import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.ICU_VENTILATION;
 import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.INPATIENT;
 import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.OUTPATIENT;
@@ -78,30 +79,22 @@ public class CumulativeMaxTreatmentLevel extends DashboardData {
         mapPositiveEncounterByClass.entrySet()) {
       List<UkbEncounter> value = entry.getValue();
       switch (treatmentLevel) {
-        case OUTPATIENT -> {
-          // If the 12 days appeared its minimum normal ward+ treatmentlevel
-          ambulantPidSet.addAll(
-              value.stream()
-                  .filter(
-                      encounter ->
-                          encounter.isCaseClassOutpatient()
-                              && !encounter.hasExtension(TWELVE_DAYS_LOGIC.getValue()))
-                  .map(UkbEncounter::getPatientId)
-                  .collect(Collectors.toSet()));
-        }
-        case INPATIENT -> {
-          // Check if the encounter is not part of any icu+ treatmentlevel
-          normalWardPidSet.addAll(
-              value.stream()
-                  .filter(UkbEncounter::isCaseClassInpatient)
-                  .filter(
-                      e ->
-                          !mapIcu.get(ICU_ECMO).contains(e)
-                              && !mapIcu.get(ICU_VENTILATION).contains(e)
-                              && !mapIcu.get(ICU).contains(e))
-                  .map(UkbEncounter::getPatientId)
-                  .collect(Collectors.toSet()));
-        }
+        case OUTPATIENT -> // If the 12 days appeared its minimum normal ward+ treatmentlevel
+            ambulantPidSet.addAll(
+                value.stream()
+                    .filter(
+                        encounter ->
+                            encounter.isCaseClassOutpatient()
+                                && !encounter.hasExtension(TWELVE_DAYS_LOGIC.getValue()))
+                    .map(UkbEncounter::getPatientId)
+                    .collect(Collectors.toSet()));
+        case INPATIENT -> // Check if the encounter is not part of any icu+ treatmentlevel
+            normalWardPidSet.addAll(
+                value.stream()
+                    .filter(UkbEncounter::isCaseClassInpatient)
+                    .filter(e -> isMaxTreatmentlevelNormalWard(mapIcu, e))
+                    .map(UkbEncounter::getPatientId)
+                    .collect(Collectors.toSet()));
       }
     }
     // print out only the most recent cases in case a patient has more than one case with the same
@@ -116,6 +109,16 @@ public class CumulativeMaxTreatmentLevel extends DashboardData {
 
     TimerTools.stopTimerAndLog(startTime, "finished getCumulativeByClass");
     return resultEncounters;
+  }
+
+  private static boolean isMaxTreatmentlevelNormalWard(
+      Map<TreatmentLevels, List<UkbEncounter>> mapIcu, UkbEncounter e) {
+    // If ICU_UNDIFFERENTIATED is found, the other variants do not exist in the map
+    if (mapIcu.containsKey(ICU_UNDIFF)) return !mapIcu.get(ICU_UNDIFF).contains(e);
+    else
+      return !mapIcu.get(ICU_ECMO).contains(e)
+          && !mapIcu.get(ICU_VENTILATION).contains(e)
+          && !mapIcu.get(ICU).contains(e);
   }
 
   /**
@@ -164,7 +167,7 @@ public class CumulativeMaxTreatmentLevel extends DashboardData {
   private Set<String> setEcmoPids;
 
   /**
-   * Creates a list which contains encounter who have or had icu, ventilation or ecmo as highest
+   * Creates a list which contains encounters who have or had icu, ventilation or ecmo as highest
    * treatmentlevel. [needed in data item: cumulative.maxtreatmentlevel]
    *
    * @param mapIcu Map that assigns a list of case numbers to an ICU treatment level class.
@@ -175,15 +178,28 @@ public class CumulativeMaxTreatmentLevel extends DashboardData {
   @SuppressWarnings("incomplete-switch")
   public List<UkbEncounter> getCumulativeByIcuLevel(
       Map<TreatmentLevels, List<UkbEncounter>> mapIcu, TreatmentLevels treatmentLevel) {
+
     List<UkbEncounter> resultList = new ArrayList<>();
     HashMap<String, List<UkbEncounter>> mapPidCases = new HashMap<>();
-    log.debug("started getCumulativeByIcuLevel [" + treatmentLevel + "]");
+    log.debug("started getCumulativeByIcuLevel [{}]", treatmentLevel);
     Instant startTime = TimerTools.startTimer();
 
-    List<UkbEncounter> icuEncounters = mapIcu.get(ICU);
-    List<UkbEncounter> ventilationEncounters = mapIcu.get(ICU_VENTILATION);
-    List<UkbEncounter> ecmoEncounters = mapIcu.get(ICU_ECMO);
-    // Initial flattening of the patient ids by treatment level
+    // Retrieve the encounters for all treatment levels
+    List<UkbEncounter> icuEncounters = mapIcu.getOrDefault(ICU, new ArrayList<>());
+    List<UkbEncounter> ventilationEncounters =
+        mapIcu.getOrDefault(ICU_VENTILATION, new ArrayList<>());
+    List<UkbEncounter> ecmoEncounters = mapIcu.getOrDefault(ICU_ECMO, new ArrayList<>());
+    List<UkbEncounter> icuUndiffEncounters = mapIcu.getOrDefault(ICU_UNDIFF, new ArrayList<>());
+
+    // If ICU_UNDIFFERENTIATED encounters are present, process them and ignore other levels.
+    if (!icuUndiffEncounters.isEmpty()) {
+      processIcuUndiffEncounters(icuUndiffEncounters, mapPidCases, resultList);
+      TimerTools.stopTimerAndLog(
+          startTime, "finished getCumulativeByIcuLevel (ICU_UNDIFFERENTIATED)");
+      return resultList;
+    }
+
+    // Flatten the patient ids by treatment level if not already initialized
     if (setVentilationPids == null || setEcmoPids == null) {
       setVentilationPids =
           ventilationEncounters.stream()
@@ -192,62 +208,165 @@ public class CumulativeMaxTreatmentLevel extends DashboardData {
       setEcmoPids =
           ecmoEncounters.stream().map(UkbEncounter::getPatientId).collect(Collectors.toSet());
     }
-    // PIDs of the patients that had no ventilation and no ecmo.
+
     Set<String> setIcuOnlyPids = new HashSet<>();
     Set<UkbEncounter> setEncounterToBeRemoved = new HashSet<>();
 
-    // Process based on the treatment level
+    // Process encounters based on the treatment level
     switch (treatmentLevel) {
       case ICU:
-        {
-          // Process ICU encounters
-          for (UkbEncounter icuEncounter : icuEncounters) {
-            String currentPid = icuEncounter.getPatientId();
-            if (!setEcmoPids.contains(currentPid) && !setVentilationPids.contains(currentPid)) {
-              addPidToMap(mapPidCases, icuEncounter);
-              setIcuOnlyPids.add(icuEncounter.getPatientId());
-            }
-          }
-
-          // Add first disease-positive encounter for each patient
-          resultList.addAll(getPatientsFirstDiseasePositiveEncounter(mapPidCases));
-
-          // Remove encounters with higher treatment levels than ICU
-          ventilationEncounters.stream()
-              .filter(ventEncounter -> setIcuOnlyPids.contains(ventEncounter.getPatientId()))
-              .forEach(setEncounterToBeRemoved::add);
-
-          ecmoEncounters.stream()
-              .filter(ecmoEncounter -> setIcuOnlyPids.contains(ecmoEncounter.getPatientId()))
-              .forEach(setEncounterToBeRemoved::add);
-
-          resultList.removeAll(setEncounterToBeRemoved);
-          break;
-        }
+        processIcuEncounters(
+            icuEncounters,
+            ventilationEncounters,
+            ecmoEncounters,
+            mapPidCases,
+            resultList,
+            setIcuOnlyPids,
+            setEncounterToBeRemoved);
+        break;
       case ICU_VENTILATION:
-        {
-          // Process ventilation encounters
-          ventilationEncounters.stream()
-              .filter(ventEncounter -> !ecmoEncounters.contains(ventEncounter))
-              .forEach(encounter -> addPidToMap(mapPidCases, encounter));
-
-          // Add first disease-positive encounter for each patient
-          resultList.addAll(getPatientsFirstDiseasePositiveEncounter(mapPidCases));
-          break;
-        }
+        processVentilationEncounters(
+            ventilationEncounters, ecmoEncounters, mapPidCases, resultList);
+        break;
       case ICU_ECMO:
-        {
-          // Process ECMO encounters
-          ecmoEncounters.forEach(encounter -> addPidToMap(mapPidCases, encounter));
-
-          // Add first disease-positive encounter for each patient
-          resultList.addAll(getPatientsFirstDiseasePositiveEncounter(mapPidCases));
-          break;
-        }
+        processEcmoEncounters(ecmoEncounters, mapPidCases, resultList);
+        break;
     }
 
     TimerTools.stopTimerAndLog(startTime, "finished getCumulativeByIcuLevel");
     return resultList;
+  }
+
+  /**
+   * Processes the ICU_UNDIFFERENTIATED encounters and adds the first disease-positive encounter for
+   * each patient to the result list.
+   *
+   * @param icuUndiffEncounters List of encounters for ICU_UNDIFFERENTIATED treatment level.
+   * @param mapPidCases A map to store encounters by patient ID.
+   * @param resultList The list that will contain the first disease-positive encounter for each
+   *     patient.
+   */
+  private void processIcuUndiffEncounters(
+      List<UkbEncounter> icuUndiffEncounters,
+      Map<String, List<UkbEncounter>> mapPidCases,
+      List<UkbEncounter> resultList) {
+    // Process ICU_UNDIFFERENTIATED encounters
+    for (UkbEncounter undiffEncounter : icuUndiffEncounters) {
+      addPidToMap(mapPidCases, undiffEncounter);
+    }
+
+    // Add first disease-positive encounter for each patient
+    resultList.addAll(getPatientsFirstDiseasePositiveEncounter(mapPidCases));
+  }
+
+  /**
+   * Processes the ICU encounters and handles patients that have no ventilation or ECMO. Also
+   * removes encounters with higher treatment levels.
+   *
+   * @param icuEncounters List of ICU encounters.
+   * @param ventilationEncounters List of ICU_VENTILATION encounters.
+   * @param ecmoEncounters List of ICU_ECMO encounters.
+   * @param mapPidCases A map to store encounters by patient ID.
+   * @param resultList The list to store the result encounters.
+   * @param setIcuOnlyPids Set of patient IDs for ICU-only patients.
+   * @param setEncounterToBeRemoved Set of encounters to be removed from the result list.
+   */
+  private void processIcuEncounters(
+      List<UkbEncounter> icuEncounters,
+      List<UkbEncounter> ventilationEncounters,
+      List<UkbEncounter> ecmoEncounters,
+      Map<String, List<UkbEncounter>> mapPidCases,
+      List<UkbEncounter> resultList,
+      Set<String> setIcuOnlyPids,
+      Set<UkbEncounter> setEncounterToBeRemoved) {
+    // Process ICU encounters
+    icuEncounters.stream()
+        .filter(
+            e ->
+                !setEcmoPids.contains(e.getPatientId())
+                    && !setVentilationPids.contains(e.getPatientId()))
+        .forEach(
+            e -> {
+              addPidToMap(mapPidCases, e);
+              setIcuOnlyPids.add(e.getPatientId());
+            });
+
+    // Add first disease-positive encounter for each patient
+    resultList.addAll(getPatientsFirstDiseasePositiveEncounter(mapPidCases));
+
+    // Remove encounters with higher treatment levels than ICU
+    removeHigherLevelEncounters(ventilationEncounters, setIcuOnlyPids, setEncounterToBeRemoved);
+    removeHigherLevelEncounters(ecmoEncounters, setIcuOnlyPids, setEncounterToBeRemoved);
+
+    resultList.removeAll(setEncounterToBeRemoved);
+  }
+
+  /**
+   * Processes the ICU_VENTILATION encounters and adds the first disease-positive encounter for each
+   * patient to the result list.
+   *
+   * @param ventilationEncounters List of ICU_VENTILATION encounters.
+   * @param ecmoEncounters List of ICU_ECMO encounters.
+   * @param mapPidCases A map to store encounters by patient ID.
+   * @param resultList The list to store the result encounters.
+   */
+  private void processVentilationEncounters(
+      List<UkbEncounter> ventilationEncounters,
+      List<UkbEncounter> ecmoEncounters,
+      Map<String, List<UkbEncounter>> mapPidCases,
+      List<UkbEncounter> resultList) {
+    ventilationEncounters.stream()
+        .filter(ventEncounter -> !ecmoEncounters.contains(ventEncounter))
+        .forEach(encounter -> addPidToMap(mapPidCases, encounter));
+
+    // Add first disease-positive encounter for each patient
+    resultList.addAll(getPatientsFirstDiseasePositiveEncounter(mapPidCases));
+  }
+
+  /**
+   * Processes the ICU_ECMO encounters and adds the first disease-positive encounter for each
+   * patient to the result list.
+   *
+   * @param ecmoEncounters List of ICU_ECMO encounters.
+   * @param mapPidCases A map to store encounters by patient ID.
+   * @param resultList The list to store the result encounters.
+   */
+  private void processEcmoEncounters(
+      List<UkbEncounter> ecmoEncounters,
+      Map<String, List<UkbEncounter>> mapPidCases,
+      List<UkbEncounter> resultList) {
+    ecmoEncounters.forEach(encounter -> addPidToMap(mapPidCases, encounter));
+
+    // Add first disease-positive encounter for each patient
+    resultList.addAll(getPatientsFirstDiseasePositiveEncounter(mapPidCases));
+  }
+
+  /**
+   * Removes encounters from the list that have higher treatment levels than the specified ICU
+   * level.
+   *
+   * @param encounters List of encounters to process.
+   * @param setIcuOnlyPids Set of patient IDs that should only be in the ICU level.
+   * @param setEncounterToBeRemoved Set of encounters to be removed from the result list.
+   */
+  private void removeHigherLevelEncounters(
+      List<UkbEncounter> encounters,
+      Set<String> setIcuOnlyPids,
+      Set<UkbEncounter> setEncounterToBeRemoved) {
+    encounters.stream()
+        .filter(encounter -> setIcuOnlyPids.contains(encounter.getPatientId()))
+        .forEach(setEncounterToBeRemoved::add);
+  }
+
+  /**
+   * Adds an encounter to the map of patient encounters. Uses computeIfAbsent to minimize
+   * unnecessary HashMap lookups.
+   *
+   * @param mapPidCases A map storing encounters by patient ID.
+   * @param encounter The encounter to add.
+   */
+  private void addPidToMap(Map<String, List<UkbEncounter>> mapPidCases, UkbEncounter encounter) {
+    mapPidCases.computeIfAbsent(encounter.getPatientId(), k -> new ArrayList<>()).add(encounter);
   }
 
   /**
@@ -280,21 +399,5 @@ public class CumulativeMaxTreatmentLevel extends DashboardData {
         .filter(UkbEncounter::isPeriodStartExistent)
         .min(Comparator.comparing(x -> x.getPeriod().getStart()))
         .orElse(null);
-  }
-
-  /**
-   * Add specific encounter to a map.
-   *
-   * @param mapPidAndCase Map consisting of encounter sorted by their pids.
-   * @param encounter The {@link UkbEncounter} that has to be added.
-   */
-  private void addPidToMap(Map<String, List<UkbEncounter>> mapPidAndCase, UkbEncounter encounter) {
-    if (mapPidAndCase.containsKey(encounter.getPatientId())) {
-      mapPidAndCase.get(encounter.getPatientId()).add(encounter);
-    } else {
-      // Initialization of the encounter list for the given patient
-      mapPidAndCase.put(
-          encounter.getPatientId(), new ArrayList<>(Collections.singletonList(encounter)));
-    }
   }
 }

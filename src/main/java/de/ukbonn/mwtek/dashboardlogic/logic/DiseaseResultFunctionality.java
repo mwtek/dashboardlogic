@@ -21,6 +21,7 @@ import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.POS
 import static de.ukbonn.mwtek.dashboardlogic.enums.NumDashboardConstants.YEAR_MONTH_DATE_FORMAT;
 import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.ICU;
 import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.ICU_ECMO;
+import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.ICU_UNDIFF;
 import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.ICU_VENTILATION;
 import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.INPATIENT;
 import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.OUTPATIENT;
@@ -91,6 +92,10 @@ public class DiseaseResultFunctionality {
    *     artificial ventilation periods.
    * @param inputCodeSettings The configuration of the parameterizable codes such as the observation
    *     codes or procedure codes.
+   * @param useIcuUndiff If {@code true}, all ICU-related cases (ICU, ventilation, ECMO) are merged
+   *     into the {@link TreatmentLevels#ICU_UNDIFF} category. If {@code false}, ICU cases are
+   *     categorized separately into {@link TreatmentLevels#ICU}, {@link
+   *     TreatmentLevels#ICU_VENTILATION}, and {@link TreatmentLevels#ICU_ECMO}.
    * @return Map on which ICU cases are separated according to ICU, ventilation and Ecmo
    */
   public static Map<TreatmentLevels, List<UkbEncounter>> createIcuMap(
@@ -98,7 +103,8 @@ public class DiseaseResultFunctionality {
       List<UkbEncounter> supplyContactEncounters,
       List<UkbLocation> locations,
       List<UkbProcedure> icuProcedures,
-      InputCodeSettings inputCodeSettings) {
+      InputCodeSettings inputCodeSettings,
+      boolean useIcuUndiff) {
     log.debug("started createIcuMap");
 
     // List of stationary Cases
@@ -114,14 +120,14 @@ public class DiseaseResultFunctionality {
     Instant start = TimerTools.startTimer();
 
     // checking location = icu location via location id
-    Set<String> listIcuLocationIds = getIcuLocationIds(locations);
+    Set<String> icuLocationIds = locations != null ? getIcuLocationIds(locations) : new HashSet<>();
 
     // Filter procedure resources to usable ones (e.g. encounter id must be set)
     List<UkbProcedure> icuProceduresWithEncRef =
         icuProcedures.stream().filter(x -> x.getCaseId() != null).toList();
     Set<String> facilityContactsOnIcu =
         supplyContactEncountersPositive.stream()
-            .filter(x -> x.isIcuCase(listIcuLocationIds, false))
+            .filter(x -> x.isIcuCase(icuLocationIds, false))
             .map(UkbEncounter::getFacilityContactId)
             .collect(Collectors.toSet());
 
@@ -159,9 +165,20 @@ public class DiseaseResultFunctionality {
             .toList();
 
     Map<TreatmentLevels, List<UkbEncounter>> resultMap = new ConcurrentHashMap<>();
-    resultMap.put(ICU, icuEncounters);
-    resultMap.put(ICU_VENTILATION, ventEncounters);
-    resultMap.put(ICU_ECMO, ecmoEncounters);
+
+    if (useIcuUndiff) {
+      // Merge all ICU-related cases into ICU_UNDIFFERENTIATED
+      List<UkbEncounter> totalIcuEncounters = new ArrayList<>();
+      totalIcuEncounters.addAll(icuEncounters);
+      totalIcuEncounters.addAll(ventEncounters);
+      totalIcuEncounters.addAll(ecmoEncounters);
+      resultMap.put(ICU_UNDIFF, totalIcuEncounters);
+    } else {
+      // Store ICU cases separately
+      resultMap.put(ICU, icuEncounters);
+      resultMap.put(ICU_VENTILATION, ventEncounters);
+      resultMap.put(ICU_ECMO, ecmoEncounters);
+    }
 
     TimerTools.stopTimerAndLog(start, "finished createIcuMap");
     return resultMap;
@@ -391,39 +408,47 @@ public class DiseaseResultFunctionality {
    *
    * @param mapIcuOverall The map generated in the {@link DiseaseResultFunctionality#createIcuMap}
    *     method.
+   * @param useIcuUndiff Merge ICU+ items to {@link TreatmentLevels#ICU_UNDIFF}?
    * @return Map Containing encounter which are currently in icu
    */
   public static Map<TreatmentLevels, List<UkbEncounter>> createCurrentIcuMap(
-      Map<TreatmentLevels, List<UkbEncounter>> mapIcuOverall) {
-    log.debug("started createCurrentIcuMap");
+      Map<TreatmentLevels, List<UkbEncounter>> mapIcuOverall, boolean useIcuUndiff) {
+
+    log.debug("Started createCurrentIcuMap");
     Instant startTimer = TimerTools.startTimer();
 
-    // Pre-filtering: Figure out if the facility contact encounter is in-progress (NOT the
-    // procedure/icu situation!)
-    List<UkbEncounter> currentActiveIcuEncounters =
-        mapIcuOverall.get(ICU).stream()
-            .filter(UkbEncounter::isActive)
-            .filter(EncounterFilter::isDiseasePositive)
-            .toList();
-
-    List<UkbEncounter> currentActiveIcuVentEncounters =
-        mapIcuOverall.get(ICU_VENTILATION).stream()
-            .filter(UkbEncounter::isActive)
-            .filter(EncounterFilter::isDiseasePositive)
-            .toList();
-
-    List<UkbEncounter> currentActiveIcuEcmoEncounters =
-        mapIcuOverall.get(ICU_ECMO).stream()
-            .filter(UkbEncounter::isActive)
-            .filter(EncounterFilter::isDiseasePositive)
-            .toList();
-
     Map<TreatmentLevels, List<UkbEncounter>> resultMap = new ConcurrentHashMap<>();
-    resultMap.put(ICU, currentActiveIcuEncounters);
-    resultMap.put(ICU_VENTILATION, currentActiveIcuVentEncounters);
-    resultMap.put(ICU_ECMO, currentActiveIcuEcmoEncounters);
 
-    TimerTools.stopTimerAndLog(startTimer, "finished createCurrentIcuMap");
+    if (useIcuUndiff) {
+      List<UkbEncounter> currentActiveIcuUndiff =
+          mapIcuOverall.get(ICU_UNDIFF).stream()
+              .filter(UkbEncounter::isActive)
+              .filter(EncounterFilter::isDiseasePositive)
+              .toList();
+
+      resultMap.put(ICU_UNDIFF, currentActiveIcuUndiff);
+    } else {
+      resultMap.put(
+          ICU,
+          mapIcuOverall.get(ICU).stream()
+              .filter(UkbEncounter::isActive)
+              .filter(EncounterFilter::isDiseasePositive)
+              .toList());
+      resultMap.put(
+          ICU_VENTILATION,
+          mapIcuOverall.get(ICU_VENTILATION).stream()
+              .filter(UkbEncounter::isActive)
+              .filter(EncounterFilter::isDiseasePositive)
+              .toList());
+      resultMap.put(
+          ICU_ECMO,
+          mapIcuOverall.get(ICU_ECMO).stream()
+              .filter(UkbEncounter::isActive)
+              .filter(EncounterFilter::isDiseasePositive)
+              .toList());
+    }
+
+    TimerTools.stopTimerAndLog(startTimer, "Finished createCurrentIcuMap");
     return resultMap;
   }
 
@@ -718,8 +743,9 @@ public class DiseaseResultFunctionality {
   /**
    * Extracts the plain ID from a FHIR resource reference.
    *
-   * <p>For example, given a FHIR resource reference like http://fhirserver.com/r4/Location/123,
-   * this method will extract "123" as the plain ID of the resource.
+   * <p>For example, given a FHIR resource reference like <a
+   * href="http://fhirserver.com/r4/Location/123">...</a>, this method will extract "123" as the
+   * plain ID of the resource.
    *
    * @param fhirResourceReference The FHIR resource reference to extract the ID from.
    * @return The plain ID of the resource.

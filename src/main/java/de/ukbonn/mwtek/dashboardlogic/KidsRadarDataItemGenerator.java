@@ -44,6 +44,7 @@ import de.ukbonn.mwtek.dashboardlogic.logic.KiraData;
 import de.ukbonn.mwtek.dashboardlogic.logic.timeline.KiraTimelineDisorders;
 import de.ukbonn.mwtek.dashboardlogic.models.CoreCaseData;
 import de.ukbonn.mwtek.dashboardlogic.models.DiseaseDataItem;
+import de.ukbonn.mwtek.dashboardlogic.settings.GlobalConfiguration;
 import de.ukbonn.mwtek.dashboardlogic.settings.InputCodeSettings;
 import de.ukbonn.mwtek.dashboardlogic.settings.QualitativeLabCodesSettings;
 import de.ukbonn.mwtek.dashboardlogic.settings.VariantSettings;
@@ -97,32 +98,24 @@ public class KidsRadarDataItemGenerator extends DataItemGenerator {
    *
    * @param mapExcludeDataItems Map with data items to be excluded from the output (e.g.
    *     "current.treatmentlevel").
-   * @param debug Flag to provide debug information (e.g. casenrs) in the output.
    * @param inputCodeSettings The configuration of the parameterizable codes such as the observation
    *     codes or procedure codes.
-   * @param usePartOfInsteadOfIdentifier Should the Encounter.partOf value be used additionally of
-   *     the visit-number in {@link UkbEncounter#getIdentifier()} to assign
-   *     'Versorgungsstellenkontakt' to 'Einrichtungskontakt'?
    * @return List with all the {@link DiseaseDataItem data items} that are defined in the corona
    *     dashboard json specification
    */
   @SuppressWarnings("unused")
   public List<DiseaseDataItem> getDataItems(
       Map<String, Boolean> mapExcludeDataItems,
-      Boolean debug,
       VariantSettings variantSettings,
       InputCodeSettings inputCodeSettings,
       QualitativeLabCodesSettings qualitativeLabCodesSettings,
       DataItemContext dataItemContext,
-      Boolean usePartOfInsteadOfIdentifier) {
+      GlobalConfiguration globalConfiguration) {
     List<DiseaseDataItem> currentDataList = new ArrayList<>();
     if (mapExcludeDataItems == null) {
       mapExcludeDataItems = new HashMap<>();
     }
-
-    if (debug == null) {
-      debug = false;
-    }
+    boolean debug = globalConfiguration.getDebug();
 
     // If there are resources with unfilled mandatory attributes, report them immediately (may give
     // partially reduced result sets)

@@ -20,6 +20,7 @@ package de.ukbonn.mwtek.dashboardlogic.logic.current;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.POSITIVE_RESULT;
 import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.ICU;
 import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.ICU_ECMO;
+import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.ICU_UNDIFF;
 import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.ICU_VENTILATION;
 import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.NORMAL_WARD;
 import static de.ukbonn.mwtek.dashboardlogic.tools.EncounterFilter.getPositiveCurrentlyOnIcuWardEncounters;
@@ -68,25 +69,51 @@ public class CurrentTreatmentLevel extends DashboardDataItemLogic {
       List<UkbLocation> locations,
       InputCodeSettings inputCodeSettings) {
 
-    List<UkbEncounter> currentIcuEncounters = mapCurrentIcu.get(ICU);
-    List<UkbEncounter> currentVentEncounters = mapCurrentIcu.get(ICU_VENTILATION);
-    List<UkbEncounter> currentEcmoEncounters = mapCurrentIcu.get(ICU_ECMO);
-
-    // Figuring out the current status of all treatment levels (an encounter can appear in all of
-    // these at the same time!)
-    // Figure out if there is an ACTIVE ICU ward admission ongoing
+    // Further processing for encounters based on ICU treatment levels
     List<UkbEncounter> positiveCurrentlyOnIcuWardSupplyContacts =
         getPositiveCurrentlyOnIcuWardEncounters(icuSupplyContactEncounters, locations);
     List<String> positiveCurrentlyOnIcuWardFacilityContactIds =
         positiveCurrentlyOnIcuWardSupplyContacts.stream()
             .map(UkbEncounter::getFacilityContactId)
             .toList();
-    // Find the corresponding facility encounter resource to keep the output
+
+    // Check if ICU_UNDIFFERENTIATED exists
+    if (mapCurrentIcu.containsKey(ICU_UNDIFF)) {
+      // If ICU_UNDIFFERENTIATED exists, only process those encounters
+      switch (icuTreatmentLevel) {
+        case NORMAL_WARD:
+          // Process encounters for normal ward, excluding ICU, Ventilation, and ECMO encounters
+          return facilityEncounters.parallelStream()
+              .filter(EncounterFilter::isDiseasePositive)
+              .filter(UkbEncounter::isCaseClassInpatient)
+              .filter(UkbEncounter::isActive)
+              // No higher treatmentlevel found
+              .filter(x -> !positiveCurrentlyOnIcuWardFacilityContactIds.contains(x.getId()))
+              .toList();
+        case ICU_UNDIFF:
+          return positiveCurrentlyOnIcuWardSupplyContacts;
+      }
+    }
+
+    // Continue with normal processing for other ICU levels
+    List<UkbEncounter> currentIcuEncounters = mapCurrentIcu.get(ICU);
+    List<UkbEncounter> currentVentEncounters = mapCurrentIcu.get(ICU_VENTILATION);
+    List<UkbEncounter> currentEcmoEncounters = mapCurrentIcu.get(ICU_ECMO);
+
+    // If no ICU, ICU_VENTILATION, or ICU_ECMO encounters exist, return an empty list
+    if (currentIcuEncounters == null
+        || currentVentEncounters == null
+        || currentEcmoEncounters == null) {
+      return new ArrayList<>();
+    }
+
+    // Find the corresponding facility encounters for positive ICU ward contacts
     List<UkbEncounter> currentPositiveIcuFacilityContactEncounter =
         currentIcuEncounters.stream()
             .filter(x -> positiveCurrentlyOnIcuWardFacilityContactIds.contains(x.getId()))
             .toList();
 
+    // Active ventilation and ECMO procedures
     List<UkbProcedure> currentActiveIcuVentProcedures =
         icuProcedures.stream()
             .filter(
@@ -121,43 +148,39 @@ public class CurrentTreatmentLevel extends DashboardDataItemLogic {
             .filter(x -> currentActiveEcmoFacilityContactIds.contains(x.getId()))
             .toList();
 
-    // Assigning regarding the icu level hierarchy
-    switch (icuTreatmentLevel) {
-      case NORMAL_WARD -> {
-        // The inpatient filter filters pre-stationary cases
-        // If it's not on one of the upper level it must be a normal ward.
-        return facilityEncounters.parallelStream()
-            .filter(EncounterFilter::isDiseasePositive)
-            .filter(UkbEncounter::isCaseClassInpatient)
-            .filter(UkbEncounter::isActive)
-            .filter(x -> !positiveCurrentlyOnIcuWardFacilityContactIds.contains(x.getId()))
-            .filter(x -> !currentActiveVentFacilityContactIds.contains(x.getId()))
-            .filter(x -> !currentActiveEcmoFacilityContactIds.contains(x.getId()))
-            .toList();
-      }
-      case ICU -> {
-        // Just treat it as ICU if there is no active VENT or ECMO
-        return currentPositiveIcuFacilityContactEncounter.stream()
-            .filter(x -> !currentActiveVentFacilityContactIds.contains(x.getId()))
-            .filter(x -> !currentActiveEcmoFacilityContactIds.contains(x.getId()))
-            .toList();
-      }
-      case ICU_VENTILATION -> {
-        // Just treat it as VENT if there is no active ECMO
-        return currentEncountersWithActiveVent.stream()
-            .filter(x -> !currentActiveEcmoFacilityContactIds.contains(x.getId()))
-            .toList();
-      }
-      case ICU_ECMO -> {
-        return currentEncountersWithActiveEcmo;
-      }
+    // Handling the encounters according to ICU treatment level
+    return switch (icuTreatmentLevel) {
+      case NORMAL_WARD ->
+          // Process encounters for normal ward, excluding ICU, Ventilation, and ECMO encounters
+          facilityEncounters.parallelStream()
+              .filter(EncounterFilter::isDiseasePositive)
+              .filter(UkbEncounter::isCaseClassInpatient)
+              .filter(UkbEncounter::isActive)
+              .filter(x -> !positiveCurrentlyOnIcuWardFacilityContactIds.contains(x.getId()))
+              .filter(x -> !currentActiveVentFacilityContactIds.contains(x.getId()))
+              .filter(x -> !currentActiveEcmoFacilityContactIds.contains(x.getId()))
+              .toList();
+      case ICU ->
+          // Process encounters for ICU level, excluding active Vent and ECMO
+          currentPositiveIcuFacilityContactEncounter.stream()
+              .filter(x -> !currentActiveVentFacilityContactIds.contains(x.getId()))
+              .filter(x -> !currentActiveEcmoFacilityContactIds.contains(x.getId()))
+              .toList();
+      case ICU_VENTILATION ->
+          // Process encounters for ICU Ventilation, excluding active ECMO
+          currentEncountersWithActiveVent.stream()
+              .filter(x -> !currentActiveEcmoFacilityContactIds.contains(x.getId()))
+              .toList();
+      case ICU_ECMO ->
+          // Process encounters for ECMO treatment level
+          currentEncountersWithActiveEcmo;
       default -> {
         log.error(
             "Invalid treatment level ({}) used in getCurrentEncounterByIcuLevel.",
             icuTreatmentLevel);
-        return new ArrayList<>();
+        yield new ArrayList<>();
       }
-    }
+    };
   }
 
   /**
@@ -178,7 +201,9 @@ public class CurrentTreatmentLevel extends DashboardDataItemLogic {
       List<UkbEncounter> standardWardEncounters,
       List<UkbEncounter> icuEncounters,
       List<UkbEncounter> ventEncounters,
-      List<UkbEncounter> ecmoEncounters) {
+      List<UkbEncounter> ecmoEncounters,
+      List<UkbEncounter> icuUndiffEncounters,
+      Boolean useIcuUndiff) {
 
     // Lists to store case numbers for different treatment levels
     List<String> stationaryCaseNrs =
@@ -189,6 +214,15 @@ public class CurrentTreatmentLevel extends DashboardDataItemLogic {
                         && encounter.hasExtension(POSITIVE_RESULT.getValue()))
             .map(UkbEncounter::getId)
             .toList();
+
+    // If icu undiff is used, return the corresponding map
+    if (useIcuUndiff) {
+      List<String> icuUndiffCaseNrs =
+          icuUndiffEncounters.stream().map(UkbEncounter::getId).toList();
+      return Map.of(
+          NORMAL_WARD.getValue(), stationaryCaseNrs,
+          ICU_UNDIFF.getValue(), icuUndiffCaseNrs);
+    }
 
     List<String> icuCaseNrs = icuEncounters.stream().map(UkbEncounter::getId).toList();
     List<String> ventCaseNrs = ventEncounters.stream().map(UkbEncounter::getId).toList();

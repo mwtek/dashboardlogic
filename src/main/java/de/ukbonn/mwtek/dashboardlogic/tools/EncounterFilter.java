@@ -49,6 +49,7 @@ public class EncounterFilter {
       Collection<UkbEncounter> supplyContactEncounters, List<UkbLocation> locations) {
     return supplyContactEncounters.stream()
         .filter(EncounterFilter::isDiseasePositive)
+        .filter(UkbEncounter::isActive)
         .filter(x -> x.isCurrentlyOnIcuWard(LocationFilter.getIcuLocationIds(locations)))
         .toList();
   }

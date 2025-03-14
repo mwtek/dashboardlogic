@@ -313,9 +313,7 @@ public class DiseaseDetectionManagement {
         switch (dataItemContext) {
           case COVID -> inputCodeSettings.getCovidObservationPcrLoincCodes();
           case INFLUENZA -> inputCodeSettings.getInfluenzaObservationPcrLoincCodes();
-          case KIDS_RADAR -> null;
-          case KIDS_RADAR_KJP -> null;
-          case KIDS_RADAR_RSV -> null;
+          case KIDS_RADAR, KIDS_RADAR_KJP, KIDS_RADAR_RSV, UKB_MODEL -> null;
         };
 
     Set<String> observationsWithoutResult =

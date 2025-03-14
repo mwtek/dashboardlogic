@@ -20,9 +20,9 @@ package de.ukbonn.mwtek.dashboardlogic.logic.cumulative.maxtreatmentlevel;
 
 import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.ICU;
 import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.ICU_ECMO;
+import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.ICU_UNDIFF;
 import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.ICU_VENTILATION;
 import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.INPATIENT;
-import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.NORMAL_WARD;
 import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.OUTPATIENT;
 import static de.ukbonn.mwtek.dashboardlogic.logic.CoronaResultFunctionality.checkAgeGroup;
 import static de.ukbonn.mwtek.dashboardlogic.logic.DiseaseResultFunctionality.calculateAge;
@@ -62,6 +62,7 @@ public class CumulativeMaxTreatmentLevelAge extends DashboardDataItemLogic {
 
   private Set<String> outpatientPatientIds;
   private Set<String> inpatientPatientIds;
+  private Set<String> icuUndiffPatientIds;
   private Set<String> icuPatientIds;
   private Set<String> icuVentPatientIds;
   private Set<String> ecmoPatientIds;
@@ -74,12 +75,13 @@ public class CumulativeMaxTreatmentLevelAge extends DashboardDataItemLogic {
       Map<TreatmentLevels, List<UkbEncounter>> mapPositiveEncounterByClass,
       Map<TreatmentLevels, List<UkbEncounter>> mapIcuOverall,
       List<UkbPatient> patients,
-      TreatmentLevels treatmentLevel) {
+      TreatmentLevels treatmentLevel,
+      Boolean useIcuUndiff) {
 
     log.debug("Started createMaxTreatmentLevelAgeMap");
     Instant startTimer = TimerTools.startTimer();
 
-    initializeIfNeeded(mapPositiveEncounterByClass, mapIcuOverall, patients);
+    initializeIfNeeded(mapPositiveEncounterByClass, mapIcuOverall, patients, useIcuUndiff);
 
     List<Integer> resultList = new ArrayList<>();
 
@@ -105,11 +107,10 @@ public class CumulativeMaxTreatmentLevelAge extends DashboardDataItemLogic {
         continue;
       }
 
-      if (!hasHigherTreatmentLevel(patient.getId(), treatmentLevel)) {
+      if (!hasHigherTreatmentLevel(patient.getId(), treatmentLevel, useIcuUndiff)) {
         addPatientIfEligible(patient, validAdmissionDate, resultList, treatmentLevel);
       }
     }
-
     Collections.sort(resultList);
     TimerTools.stopTimerAndLog(startTimer, "Finished createMaxTreatmentLevelAgeMap");
     return resultList;
@@ -118,24 +119,37 @@ public class CumulativeMaxTreatmentLevelAge extends DashboardDataItemLogic {
   private void initializeIfNeeded(
       Map<TreatmentLevels, List<UkbEncounter>> mapPositiveEncounterByClass,
       Map<TreatmentLevels, List<UkbEncounter>> mapIcuOverall,
-      List<UkbPatient> patients) {
+      List<UkbPatient> patients,
+      Boolean useIcuUndiff) {
     if (!initialized) {
       pidAdmissionMap = new ConcurrentHashMap<>();
       encountersOverall = new HashSet<>();
 
       outpatientPatientIds = getPatientIds(mapPositiveEncounterByClass, OUTPATIENT);
       inpatientPatientIds = getPatientIds(mapPositiveEncounterByClass, INPATIENT);
-      icuPatientIds = getPatientIds(mapIcuOverall, ICU);
-      icuVentPatientIds = getPatientIds(mapIcuOverall, ICU_VENTILATION);
-      ecmoPatientIds = getPatientIds(mapIcuOverall, ICU_ECMO);
+
+      if (useIcuUndiff) {
+        icuUndiffPatientIds = getPatientIds(mapIcuOverall, ICU_UNDIFF);
+      } else {
+        icuPatientIds = getPatientIds(mapIcuOverall, ICU);
+        icuVentPatientIds = getPatientIds(mapIcuOverall, ICU_VENTILATION);
+        ecmoPatientIds = getPatientIds(mapIcuOverall, ICU_ECMO);
+      }
 
       Stream.of(
               mapPositiveEncounterByClass.getOrDefault(OUTPATIENT, Collections.emptyList()),
               mapPositiveEncounterByClass.getOrDefault(INPATIENT, Collections.emptyList()),
-              mapIcuOverall.getOrDefault(ICU, Collections.emptyList()),
-              mapIcuOverall.getOrDefault(ICU_VENTILATION, Collections.emptyList()),
-              mapIcuOverall.getOrDefault(ICU_ECMO, Collections.emptyList()))
-          .forEach(encountersOverall::addAll);
+              // Decide whether we need all 3 subitems or just undiff
+              useIcuUndiff
+                  ? mapIcuOverall.getOrDefault(ICU_UNDIFF, Collections.emptyList())
+                  : Stream.of(
+                          mapIcuOverall.getOrDefault(ICU, Collections.emptyList()),
+                          mapIcuOverall.getOrDefault(ICU_VENTILATION, Collections.emptyList()),
+                          mapIcuOverall.getOrDefault(ICU_ECMO, Collections.emptyList()))
+                      .flatMap(List::stream)
+                      .collect(Collectors.toList()))
+          .flatMap(List::stream)
+          .forEach(encountersOverall::add);
 
       encountersOverall.forEach(
           encounter ->
@@ -147,24 +161,30 @@ public class CumulativeMaxTreatmentLevelAge extends DashboardDataItemLogic {
     }
   }
 
-  private boolean hasHigherTreatmentLevel(String patientId, TreatmentLevels level) {
+  private boolean hasHigherTreatmentLevel(
+      String patientId, TreatmentLevels level, Boolean useIcuUndiff) {
+
     return switch (level) {
       case OUTPATIENT ->
-          inpatientPatientIds.contains(patientId)
-              || icuPatientIds.contains(patientId)
-              || icuVentPatientIds.contains(patientId)
-              || ecmoPatientIds.contains(patientId);
-      case NORMAL_WARD ->
-          icuPatientIds.contains(patientId)
-              || icuVentPatientIds.contains(patientId)
-              || ecmoPatientIds.contains(patientId);
-      case ICU -> icuVentPatientIds.contains(patientId) || ecmoPatientIds.contains(patientId);
+          inpatientPatientIds.contains(patientId) || hasIcuTreatment(patientId, useIcuUndiff);
+      case NORMAL_WARD -> hasIcuTreatment(patientId, useIcuUndiff);
+      case ICU ->
+          useIcuUndiff
+              ? icuUndiffPatientIds.contains(patientId)
+              : icuVentPatientIds.contains(patientId) || ecmoPatientIds.contains(patientId);
       case ICU_VENTILATION -> ecmoPatientIds.contains(patientId);
       default -> false;
     };
   }
 
-  // 5. Kapselung der Patientenprüfung in eine eigene Methode
+  private boolean hasIcuTreatment(String patientId, boolean useIcuUndiff) {
+    return useIcuUndiff
+        ? icuUndiffPatientIds.contains(patientId)
+        : icuPatientIds.contains(patientId)
+            || icuVentPatientIds.contains(patientId)
+            || ecmoPatientIds.contains(patientId);
+  }
+
   private void addPatientIfEligible(
       UkbPatient patient,
       Date admissionDate,
@@ -178,6 +198,7 @@ public class CumulativeMaxTreatmentLevelAge extends DashboardDataItemLogic {
           case ICU -> icuPatientIds.contains(patient.getId());
           case ICU_VENTILATION -> icuVentPatientIds.contains(patient.getId());
           case ICU_ECMO -> ecmoPatientIds.contains(patient.getId());
+          case ICU_UNDIFF -> icuUndiffPatientIds.contains(patient.getId());
           case ALL -> false;
         };
 

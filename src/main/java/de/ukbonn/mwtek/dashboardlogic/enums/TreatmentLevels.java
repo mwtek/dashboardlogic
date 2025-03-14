@@ -26,6 +26,7 @@ public enum TreatmentLevels {
   ICU("ICU"),
   ICU_VENTILATION("ICU_with_ventilation"),
   ICU_ECMO("ICU_with_ecmo"),
+  ICU_UNDIFF("ICU_undifferentiated"),
   NORMAL_WARD("Normal_ward"),
 
   // Internal usages for list management

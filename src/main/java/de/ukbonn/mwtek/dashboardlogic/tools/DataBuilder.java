@@ -69,6 +69,7 @@ public class DataBuilder {
   private List<UkbEncounter> currentIcuEncounters;
   private List<UkbEncounter> currentVentEncounters;
   private List<UkbEncounter> currentEcmoEncounters;
+  private List<UkbEncounter> currentIcuUndiffEncounters;
 
   private DashboardLogicFixedValues labResult;
   private DataItemContext dataItemContext;
@@ -77,6 +78,8 @@ public class DataBuilder {
   private KidsRadarDataItemContext kidsRadarDataItemContext;
   private KiraData kiraData;
   private Map<String, Map<String, CoreCaseData>> coreCaseDataByGroups;
+
+  private Boolean useIcuUndiff;
 
   public List<UkbEncounter> buildCumulativeByClass() {
     return new CumulativeMaxTreatmentLevel()
@@ -103,13 +106,15 @@ public class DataBuilder {
         currentStandardWardEncounters,
         currentIcuEncounters,
         currentVentEncounters,
-        currentEcmoEncounters);
+        currentEcmoEncounters,
+        currentIcuUndiffEncounters,
+        useIcuUndiff);
   }
 
   public List<UkbEncounter> buildNumberOfCurrentMaxTreatmentLevel() {
     return new CurrentMaxTreatmentLevel()
         .getNumberOfCurrentMaxTreatmentLevel(
-            icuDiseaseMap, dbData.getFacilityContactEncounters(), treatmentLevel);
+            icuDiseaseMap, dbData.getFacilityContactEncounters(), treatmentLevel, useIcuUndiff);
   }
 
   public Set<UkbObservation> buildObservationsByResult() {
@@ -130,7 +135,11 @@ public class DataBuilder {
   public List<Integer> buildCumMaxtreatmentlevelAgeList() {
     return new CumulativeMaxTreatmentLevelAge()
         .createMaxTreatmentLevelAgeMap(
-            mapPositiveEncounterByClass, icuDiseaseMap, dbData.getPatients(), treatmentLevel);
+            mapPositiveEncounterByClass,
+            icuDiseaseMap,
+            dbData.getPatients(),
+            treatmentLevel,
+            useIcuUndiff);
   }
 
   public TimestampedListPair buildTimelineTestsMap() {
@@ -155,7 +164,8 @@ public class DataBuilder {
         dbData.getSupplyContactEncounters(),
         dbData.getIcuProcedures(),
         dbData.getLocations(),
-        dbData.getInputCodeSettings());
+        dbData.getInputCodeSettings(),
+        useIcuUndiff);
   }
 
   public Number buildGenderCountByClass() {

@@ -22,5 +22,6 @@ public enum DataItemContext {
   INFLUENZA,
   KIDS_RADAR,
   KIDS_RADAR_KJP,
-  KIDS_RADAR_RSV
+  KIDS_RADAR_RSV,
+  UKB_MODEL
 }

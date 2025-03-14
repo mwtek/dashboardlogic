@@ -30,6 +30,7 @@ import static de.ukbonn.mwtek.dashboardlogic.enums.DataItemTypes.ITEMTYPE_LIST;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItemTypes.SUBITEMTYPE_DATE;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.CUMULATIVE_AGE;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.CUMULATIVE_AGE_MAXTREATMENTLEVEL_ICU;
+import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.CUMULATIVE_AGE_MAXTREATMENTLEVEL_ICU_UNDIFF;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.CUMULATIVE_AGE_MAXTREATMENTLEVEL_ICU_WITH_ECMO;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.CUMULATIVE_AGE_MAXTREATMENTLEVEL_ICU_WITH_VENTILATION;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.CUMULATIVE_AGE_MAXTREATMENTLEVEL_NORMAL_WARD;
@@ -50,6 +51,7 @@ import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.CUMULATIVE_RESULTS;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.CUMULATIVE_VARIANTTESTRESULTS;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.CUMULATIVE_ZIPCODE;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.CURRENT_AGE_MAXTREATMENTLEVEL_ICU;
+import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.CURRENT_AGE_MAXTREATMENTLEVEL_ICU_UNDIFF;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.CURRENT_AGE_MAXTREATMENTLEVEL_ICU_WITH_ECMO;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.CURRENT_AGE_MAXTREATMENTLEVEL_ICU_WITH_VENTILATION;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.CURRENT_AGE_MAXTREATMENTLEVEL_NORMAL_WARD;
@@ -71,6 +73,7 @@ import static de.ukbonn.mwtek.dashboardlogic.enums.Gender.FEMALE;
 import static de.ukbonn.mwtek.dashboardlogic.enums.Gender.MALE;
 import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.ICU;
 import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.ICU_ECMO;
+import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.ICU_UNDIFF;
 import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.ICU_VENTILATION;
 import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.INPATIENT;
 import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.NORMAL_WARD;
@@ -90,7 +93,9 @@ import static de.ukbonn.mwtek.dashboardlogic.logic.cumulative.lengthofstay.Cumul
 import static de.ukbonn.mwtek.dashboardlogic.logic.cumulative.lengthofstay.CumulativeLengthOfStayHospital.createMapDaysHospitalList;
 import static de.ukbonn.mwtek.dashboardlogic.logic.cumulative.lengthofstay.CumulativeLengthOfStayIcu.createIcuLengthListByVitalstatus;
 import static de.ukbonn.mwtek.dashboardlogic.logic.cumulative.lengthofstay.CumulativeLengthOfStayIcu.createIcuLengthOfStayList;
+import static de.ukbonn.mwtek.dashboardlogic.tools.ProcedureFilter.filterProceduresByIcuWardCheck;
 
+import de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues;
 import de.ukbonn.mwtek.dashboardlogic.enums.DataItemContext;
 import de.ukbonn.mwtek.dashboardlogic.enums.KidsRadarDataItemContext;
 import de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels;
@@ -98,12 +103,12 @@ import de.ukbonn.mwtek.dashboardlogic.enums.VitalStatus;
 import de.ukbonn.mwtek.dashboardlogic.logic.DashboardData;
 import de.ukbonn.mwtek.dashboardlogic.logic.DiseaseDetectionManagement;
 import de.ukbonn.mwtek.dashboardlogic.logic.cumulative.age.CumulativeAge;
-import de.ukbonn.mwtek.dashboardlogic.logic.cumulative.maxtreatmentlevel.CumulativeMaxTreatmentLevelAge;
 import de.ukbonn.mwtek.dashboardlogic.logic.cumulative.results.CumulativeVariantTestResults;
 import de.ukbonn.mwtek.dashboardlogic.logic.timeline.TimelineVariantTestResults;
 import de.ukbonn.mwtek.dashboardlogic.models.DiseaseDataItem;
 import de.ukbonn.mwtek.dashboardlogic.models.FacilityEncounterToIcuSupplyContactsMap;
 import de.ukbonn.mwtek.dashboardlogic.models.TimestampedListPair;
+import de.ukbonn.mwtek.dashboardlogic.settings.GlobalConfiguration;
 import de.ukbonn.mwtek.dashboardlogic.settings.InputCodeSettings;
 import de.ukbonn.mwtek.dashboardlogic.settings.QualitativeLabCodesSettings;
 import de.ukbonn.mwtek.dashboardlogic.settings.VariantSettings;
@@ -149,6 +154,11 @@ public class DataItemGenerator {
   List<UkbProcedure> icuProcedures;
   List<UkbLocation> locations;
 
+  List<UkbEncounter> cumulativeIcuEncounters;
+  List<UkbEncounter> cumulativeIcuVentEncounters;
+  List<UkbEncounter> cumulativeIcuEcmoEncounters;
+  List<UkbEncounter> cumulativeIcuUndiffEncounters;
+
   // map with all inpatient-disease-positive cases, which is needed for internal reports in the UKB
   Map<String, List<String>> mapCurrentTreatmentlevelCaseNrs = new HashMap<>();
 
@@ -185,34 +195,28 @@ public class DataItemGenerator {
    *
    * @param mapExcludeDataItems Map with data items to be excluded from the output (e.g.
    *     "current.treatmentlevel").
-   * @param debug Flag to provide debug information (e.g. casenrs) in the output.
    * @param variantSettings {@link VariantSettings Configuration} of extended covid-19 variants for
    *     the definition of not yet known/captured variants.
    * @param inputCodeSettings The configuration of the parameterizable codes such as the observation
    *     codes or procedure codes.
-   * @param usePartOfInsteadOfIdentifier Should the Encounter.partOf value be used additionally of
-   *     the visit-number in {@link UkbEncounter#getIdentifier()} to assign
-   *     'Versorgungsstellenkontakt' to 'Einrichtungskontakt'?
+   * @param globalConfiguration An instance of the global configuration settings.
    * @return List with all the {@link DiseaseDataItem data items} that are defined in the corona
    *     dashboard json specification
    */
   @SuppressWarnings("unused")
   public List<DiseaseDataItem> getDataItems(
       Map<String, Boolean> mapExcludeDataItems,
-      Boolean debug,
       VariantSettings variantSettings,
       InputCodeSettings inputCodeSettings,
       QualitativeLabCodesSettings qualitativeLabCodesSettings,
       DataItemContext dataItemContext,
-      Boolean usePartOfInsteadOfIdentifier) {
+      GlobalConfiguration globalConfiguration) {
     List<DiseaseDataItem> currentDataList = new ArrayList<>();
     if (mapExcludeDataItems == null) {
       mapExcludeDataItems = new HashMap<>();
     }
-
-    if (debug == null) {
-      debug = false;
-    }
+    boolean useIcuUndiff = globalConfiguration.getUseIcuUndifferentiated();
+    boolean debug = globalConfiguration.getDebug();
 
     // If there are resources with unfilled mandatory attributes, report them immediately (may give
     // partially reduced result sets)
@@ -244,14 +248,14 @@ public class DataItemGenerator {
     // Same logic if their is no location data found. If Encounter.service provider is used instead,
     // there should be at least one dummy icu location.
     boolean supplyContactsFound = isSupplyContactFound(supplyContactEncounters);
-    boolean locationsFound = !locations.isEmpty();
+    boolean locationsFound = locations != null && !locations.isEmpty();
     if (supplyContactsFound && locationsFound) {
       Map<String, String> supplyContactIdFacilityContactId =
           generateSupplyContactToFacilityContactMap(
               supplyContactEncounters,
               departmentContactEncounters,
               facilityContactEncounters,
-              usePartOfInsteadOfIdentifier);
+              globalConfiguration.getUsePartOfInsteadOfIdentifier());
     } else {
       log.warn(
           "No encounter with level 'Versorgungsstellenkontakt' and/or location resources were"
@@ -268,14 +272,17 @@ public class DataItemGenerator {
         qualitativeLabCodesSettings,
         dataItemContext);
 
-    Map<TreatmentLevels, List<UkbEncounter>> mapPositiveEncounterByClass =
-        createEncounterMapByClass(facilityContactEncounters);
-
     // the icu information is part of the supply contact
     List<UkbEncounter> icuSupplyContactEncounters =
         supplyContactEncounters.stream()
             .filter(x -> x.isIcuCase(LocationFilter.getIcuLocationIds(locations), false))
             .toList();
+
+    if (globalConfiguration.getCheckProceduresIcuStays())
+      icuProcedures = filterProceduresByIcuWardCheck(icuProcedures, icuSupplyContactEncounters);
+
+    Map<TreatmentLevels, List<UkbEncounter>> mapPositiveEncounterByClass =
+        createEncounterMapByClass(facilityContactEncounters);
 
     // List of stationary Cases
     List<UkbEncounter> inpatientEncounters =
@@ -286,11 +293,16 @@ public class DataItemGenerator {
 
     Map<TreatmentLevels, List<UkbEncounter>> mapIcuDiseasePositiveOverall =
         createIcuMap(
-            encounters, icuSupplyContactEncounters, locations, icuProcedures, inputCodeSettings);
+            encounters,
+            icuSupplyContactEncounters,
+            locations,
+            icuProcedures,
+            inputCodeSettings,
+            useIcuUndiff);
 
     /* used for current logic */
     Map<TreatmentLevels, List<UkbEncounter>> mapCurrentIcuDiseasePositive =
-        createCurrentIcuMap(mapIcuDiseasePositiveOverall);
+        createCurrentIcuMap(mapIcuDiseasePositiveOverall, useIcuUndiff);
 
     // Initialize an instance with the clinical data sets.
     DashboardData dbData =
@@ -311,18 +323,21 @@ public class DataItemGenerator {
     List<UkbEncounter> currentIcuEncounters = new ArrayList<>();
     List<UkbEncounter> currentVentEncounters = new ArrayList<>();
     List<UkbEncounter> currentEcmoEncounters = new ArrayList<>();
+    List<UkbEncounter> currentIcuUndiffEncounters = new ArrayList<>();
 
     // Lists of current maxtreatmentlevels
     List<UkbEncounter> currentMaxStationary = new ArrayList<>();
-    List<UkbEncounter> currentMaxIcu;
-    List<UkbEncounter> currentMaxIcuVent;
-    List<UkbEncounter> currentMaxIcuEcmo;
+    List<UkbEncounter> currentMaxIcu = new ArrayList<>();
+    List<UkbEncounter> currentMaxIcuVent = new ArrayList<>();
+    List<UkbEncounter> currentMaxIcuEcmo = new ArrayList<>();
+    List<UkbEncounter> currentMaxIcuUndiff = new ArrayList<>();
 
     // Lists of current maxtreatmentlevels with ages
     List<Long> currentMaxStationaryAgeList;
     List<Long> currentMaxIcuAgeList;
     List<Long> currentMaxIcuVentAgeList;
     List<Long> currentMaxIcuEcmoAgeList;
+    List<Long> currentMaxIcuUndiffAgeList;
 
     // Inpatients = NORMAL_WARD + ICU + ICU_VENT + ECMO
     // needed later for the splitting cumulative.gender into
@@ -343,31 +358,43 @@ public class DataItemGenerator {
             .icuDiseaseMap(mapCurrentIcuDiseasePositive)
             .buildCumulativeByClass();
     // initialize ICU data
-    List<UkbEncounter> cumulativeIcuEncounters =
-        new DataBuilder()
-            .treatmentLevel(ICU)
-            .icuDiseaseMap(mapIcuDiseasePositiveOverall)
-            .buildCumulativeByIcuLevel();
-    // initialize ICU_VENT data
-    List<UkbEncounter> cumulativeIcuVentEncounters =
-        new DataBuilder()
-            .treatmentLevel(ICU_VENTILATION)
-            .icuDiseaseMap(mapIcuDiseasePositiveOverall)
-            .buildCumulativeByIcuLevel();
-    // initialize ECMO data
-    List<UkbEncounter> cumulativeIcuEcmoEncounters =
-        new DataBuilder()
-            .treatmentLevel(ICU_ECMO)
-            .icuDiseaseMap(mapIcuDiseasePositiveOverall)
-            .buildCumulativeByIcuLevel();
+    if (useIcuUndiff) {
+      // initialize ICU_UNDIFF data
+      cumulativeIcuUndiffEncounters =
+          new DataBuilder()
+              .treatmentLevel(ICU_UNDIFF)
+              .icuDiseaseMap(mapIcuDiseasePositiveOverall)
+              .buildCumulativeByIcuLevel();
+      removeDuplicatePids(
+          cumulativeOutpatientEncounters,
+          cumulativeStandardWardEncounters,
+          cumulativeIcuUndiffEncounters);
+    } else {
 
-    removeDuplicatePids(
-        cumulativeOutpatientEncounters,
-        cumulativeStandardWardEncounters,
-        cumulativeIcuEncounters,
-        cumulativeIcuVentEncounters,
-        cumulativeIcuEcmoEncounters);
-
+      cumulativeIcuEncounters =
+          new DataBuilder()
+              .treatmentLevel(ICU)
+              .icuDiseaseMap(mapIcuDiseasePositiveOverall)
+              .buildCumulativeByIcuLevel();
+      // initialize ICU_VENT data
+      cumulativeIcuVentEncounters =
+          new DataBuilder()
+              .treatmentLevel(ICU_VENTILATION)
+              .icuDiseaseMap(mapIcuDiseasePositiveOverall)
+              .buildCumulativeByIcuLevel();
+      // initialize ECMO data
+      cumulativeIcuEcmoEncounters =
+          new DataBuilder()
+              .treatmentLevel(ICU_ECMO)
+              .icuDiseaseMap(mapIcuDiseasePositiveOverall)
+              .buildCumulativeByIcuLevel();
+      removeDuplicatePids(
+          cumulativeOutpatientEncounters,
+          cumulativeStandardWardEncounters,
+          cumulativeIcuEncounters,
+          cumulativeIcuVentEncounters,
+          cumulativeIcuEcmoEncounters);
+    }
     DiseaseDataItem cd;
     // current treatmentlevel
     String currentTreatmentlevelItemName = determineLabel(dataItemContext, CURRENT_TREATMENTLEVEL);
@@ -380,31 +407,45 @@ public class DataItemGenerator {
               .icuSupplyContactEncounters(icuSupplyContactEncounters)
               .dbData(dbData)
               .buildCurrentEncounterByIcuLevel();
-      currentIcuEncounters =
-          new DataBuilder()
-              .mapCurrentIcuPositive(mapCurrentIcuDiseasePositive)
-              .treatmentLevel(ICU)
-              .icuSupplyContactEncounters(icuSupplyContactEncounters)
-              .dbData(dbData)
-              .buildCurrentEncounterByIcuLevel();
-      currentVentEncounters =
-          new DataBuilder()
-              .mapCurrentIcuPositive(mapCurrentIcuDiseasePositive)
-              .treatmentLevel(ICU_VENTILATION)
-              .icuSupplyContactEncounters(icuSupplyContactEncounters)
-              .dbData(dbData)
-              .buildCurrentEncounterByIcuLevel();
-      currentEcmoEncounters =
-          new DataBuilder()
-              .mapCurrentIcuPositive(mapCurrentIcuDiseasePositive)
-              .treatmentLevel(ICU_ECMO)
-              .icuSupplyContactEncounters(icuSupplyContactEncounters)
-              .dbData(dbData)
-              .buildCurrentEncounterByIcuLevel();
       mapCurrent.put(NORMAL_WARD.getValue(), currentStandardWardEncounters.size());
-      mapCurrent.put(ICU.getValue(), currentIcuEncounters.size());
-      mapCurrent.put(ICU_VENTILATION.getValue(), currentVentEncounters.size());
-      mapCurrent.put(ICU_ECMO.getValue(), currentEcmoEncounters.size());
+
+      if (!useIcuUndiff) {
+        currentIcuEncounters =
+            new DataBuilder()
+                .mapCurrentIcuPositive(mapCurrentIcuDiseasePositive)
+                .treatmentLevel(ICU)
+                .icuSupplyContactEncounters(icuSupplyContactEncounters)
+                .dbData(dbData)
+                .buildCurrentEncounterByIcuLevel();
+        currentVentEncounters =
+            new DataBuilder()
+                .mapCurrentIcuPositive(mapCurrentIcuDiseasePositive)
+                .treatmentLevel(ICU_VENTILATION)
+                .icuSupplyContactEncounters(icuSupplyContactEncounters)
+                .dbData(dbData)
+                .buildCurrentEncounterByIcuLevel();
+        currentEcmoEncounters =
+            new DataBuilder()
+                .mapCurrentIcuPositive(mapCurrentIcuDiseasePositive)
+                .treatmentLevel(ICU_ECMO)
+                .icuSupplyContactEncounters(icuSupplyContactEncounters)
+                .dbData(dbData)
+                .buildCurrentEncounterByIcuLevel();
+        mapCurrent.put(ICU.getValue(), currentIcuEncounters.size());
+        mapCurrent.put(ICU_VENTILATION.getValue(), currentVentEncounters.size());
+        mapCurrent.put(ICU_ECMO.getValue(), currentEcmoEncounters.size());
+      } else {
+        currentIcuUndiffEncounters =
+            new DataBuilder()
+                .mapCurrentIcuPositive(mapCurrentIcuDiseasePositive)
+                .treatmentLevel(ICU_UNDIFF)
+                .icuSupplyContactEncounters(icuSupplyContactEncounters)
+                .dbData(dbData)
+                .buildCurrentEncounterByIcuLevel();
+        mapCurrent.put(ICU_UNDIFF.getValue(), currentIcuUndiffEncounters.size());
+        currentIcuUndiffEncounters.forEach(
+            x -> System.out.println("ICU_UNDIFF: " + x.getCaseId() + " pid: " + x.getPatientId()));
+      }
 
       currentDataList.add(
           new DiseaseDataItem(currentTreatmentlevelItemName, ITEMTYPE_AGGREGATED, mapCurrent));
@@ -417,6 +458,8 @@ public class DataItemGenerator {
               .currentIcuEncounters(currentIcuEncounters)
               .currentVentEncounters(currentVentEncounters)
               .currentEcmoEncounters(currentEcmoEncounters)
+              .currentIcuUndiffEncounters(currentIcuUndiffEncounters)
+              .useIcuUndiff(useIcuUndiff)
               .buildCurrentTreatmentlevelMapCaseIds();
       this.setMapCurrentTreatmentlevelCaseIds(mapCurrentTreatmentlevelCaseIds);
 
@@ -438,49 +481,70 @@ public class DataItemGenerator {
           new DataBuilder()
               .icuDiseaseMap(mapIcuDiseasePositiveOverall)
               .dbData(dbData)
-              .treatmentLevel(INPATIENT)
-              .buildNumberOfCurrentMaxTreatmentLevel();
-      currentMaxIcu =
-          new DataBuilder()
-              .icuDiseaseMap(mapIcuDiseasePositiveOverall)
-              .dbData(dbData)
-              .treatmentLevel(ICU)
-              .buildNumberOfCurrentMaxTreatmentLevel();
-      currentMaxIcuVent =
-          new DataBuilder()
-              .icuDiseaseMap(mapIcuDiseasePositiveOverall)
-              .dbData(dbData)
-              .treatmentLevel(ICU_VENTILATION)
-              .buildNumberOfCurrentMaxTreatmentLevel();
-      currentMaxIcuEcmo =
-          new DataBuilder()
-              .icuDiseaseMap(mapIcuDiseasePositiveOverall)
-              .dbData(dbData)
-              .treatmentLevel(ICU_ECMO)
+              .useIcuUndiff(useIcuUndiff)
+              .treatmentLevel(NORMAL_WARD)
               .buildNumberOfCurrentMaxTreatmentLevel();
       mapCurrentMax.put(NORMAL_WARD.getValue(), currentMaxStationary.size());
-      mapCurrentMax.put(ICU.getValue(), currentMaxIcu.size());
-      mapCurrentMax.put(ICU_VENTILATION.getValue(), currentMaxIcuVent.size());
-      mapCurrentMax.put(ICU_ECMO.getValue(), currentMaxIcuEcmo.size());
+      if (!useIcuUndiff) {
+        currentMaxIcu =
+            new DataBuilder()
+                .icuDiseaseMap(mapIcuDiseasePositiveOverall)
+                .dbData(dbData)
+                .useIcuUndiff(false)
+                .treatmentLevel(ICU)
+                .buildNumberOfCurrentMaxTreatmentLevel();
+        currentMaxIcuVent =
+            new DataBuilder()
+                .icuDiseaseMap(mapIcuDiseasePositiveOverall)
+                .dbData(dbData)
+                .useIcuUndiff(false)
+                .treatmentLevel(ICU_VENTILATION)
+                .buildNumberOfCurrentMaxTreatmentLevel();
+        currentMaxIcuEcmo =
+            new DataBuilder()
+                .icuDiseaseMap(mapIcuDiseasePositiveOverall)
+                .dbData(dbData)
+                .useIcuUndiff(false)
+                .treatmentLevel(ICU_ECMO)
+                .buildNumberOfCurrentMaxTreatmentLevel();
+        mapCurrentMax.put(ICU.getValue(), currentMaxIcu.size());
+        mapCurrentMax.put(ICU_VENTILATION.getValue(), currentMaxIcuVent.size());
+        mapCurrentMax.put(ICU_ECMO.getValue(), currentMaxIcuEcmo.size());
+      } else {
+        currentMaxIcuUndiff =
+            new DataBuilder()
+                .icuDiseaseMap(mapIcuDiseasePositiveOverall)
+                .dbData(dbData)
+                .useIcuUndiff(true)
+                .treatmentLevel(ICU_UNDIFF)
+                .buildNumberOfCurrentMaxTreatmentLevel();
+        mapCurrentMax.put(ICU_UNDIFF.getValue(), currentMaxIcuUndiff.size());
+      }
       currentDataList.add(
           new DiseaseDataItem(currentMaxtreatmentlevelLabel, ITEMTYPE_AGGREGATED, mapCurrentMax));
 
       if (debug) {
-        List<String> listStationaryCaseNrs = new ArrayList<>();
-        List<String> listIcuCaseNrs = new ArrayList<>();
-        List<String> listVentCaseNrs = new ArrayList<>();
-        List<String> listEcmoCaseNrs = new ArrayList<>();
         Map<String, List<String>> resultCurrentTreatmentCaseNrs = new LinkedHashMap<>();
 
-        currentMaxStationary.forEach(encounter -> listStationaryCaseNrs.add(encounter.getId()));
-        currentMaxIcu.forEach(encounter -> listIcuCaseNrs.add(encounter.getId()));
-        currentMaxIcuVent.forEach(encounter -> listVentCaseNrs.add(encounter.getId()));
-        currentMaxIcuEcmo.forEach(encounter -> listEcmoCaseNrs.add(encounter.getId()));
+        List<String> normalWardEncounterIds =
+            currentMaxStationary.stream().map(Encounter::getId).collect(Collectors.toList());
+        resultCurrentTreatmentCaseNrs.put(NORMAL_WARD.getValue(), normalWardEncounterIds);
 
-        resultCurrentTreatmentCaseNrs.put(NORMAL_WARD.getValue(), listStationaryCaseNrs);
-        resultCurrentTreatmentCaseNrs.put(ICU.getValue(), listIcuCaseNrs);
-        resultCurrentTreatmentCaseNrs.put(ICU_VENTILATION.getValue(), listVentCaseNrs);
-        resultCurrentTreatmentCaseNrs.put(ICU_ECMO.getValue(), listEcmoCaseNrs);
+        if (useIcuUndiff) {
+          List<String> icuUndiffEncounterIds =
+              currentMaxIcuUndiff.stream().map(Encounter::getId).collect(Collectors.toList());
+          resultCurrentTreatmentCaseNrs.put(ICU_UNDIFF.getValue(), icuUndiffEncounterIds);
+        } else {
+          resultCurrentTreatmentCaseNrs.put(
+              ICU.getValue(),
+              currentMaxIcu.stream().map(Encounter::getId).collect(Collectors.toList()));
+          resultCurrentTreatmentCaseNrs.put(
+              ICU_VENTILATION.getValue(),
+              currentMaxIcuVent.stream().map(Encounter::getId).collect(Collectors.toList()));
+          resultCurrentTreatmentCaseNrs.put(
+              ICU_ECMO.getValue(),
+              currentMaxIcuEcmo.stream().map(Encounter::getId).collect(Collectors.toList()));
+        }
 
         currentDataList.add(
             new DiseaseDataItem(
@@ -494,13 +558,13 @@ public class DataItemGenerator {
         determineLabel(dataItemContext, CURRENT_AGE_MAXTREATMENTLEVEL_NORMAL_WARD);
     // current.age.maxtreatmentlevel.normal_ward
     if (isItemNotExcluded(mapExcludeDataItems, currentAgeMaxtreatmentlevelNormalWard, false)) {
-
       if (mapExcludeDataItems.getOrDefault(currentMaxtreatmentlevelLabel, false)) {
         currentMaxStationary =
             new DataBuilder()
                 .icuDiseaseMap(mapIcuDiseasePositiveOverall)
                 .dbData(dbData)
-                .treatmentLevel(INPATIENT)
+                .treatmentLevel(NORMAL_WARD)
+                .useIcuUndiff(useIcuUndiff)
                 .buildNumberOfCurrentMaxTreatmentLevel();
       }
       currentDataList.add(
@@ -513,102 +577,65 @@ public class DataItemGenerator {
                   .mapPositiveEncounterByClass(mapPositiveEncounterByClass)
                   .buildCurrentMaxAgeMap()));
     }
-    // current.age.maxtreatmentlevel.icu
-    String currentAgeMaxtreatmentlevelIcuLabel =
-        determineLabel(dataItemContext, CURRENT_AGE_MAXTREATMENTLEVEL_ICU);
-    if (isItemNotExcluded(mapExcludeDataItems, currentAgeMaxtreatmentlevelIcuLabel, false)) {
-      // This item is entirely depending on current.maxtreatmentlevel
-      if (isItemNotExcluded(mapExcludeDataItems, currentMaxtreatmentlevelLabel, false)) {
-        currentMaxIcu =
-            new DataBuilder()
-                .icuDiseaseMap(mapIcuDiseasePositiveOverall)
-                .dbData(dbData)
-                .treatmentLevel(ICU)
-                .buildNumberOfCurrentMaxTreatmentLevel();
-        currentDataList.add(
-            new DiseaseDataItem(
-                currentAgeMaxtreatmentlevelIcuLabel,
-                ITEMTYPE_LIST,
-                new DataBuilder()
-                    .dbData(dbData)
-                    .encounterSubSet(currentMaxIcu)
-                    .mapPositiveEncounterByClass(mapPositiveEncounterByClass)
-                    .buildCurrentMaxAgeMap()));
-      }
-    }
-    // current.age.maxtreatmentlevel.icu_with_ventilation
-    String currentAgeMaxtreatmentlevelIcuVent =
-        determineLabel(dataItemContext, CURRENT_AGE_MAXTREATMENTLEVEL_ICU_WITH_VENTILATION);
-    if (isItemNotExcluded(mapExcludeDataItems, currentAgeMaxtreatmentlevelIcuVent, false)) {
-      // This item is entirely depending on current.maxtreatmentlevel
-      if (isItemNotExcluded(mapExcludeDataItems, currentMaxtreatmentlevelLabel, false)) {
-        currentMaxIcuVent =
-            new DataBuilder()
-                .icuDiseaseMap(mapIcuDiseasePositiveOverall)
-                .dbData(dbData)
-                .treatmentLevel(ICU_VENTILATION)
-                .buildNumberOfCurrentMaxTreatmentLevel();
-
-        currentDataList.add(
-            new DiseaseDataItem(
-                currentAgeMaxtreatmentlevelIcuVent,
-                ITEMTYPE_LIST,
-                new DataBuilder()
-                    .dbData(dbData)
-                    .encounterSubSet(currentMaxIcuVent)
-                    .mapPositiveEncounterByClass(mapPositiveEncounterByClass)
-                    .buildCurrentMaxAgeMap()));
-      }
-    }
-    // current.age.maxtreatmentlevel.icu_with_ecmo
-    String currentAgeMaxtreatmentlevelIcuEcmo =
-        determineLabel(dataItemContext, CURRENT_AGE_MAXTREATMENTLEVEL_ICU_WITH_ECMO);
-    if (isItemNotExcluded(mapExcludeDataItems, currentAgeMaxtreatmentlevelIcuEcmo, false)) {
-      // This item is entirely depending on current.maxtreatmentlevel
-      if (isItemNotExcluded(mapExcludeDataItems, currentMaxtreatmentlevelLabel, false)) {
-        currentMaxIcuEcmo =
-            new DataBuilder()
-                .icuDiseaseMap(mapIcuDiseasePositiveOverall)
-                .dbData(dbData)
-                .treatmentLevel(ICU_ECMO)
-                .buildNumberOfCurrentMaxTreatmentLevel();
-        currentDataList.add(
-            new DiseaseDataItem(
-                currentAgeMaxtreatmentlevelIcuEcmo,
-                ITEMTYPE_LIST,
-                new DataBuilder()
-                    .dbData(dbData)
-                    .encounterSubSet(currentMaxIcuEcmo)
-                    .mapPositiveEncounterByClass(mapPositiveEncounterByClass)
-                    .buildCurrentMaxAgeMap()));
-      }
+    // current.age.maxtreatmentlevel.icu+
+    if (!useIcuUndiff) {
+      processIcuTreatmentLevel(
+          dataItemContext,
+          CURRENT_AGE_MAXTREATMENTLEVEL_ICU,
+          ICU,
+          currentDataList,
+          mapExcludeDataItems,
+          currentMaxtreatmentlevelLabel,
+          mapIcuDiseasePositiveOverall,
+          mapPositiveEncounterByClass,
+          dbData,
+          false);
+      processIcuTreatmentLevel(
+          dataItemContext,
+          CURRENT_AGE_MAXTREATMENTLEVEL_ICU_WITH_VENTILATION,
+          ICU_VENTILATION,
+          currentDataList,
+          mapExcludeDataItems,
+          currentMaxtreatmentlevelLabel,
+          mapIcuDiseasePositiveOverall,
+          mapPositiveEncounterByClass,
+          dbData,
+          false);
+      processIcuTreatmentLevel(
+          dataItemContext,
+          CURRENT_AGE_MAXTREATMENTLEVEL_ICU_WITH_ECMO,
+          ICU_ECMO,
+          currentDataList,
+          mapExcludeDataItems,
+          currentMaxtreatmentlevelLabel,
+          mapIcuDiseasePositiveOverall,
+          mapPositiveEncounterByClass,
+          dbData,
+          false);
+    } else {
+      // ICU_UNDIFF handling
+      processIcuTreatmentLevel(
+          dataItemContext,
+          CURRENT_AGE_MAXTREATMENTLEVEL_ICU_UNDIFF,
+          ICU_UNDIFF,
+          currentDataList,
+          mapExcludeDataItems,
+          currentMaxtreatmentlevelLabel,
+          mapIcuDiseasePositiveOverall,
+          mapPositiveEncounterByClass,
+          dbData,
+          true);
     }
 
     // cumulative.results
     String cumulativeResultsLabel = determineLabel(dataItemContext, CUMULATIVE_RESULTS);
     if (isItemNotExcluded(mapExcludeDataItems, cumulativeResultsLabel, false)) {
-      Set<UkbObservation> positiveObservations =
-          new DataBuilder()
-              .labResult(POSITIVE)
-              .dataItemContext(dataItemContext)
-              .dbData(dbData)
-              .buildObservationsByResult();
-      Set<UkbObservation> negativeObservations =
-          new DataBuilder()
-              .labResult(NEGATIVE)
-              .dataItemContext(dataItemContext)
-              .dbData(dbData)
-              .buildObservationsByResult();
-      Set<UkbObservation> borderlineObservations =
-          new DataBuilder()
-              .labResult(BORDERLINE)
-              .dataItemContext(dataItemContext)
-              .dbData(dbData)
-              .buildObservationsByResult();
       Map<String, Number> cumulativeResultMap = new LinkedHashMap<>();
-      cumulativeResultMap.put(POSITIVE.getValue(), positiveObservations.size());
-      cumulativeResultMap.put(BORDERLINE.getValue(), borderlineObservations.size());
-      cumulativeResultMap.put(NEGATIVE.getValue(), negativeObservations.size());
+      for (DashboardLogicFixedValues result : List.of(POSITIVE, BORDERLINE, NEGATIVE)) {
+        Set<UkbObservation> observations =
+            buildObservationsByResult(result, dataItemContext, dbData);
+        cumulativeResultMap.put(result.getValue(), observations.size());
+      }
       currentDataList.add(
           new DiseaseDataItem(cumulativeResultsLabel, ITEMTYPE_AGGREGATED, cumulativeResultMap));
     }
@@ -653,11 +680,14 @@ public class DataItemGenerator {
           OUTPATIENT.getValue(), cumulativeOutpatientEncounters.size());
       mapCumulativeMaxtreatmentlevel.put(
           NORMAL_WARD.getValue(), cumulativeStandardWardEncounters.size());
-      mapCumulativeMaxtreatmentlevel.put(ICU.getValue(), cumulativeIcuEncounters.size());
-      mapCumulativeMaxtreatmentlevel.put(
-          ICU_VENTILATION.getValue(), cumulativeIcuVentEncounters.size());
-      mapCumulativeMaxtreatmentlevel.put(ICU_ECMO.getValue(), cumulativeIcuEcmoEncounters.size());
-
+      if (!useIcuUndiff) {
+        mapCumulativeMaxtreatmentlevel.put(ICU.getValue(), cumulativeIcuEncounters.size());
+        mapCumulativeMaxtreatmentlevel.put(
+            ICU_VENTILATION.getValue(), cumulativeIcuVentEncounters.size());
+        mapCumulativeMaxtreatmentlevel.put(ICU_ECMO.getValue(), cumulativeIcuEcmoEncounters.size());
+      } else
+        mapCumulativeMaxtreatmentlevel.put(
+            ICU_UNDIFF.getValue(), cumulativeIcuUndiffEncounters.size());
       currentDataList.add(
           new DiseaseDataItem(
               cumulativeMaxTreatmentLevelLabel,
@@ -670,20 +700,26 @@ public class DataItemGenerator {
 
         resultMaxTreatmentCaseNrs.put(OUTPATIENT.getValue(), new HashMap<>());
         resultMaxTreatmentCaseNrs.put(NORMAL_WARD.getValue(), new HashMap<>());
-        resultMaxTreatmentCaseNrs.put(ICU.getValue(), new HashMap<>());
-        resultMaxTreatmentCaseNrs.put(ICU_VENTILATION.getValue(), new HashMap<>());
-        resultMaxTreatmentCaseNrs.put(ICU_ECMO.getValue(), new HashMap<>());
-
         createCumulativeMaxDebug(
             cumulativeOutpatientEncounters, OUTPATIENT.getValue(), resultMaxTreatmentCaseNrs);
         createCumulativeMaxDebug(
             cumulativeStandardWardEncounters, NORMAL_WARD.getValue(), resultMaxTreatmentCaseNrs);
-        createCumulativeMaxDebug(
-            cumulativeIcuEncounters, ICU.getValue(), resultMaxTreatmentCaseNrs);
-        createCumulativeMaxDebug(
-            cumulativeIcuVentEncounters, ICU_VENTILATION.getValue(), resultMaxTreatmentCaseNrs);
-        createCumulativeMaxDebug(
-            cumulativeIcuEcmoEncounters, ICU_ECMO.getValue(), resultMaxTreatmentCaseNrs);
+
+        if (!useIcuUndiff) {
+          resultMaxTreatmentCaseNrs.put(ICU.getValue(), new HashMap<>());
+          resultMaxTreatmentCaseNrs.put(ICU_VENTILATION.getValue(), new HashMap<>());
+          resultMaxTreatmentCaseNrs.put(ICU_ECMO.getValue(), new HashMap<>());
+          createCumulativeMaxDebug(
+              cumulativeIcuEncounters, ICU.getValue(), resultMaxTreatmentCaseNrs);
+          createCumulativeMaxDebug(
+              cumulativeIcuVentEncounters, ICU_VENTILATION.getValue(), resultMaxTreatmentCaseNrs);
+          createCumulativeMaxDebug(
+              cumulativeIcuEcmoEncounters, ICU_ECMO.getValue(), resultMaxTreatmentCaseNrs);
+        } else {
+          resultMaxTreatmentCaseNrs.put(ICU_UNDIFF.getValue(), new HashMap<>());
+          createCumulativeMaxDebug(
+              cumulativeIcuUndiffEncounters, ICU_UNDIFF.getValue(), resultMaxTreatmentCaseNrs);
+        }
 
         currentDataList.add(
             new DiseaseDataItem(
@@ -698,12 +734,13 @@ public class DataItemGenerator {
     if (isItemNotExcluded(
         mapExcludeDataItems, cumulativeAgeMaxTreatmentlevelOutpatientLabel, false)) {
       List<Integer> cumulativeMaxtreatmentlevelOutpatientAgeList =
-          new CumulativeMaxTreatmentLevelAge()
-              .createMaxTreatmentLevelAgeMap(
-                  mapPositiveEncounterByClass,
-                  mapIcuDiseasePositiveOverall,
-                  dbData.getPatients(),
-                  OUTPATIENT);
+          new DataBuilder()
+              .mapPositiveEncounterByClass(mapPositiveEncounterByClass)
+              .icuDiseaseMap(mapIcuDiseasePositiveOverall)
+              .dbData(dbData)
+              .useIcuUndiff(useIcuUndiff)
+              .treatmentLevel(OUTPATIENT)
+              .buildCumMaxtreatmentlevelAgeList();
       currentDataList.add(
           new DiseaseDataItem(
               cumulativeAgeMaxTreatmentlevelOutpatientLabel,
@@ -720,6 +757,7 @@ public class DataItemGenerator {
               .mapPositiveEncounterByClass(mapPositiveEncounterByClass)
               .icuDiseaseMap(mapIcuDiseasePositiveOverall)
               .dbData(dbData)
+              .useIcuUndiff(useIcuUndiff)
               .treatmentLevel(NORMAL_WARD)
               .buildCumMaxtreatmentlevelAgeList();
       currentDataList.add(
@@ -729,55 +767,80 @@ public class DataItemGenerator {
               cumulativeMaxtreatmentlevelNormalWardAgeList));
     }
     // cumulative.age.maxtreatmentlevel.icu
-    String cumulativeAgeMaxTreatmentlevelIcuLabel =
-        determineLabel(dataItemContext, CUMULATIVE_AGE_MAXTREATMENTLEVEL_ICU);
-    if (isItemNotExcluded(mapExcludeDataItems, cumulativeAgeMaxTreatmentlevelIcuLabel, false)) {
-      List<Integer> cumulativeMaxtreatmentlevelIcuAgeList =
-          new DataBuilder()
-              .mapPositiveEncounterByClass(mapPositiveEncounterByClass)
-              .icuDiseaseMap(mapIcuDiseasePositiveOverall)
-              .dbData(dbData)
-              .treatmentLevel(ICU)
-              .buildCumMaxtreatmentlevelAgeList();
-      currentDataList.add(
-          new DiseaseDataItem(
-              cumulativeAgeMaxTreatmentlevelIcuLabel,
-              ITEMTYPE_LIST,
-              cumulativeMaxtreatmentlevelIcuAgeList));
-    }
-    String cumulativeAgeMaxTreatmentlevelVentLabel =
-        determineLabel(dataItemContext, CUMULATIVE_AGE_MAXTREATMENTLEVEL_ICU_WITH_VENTILATION);
-    // cumulative.age.maxtreatmentlevel.icu_with_ventilation
-    if (isItemNotExcluded(mapExcludeDataItems, cumulativeAgeMaxTreatmentlevelVentLabel, false)) {
-      List<Integer> cumulativeMaxtreatmentlevelIcuVentAgeList =
-          new DataBuilder()
-              .mapPositiveEncounterByClass(mapPositiveEncounterByClass)
-              .icuDiseaseMap(mapIcuDiseasePositiveOverall)
-              .dbData(dbData)
-              .treatmentLevel(ICU_VENTILATION)
-              .buildCumMaxtreatmentlevelAgeList();
-      currentDataList.add(
-          new DiseaseDataItem(
-              cumulativeAgeMaxTreatmentlevelVentLabel,
-              ITEMTYPE_LIST,
-              cumulativeMaxtreatmentlevelIcuVentAgeList));
-    }
-    // cumulative.age.maxtreatmentlevel.icu_with_ecmo
-    String cumulativeAgeMaxTreatmentlevelEcmoLabel =
-        determineLabel(dataItemContext, CUMULATIVE_AGE_MAXTREATMENTLEVEL_ICU_WITH_ECMO);
-    if (isItemNotExcluded(mapExcludeDataItems, cumulativeAgeMaxTreatmentlevelEcmoLabel, false)) {
-      List<Integer> cumulativeMaxtreatmentlevelIcuEcmoAgeList =
-          new DataBuilder()
-              .mapPositiveEncounterByClass(mapPositiveEncounterByClass)
-              .icuDiseaseMap(mapIcuDiseasePositiveOverall)
-              .dbData(dbData)
-              .treatmentLevel(ICU_ECMO)
-              .buildCumMaxtreatmentlevelAgeList();
-      currentDataList.add(
-          new DiseaseDataItem(
-              cumulativeAgeMaxTreatmentlevelEcmoLabel,
-              ITEMTYPE_LIST,
-              cumulativeMaxtreatmentlevelIcuEcmoAgeList));
+
+    if (!useIcuUndiff) {
+      String cumulativeAgeMaxTreatmentlevelIcuLabel =
+          determineLabel(dataItemContext, CUMULATIVE_AGE_MAXTREATMENTLEVEL_ICU);
+      if (isItemNotExcluded(mapExcludeDataItems, cumulativeAgeMaxTreatmentlevelIcuLabel, false)) {
+        List<Integer> cumulativeMaxtreatmentlevelIcuAgeList =
+            new DataBuilder()
+                .mapPositiveEncounterByClass(mapPositiveEncounterByClass)
+                .icuDiseaseMap(mapIcuDiseasePositiveOverall)
+                .dbData(dbData)
+                .useIcuUndiff(false)
+                .treatmentLevel(ICU)
+                .buildCumMaxtreatmentlevelAgeList();
+        currentDataList.add(
+            new DiseaseDataItem(
+                cumulativeAgeMaxTreatmentlevelIcuLabel,
+                ITEMTYPE_LIST,
+                cumulativeMaxtreatmentlevelIcuAgeList));
+      }
+      String cumulativeAgeMaxTreatmentlevelVentLabel =
+          determineLabel(dataItemContext, CUMULATIVE_AGE_MAXTREATMENTLEVEL_ICU_WITH_VENTILATION);
+      // cumulative.age.maxtreatmentlevel.icu_with_ventilation
+      if (isItemNotExcluded(mapExcludeDataItems, cumulativeAgeMaxTreatmentlevelVentLabel, false)) {
+        List<Integer> cumulativeMaxtreatmentlevelIcuVentAgeList =
+            new DataBuilder()
+                .mapPositiveEncounterByClass(mapPositiveEncounterByClass)
+                .icuDiseaseMap(mapIcuDiseasePositiveOverall)
+                .dbData(dbData)
+                .useIcuUndiff(false)
+                .treatmentLevel(ICU_VENTILATION)
+                .buildCumMaxtreatmentlevelAgeList();
+        currentDataList.add(
+            new DiseaseDataItem(
+                cumulativeAgeMaxTreatmentlevelVentLabel,
+                ITEMTYPE_LIST,
+                cumulativeMaxtreatmentlevelIcuVentAgeList));
+      }
+      // cumulative.age.maxtreatmentlevel.icu_with_ecmo
+      String cumulativeAgeMaxTreatmentlevelEcmoLabel =
+          determineLabel(dataItemContext, CUMULATIVE_AGE_MAXTREATMENTLEVEL_ICU_WITH_ECMO);
+      if (isItemNotExcluded(mapExcludeDataItems, cumulativeAgeMaxTreatmentlevelEcmoLabel, false)) {
+        List<Integer> cumulativeMaxtreatmentlevelIcuEcmoAgeList =
+            new DataBuilder()
+                .mapPositiveEncounterByClass(mapPositiveEncounterByClass)
+                .icuDiseaseMap(mapIcuDiseasePositiveOverall)
+                .dbData(dbData)
+                .useIcuUndiff(false)
+                .treatmentLevel(ICU_ECMO)
+                .buildCumMaxtreatmentlevelAgeList();
+        currentDataList.add(
+            new DiseaseDataItem(
+                cumulativeAgeMaxTreatmentlevelEcmoLabel,
+                ITEMTYPE_LIST,
+                cumulativeMaxtreatmentlevelIcuEcmoAgeList));
+      }
+    } else {
+      String cumulativeAgeMaxTreatmentlevelIcuUndiffLabel =
+          determineLabel(dataItemContext, CUMULATIVE_AGE_MAXTREATMENTLEVEL_ICU_UNDIFF);
+      if (isItemNotExcluded(
+          mapExcludeDataItems, cumulativeAgeMaxTreatmentlevelIcuUndiffLabel, false)) {
+        List<Integer> cumMtlIcuUndiffAgeList =
+            new DataBuilder()
+                .mapPositiveEncounterByClass(mapPositiveEncounterByClass)
+                .icuDiseaseMap(mapIcuDiseasePositiveOverall)
+                .dbData(dbData)
+                .useIcuUndiff(true)
+                .treatmentLevel(ICU_UNDIFF)
+                .buildCumMaxtreatmentlevelAgeList();
+        currentDataList.add(
+            new DiseaseDataItem(
+                cumulativeAgeMaxTreatmentlevelIcuUndiffLabel,
+                ITEMTYPE_LIST,
+                cumMtlIcuUndiffAgeList));
+      }
     }
     // cumulative zip code
     String cumulativeZipCodeLabel = determineLabel(dataItemContext, CUMULATIVE_ZIPCODE);
@@ -826,6 +889,7 @@ public class DataItemGenerator {
           new DataBuilder()
               .dataItemContext(dataItemContext)
               .dbData(dbData)
+              .useIcuUndiff(useIcuUndiff)
               .buildMaxTreatmentTimeline();
       mapResultTreatment.put(SUBITEMTYPE_DATE, getDatesOutputList(dataItemContext));
 
@@ -843,17 +907,14 @@ public class DataItemGenerator {
       // case ids can be shown for plausibility checks
       if (debug) {
         Map<String, Map<Long, Set<String>>> resultMaxTreatmentCaseNrs = new LinkedHashMap<>();
+        // Iterate over the resultMaxTreatmentTimeline while preserving order
         for (Map.Entry<TreatmentLevels, Map<Long, Set<String>>> entry :
             resultMaxTreatmentTimeline.entrySet()) {
-          TreatmentLevels caseContext = entry.getKey();
-          Map<Long, Set<String>> mapDateAndCaseNr = entry.getValue();
-          resultMaxTreatmentCaseNrs.put(caseContext.getValue(), mapDateAndCaseNr);
+          resultMaxTreatmentCaseNrs.put(entry.getKey().getValue(), entry.getValue());
         }
-        // The date would be redundant in the debug information but is needed, since the rest
-        // endpoint is not accepting lists of type item without date lists
-        Map<Long, Set<String>> mapTempAndDate = new LinkedHashMap<>();
-        resultMaxTreatmentCaseNrs.put(SUBITEMTYPE_DATE, mapTempAndDate);
-
+        // Add an empty date map, as required by the REST endpoint (maintaining order)
+        resultMaxTreatmentCaseNrs.put(SUBITEMTYPE_DATE, new LinkedHashMap<>());
+        // Create a new DiseaseDataItem and add it to the current data list
         currentDataList.add(
             new DiseaseDataItem(
                 addDebugLabel(timelineMaxtreatmentlevelLabel),
@@ -1301,6 +1362,25 @@ public class DataItemGenerator {
     filterEncounters(cumulativeIcuEcmoEncounter, pidsEcmo);
   }
 
+  private void removeDuplicatePids(
+      List<UkbEncounter> cumulativeOutpatientEncounter,
+      List<UkbEncounter> cumulativeStandardWardEncounter,
+      List<UkbEncounter> cumulativeIcuUndiffEncounter) {
+
+    // Create sets of patient IDs for each encounter type
+    Set<String> pidsOutpatient = createPidList(cumulativeOutpatientEncounter);
+    Set<String> pidsStandardWard = createPidList(cumulativeStandardWardEncounter);
+    Set<String> pidsIcuUndiff = createPidList(cumulativeIcuUndiffEncounter);
+
+    // Helper method to remove duplicate patient IDs across levels
+    removeDuplicates(pidsOutpatient, pidsStandardWard, pidsIcuUndiff);
+    removeDuplicates(pidsStandardWard, pidsIcuUndiff);
+
+    // Filter each encounter list based on updated patient IDs
+    filterEncounters(cumulativeOutpatientEncounter, pidsOutpatient);
+    filterEncounters(cumulativeStandardWardEncounter, pidsStandardWard);
+  }
+
   /** Removes duplicate patient IDs from a base set compared to other sets. */
   @SafeVarargs
   private void removeDuplicates(Set<String> baseSet, Set<String>... otherSets) {
@@ -1352,7 +1432,6 @@ public class DataItemGenerator {
     return switch (context) {
       case KJP -> KIDS_RADAR_PREFIX_KJP + defaultLabel;
       case RSV -> KIDS_RADAR_PREFIX_RSV + defaultLabel;
-      default -> defaultLabel;
     };
   }
 
@@ -1435,5 +1514,52 @@ public class DataItemGenerator {
     if (debug) {
       currentDataList.add(new DiseaseDataItem(addDebugLabel(label), ITEMTYPE_DEBUG, caseIds));
     }
+  }
+
+  private void processIcuTreatmentLevel(
+      DataItemContext dataItemContext,
+      String treatmentLevelLabel,
+      TreatmentLevels treatmentLevel,
+      List<DiseaseDataItem> currentDataList,
+      Map<String, Boolean> mapExcludeDataItems,
+      String currentMaxtreatmentlevelLabel,
+      Map<TreatmentLevels, List<UkbEncounter>> mapIcuDiseasePositiveOverall,
+      Map<TreatmentLevels, List<UkbEncounter>> mapPositiveEncounterByClass,
+      DashboardData dbData,
+      Boolean useIcuUndiff) {
+
+    String label = determineLabel(dataItemContext, treatmentLevelLabel);
+
+    if (isItemNotExcluded(mapExcludeDataItems, label, false)
+        && isItemNotExcluded(mapExcludeDataItems, currentMaxtreatmentlevelLabel, false)) {
+
+      var currentMax =
+          new DataBuilder()
+              .icuDiseaseMap(mapIcuDiseasePositiveOverall)
+              .dbData(dbData)
+              .treatmentLevel(treatmentLevel)
+              .useIcuUndiff(useIcuUndiff)
+              .buildNumberOfCurrentMaxTreatmentLevel();
+
+      currentDataList.add(
+          new DiseaseDataItem(
+              label,
+              ITEMTYPE_LIST,
+              new DataBuilder()
+                  .dbData(dbData)
+                  .encounterSubSet(currentMax)
+                  .mapPositiveEncounterByClass(mapPositiveEncounterByClass)
+                  .useIcuUndiff(useIcuUndiff)
+                  .buildCurrentMaxAgeMap()));
+    }
+  }
+
+  private Set<UkbObservation> buildObservationsByResult(
+      DashboardLogicFixedValues result, DataItemContext context, DashboardData dbData) {
+    return new DataBuilder()
+        .labResult(result)
+        .dataItemContext(context)
+        .dbData(dbData)
+        .buildObservationsByResult();
   }
 }

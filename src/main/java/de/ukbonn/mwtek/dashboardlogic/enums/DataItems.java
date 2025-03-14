@@ -32,12 +32,12 @@ public class DataItems {
       "current.age.maxtreatmentlevel.normal_ward";
   public static final String CURRENT_AGE_MAXTREATMENTLEVEL_ICU =
       "current.age.maxtreatmentlevel.icu";
-  public static final String CURRENT_AGE_MAXTREATMENTLEVEL_ICU_UNDIFFERENTIATED =
-      "current.age.maxtreatmentlevel.icu_undifferentiated";
   public static final String CURRENT_AGE_MAXTREATMENTLEVEL_ICU_WITH_VENTILATION =
       "current.age.maxtreatmentlevel.icu_with_ventilation";
   public static final String CURRENT_AGE_MAXTREATMENTLEVEL_ICU_WITH_ECMO =
       "current.age.maxtreatmentlevel.icu_with_ecmo";
+  public static final String CURRENT_AGE_MAXTREATMENTLEVEL_ICU_UNDIFF =
+      "current.age.maxtreatmentlevel.icu_undifferentiated";
   public static final String CUMULATIVE_VARIANTTESTRESULTS = "cumulative.varianttestresults";
   public static final String CUMULATIVE_RESULTS = "cumulative.results";
   public static final String CUMULATIVE_GENDER = "cumulative.gender";
@@ -49,7 +49,7 @@ public class DataItems {
       "cumulative.age" + ".maxtreatmentlevel.outpatient";
   public static final String CUMULATIVE_AGE_MAXTREATMENTLEVEL_ICU =
       "cumulative.age.maxtreatmentlevel.icu";
-  public static final String CUMULATIVE_AGE_MAXTREATMENTLEVEL_ICU_UNDIFFERENTIATED =
+  public static final String CUMULATIVE_AGE_MAXTREATMENTLEVEL_ICU_UNDIFF =
       "cumulative.age.maxtreatmentlevel.icu_undifferentiated";
   public static final String CUMULATIVE_AGE_MAXTREATMENTLEVEL_ICU_WITH_VENTILATION =
       "cumulative.age.maxtreatmentlevel.icu_with_ventilation";

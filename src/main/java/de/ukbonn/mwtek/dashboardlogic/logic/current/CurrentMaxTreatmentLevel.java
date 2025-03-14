@@ -19,18 +19,20 @@ package de.ukbonn.mwtek.dashboardlogic.logic.current;
 
 import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.ICU;
 import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.ICU_ECMO;
+import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.ICU_UNDIFF;
 import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.ICU_VENTILATION;
-import static de.ukbonn.mwtek.dashboardlogic.tools.EncounterFilter.isDiseasePositive;
 
 import de.ukbonn.mwtek.dashboardlogic.DashboardDataItemLogic;
 import de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels;
 import de.ukbonn.mwtek.dashboardlogic.models.DiseaseDataItem;
+import de.ukbonn.mwtek.dashboardlogic.tools.EncounterFilter;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
 import de.ukbonn.mwtek.utilities.generic.time.TimerTools;
 import java.time.Instant;
-import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -43,96 +45,75 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class CurrentMaxTreatmentLevel extends DashboardDataItemLogic {
 
-  private List<UkbEncounter> facilityContactsInpatients;
+  private List<UkbEncounter> facilityContactsInpatientPositive;
 
   /**
-   * Search for the maximum treatment level of the current ongoing encounter, for the
-   * current.maxtreatmentlevel
+   * Searches for the maximum treatment level of the current ongoing encounter for the given
+   * treatment level.
    *
    * @param mapIcu Map that assigns a list of case numbers to an ICU treatment level class.
-   * @param treatmentLevel Treatmentlevel as a separation criterion.
-   * @return All current ongoing inpatient disease-positive encounters for the given
-   *     maxtreatmentlevel.
+   * @param facilityContacts List of facility encounters.
+   * @param treatmentLevel The treatment level as a separation criterion.
+   * @param useIcuUndiff Boolean flag indicating whether ICU_UNDIFFERENTIATED should be used instead
+   *     of ICU, ICU_VENTILATION, and ICU_ECMO.
+   * @return All current ongoing inpatient disease-positive encounters for the given treatment
+   *     level.
    */
-  @SuppressWarnings("incomplete-switch")
   public List<UkbEncounter> getNumberOfCurrentMaxTreatmentLevel(
       Map<TreatmentLevels, List<UkbEncounter>> mapIcu,
       List<UkbEncounter> facilityContacts,
-      TreatmentLevels treatmentLevel) {
-    log.debug("started getNumberOfCurrentMaxTreatmentLevel");
+      TreatmentLevels treatmentLevel,
+      boolean useIcuUndiff) {
+
+    log.debug("Started getNumberOfCurrentMaxTreatmentLevel");
     Instant startTimer = TimerTools.startTimer();
 
-    if (facilityContactsInpatients == null) {
-      facilityContactsInpatients =
-          facilityContacts.parallelStream().filter(UkbEncounter::isCaseClassInpatient).toList();
+    if (facilityContactsInpatientPositive == null) {
+      facilityContactsInpatientPositive =
+          facilityContacts.stream()
+              .filter(UkbEncounter::isCaseClassInpatient)
+              .filter(UkbEncounter::isActive)
+              .filter(EncounterFilter::isDiseasePositive)
+              .collect(Collectors.toList());
     }
+    List<UkbEncounter> results;
 
-    List<UkbEncounter> results = new ArrayList<>();
-    List<UkbEncounter> icuEncounters = mapIcu.get(ICU);
-    List<UkbEncounter> icuVentEncounters = mapIcu.get(ICU_VENTILATION);
-    List<UkbEncounter> ecmoEncounters = mapIcu.get(ICU_ECMO);
-    boolean isPositive;
+    // ICU lists based on whether ICU_UNDIFFERENTIATED should be used
+    List<UkbEncounter> icuUndiffEncounters =
+        useIcuUndiff ? mapIcu.get(ICU_UNDIFF) : Collections.emptyList();
+    List<UkbEncounter> icuEncounters = useIcuUndiff ? Collections.emptyList() : mapIcu.get(ICU);
+    List<UkbEncounter> icuVentEncounters =
+        useIcuUndiff ? Collections.emptyList() : mapIcu.get(ICU_VENTILATION);
+    List<UkbEncounter> ecmoEncounters =
+        useIcuUndiff ? Collections.emptyList() : mapIcu.get(ICU_ECMO);
 
-    try {
-      switch (treatmentLevel) {
-        case INPATIENT:
-          for (UkbEncounter currentEncounter : facilityContactsInpatients) {
-            isPositive = isDiseasePositive(currentEncounter);
+    results =
+        facilityContactsInpatientPositive.stream()
+            .filter(
+                encounter ->
+                    switch (treatmentLevel) {
+                      // When icu_undiff is used its only upper hierarchy level to check
+                      case NORMAL_WARD ->
+                          useIcuUndiff
+                              ? !icuUndiffEncounters.contains(encounter)
+                              : !icuEncounters.contains(encounter)
+                                  && !icuVentEncounters.contains(encounter)
+                                  && !ecmoEncounters.contains(encounter);
+                      case ICU ->
+                          icuEncounters.contains(encounter)
+                              && !icuVentEncounters.contains(encounter)
+                              && !ecmoEncounters.contains(encounter);
+                      case ICU_VENTILATION ->
+                          icuVentEncounters.contains(encounter)
+                              && !ecmoEncounters.contains(encounter);
+                      case ICU_ECMO -> ecmoEncounters.contains(encounter);
+                      case ICU_UNDIFF -> icuUndiffEncounters.contains(encounter);
+                      default ->
+                          throw new IllegalStateException("Unexpected value: " + treatmentLevel);
+                    })
+            .collect(Collectors.toList());
 
-            if (currentEncounter.isActive()
-                && isPositive
-                && !icuEncounters.contains(currentEncounter)
-                && !icuVentEncounters.contains(currentEncounter)
-                && !ecmoEncounters.contains(currentEncounter)) {
-              results.add(currentEncounter);
-            }
-          }
-          break;
-
-        case ICU:
-          for (UkbEncounter currentEncounter : facilityContactsInpatients) {
-            isPositive = isDiseasePositive(currentEncounter);
-
-            if (!icuVentEncounters.contains(currentEncounter)
-                && !ecmoEncounters.contains(currentEncounter)
-                && icuEncounters.contains(currentEncounter)
-                && currentEncounter.isActive()
-                && isPositive) {
-              results.add(currentEncounter);
-            }
-          }
-          break;
-
-        case ICU_VENTILATION:
-          for (UkbEncounter currentEncounter : facilityContactsInpatients) {
-            isPositive = isDiseasePositive(currentEncounter);
-
-            if (currentEncounter.isActive()
-                && isPositive
-                && !ecmoEncounters.contains(currentEncounter)
-                && icuVentEncounters.contains(currentEncounter)) {
-              results.add(currentEncounter);
-            }
-          }
-          break;
-
-        case ICU_ECMO:
-          for (UkbEncounter currentEncounter : facilityContactsInpatients) {
-            isPositive = isDiseasePositive(currentEncounter);
-
-            if (currentEncounter.isActive()
-                && isPositive
-                && ecmoEncounters.contains(currentEncounter)) {
-              results.add(currentEncounter);
-            }
-          }
-          break;
-      }
-    } catch (Exception ex) {
-      log.error("Error in the getNumberOfCurrentMaxTreatmentLevel method. ", ex);
-    }
-
-    TimerTools.stopTimerAndLog(startTimer, "finished getNumberOfCurrentMaxTreatmentLevel");
+    TimerTools.stopTimerAndLog(startTimer, "Finished getNumberOfCurrentMaxTreatmentLevel");
     return results;
   }
 }

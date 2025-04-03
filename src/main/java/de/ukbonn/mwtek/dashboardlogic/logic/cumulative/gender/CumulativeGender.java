@@ -19,8 +19,12 @@
 package de.ukbonn.mwtek.dashboardlogic.logic.cumulative.gender;
 
 import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.POSITIVE_RESULT;
+import static de.ukbonn.mwtek.dashboardlogic.enums.Gender.DIVERSE;
+import static de.ukbonn.mwtek.dashboardlogic.enums.Gender.FEMALE;
+import static de.ukbonn.mwtek.dashboardlogic.enums.Gender.MALE;
 
 import de.ukbonn.mwtek.dashboardlogic.DashboardDataItemLogic;
+import de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues;
 import de.ukbonn.mwtek.dashboardlogic.enums.Gender;
 import de.ukbonn.mwtek.dashboardlogic.models.DiseaseDataItem;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
@@ -52,6 +56,20 @@ public class CumulativeGender extends DashboardDataItemLogic {
    */
   public static Number getGenderCount(
       List<UkbEncounter> filteredEncounters, List<UkbPatient> patients, Gender gender) {
+    return getGenderPatientIdList(filteredEncounters, patients, gender).size();
+  }
+
+  /**
+   * Generates a list with all patient ids of the given gender of the diesease-positive patients
+   *
+   * <p>called by "cumulative.gender"
+   *
+   * @param filteredEncounters A list with {@link UkbEncounter} resources
+   * @param gender The gender type (e.g. male) to be counted
+   * @return Frequency of gender searched across all patients who are covid positive.
+   */
+  public static Set<String> getGenderPatientIdList(
+      List<UkbEncounter> filteredEncounters, List<UkbPatient> patients, Gender gender) {
     log.debug("Started genderCounting for gender: " + gender);
     Instant startTimer = TimerTools.startTimer();
 
@@ -72,6 +90,21 @@ public class CumulativeGender extends DashboardDataItemLogic {
             .collect(Collectors.toSet());
 
     TimerTools.stopTimerAndLog(startTimer, "Finished genderCounting");
-    return resultSet.size();
+    return resultSet;
+  }
+
+  public static Gender translateGenderSpecIntoEnum(DashboardLogicFixedValues dashboardSpecGender) {
+    switch (dashboardSpecGender) {
+      case MALE_SPECIFICATION -> {
+        return MALE;
+      }
+      case FEMALE_SPECIFICATION -> {
+        return FEMALE;
+      }
+      case DIVERSE_SPECIFICATION -> {
+        return DIVERSE;
+      }
+    }
+    return null;
   }
 }

@@ -1,19 +1,19 @@
 /*
- *  Copyright (C) 2021 University Hospital Bonn - All Rights Reserved You may use, distribute and
- *  modify this code under the GPL 3 license. THERE IS NO WARRANTY FOR THE PROGRAM, TO THE EXTENT
- *  PERMITTED BY APPLICABLE LAW. EXCEPT WHEN OTHERWISE STATED IN WRITING THE COPYRIGHT HOLDERS AND/OR
- *  OTHER PARTIES PROVIDE THE PROGRAM “AS IS” WITHOUT WARRANTY OF ANY KIND, EITHER EXPRESSED OR
- *  IMPLIED, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
- *  A PARTICULAR PURPOSE. THE ENTIRE RISK AS TO THE QUALITY AND PERFORMANCE OF THE PROGRAM IS WITH
- *  YOU. SHOULD THE PROGRAM PROVE DEFECTIVE, YOU ASSUME THE COST OF ALL NECESSARY SERVICING, REPAIR
- *  OR CORRECTION. IN NO EVENT UNLESS REQUIRED BY APPLICABLE LAW OR AGREED TO IN WRITING WILL ANY
- *  COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MODIFIES AND/OR CONVEYS THE PROGRAM AS PERMITTED ABOVE,
- *  BE LIABLE TO YOU FOR DAMAGES, INCLUDING ANY GENERAL, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES
- *  ARISING OUT OF THE USE OR INABILITY TO USE THE PROGRAM (INCLUDING BUT NOT LIMITED TO LOSS OF DATA
- *  OR DATA BEING RENDERED INACCURATE OR LOSSES SUSTAINED BY YOU OR THIRD PARTIES OR A FAILURE OF THE
- *  PROGRAM TO OPERATE WITH ANY OTHER PROGRAMS), EVEN IF SUCH HOLDER OR OTHER PARTY HAS BEEN ADVISED
- *  OF THE POSSIBILITY OF SUCH DAMAGES. You should have received a copy of the GPL 3 license with
- *  this file. If not, visit http://www.gnu.de/documents/gpl-3.0.en.html
+ * Copyright (C) 2021 University Hospital Bonn - All Rights Reserved You may use, distribute and
+ * modify this code under the GPL 3 license. THERE IS NO WARRANTY FOR THE PROGRAM, TO THE EXTENT
+ * PERMITTED BY APPLICABLE LAW. EXCEPT WHEN OTHERWISE STATED IN WRITING THE COPYRIGHT HOLDERS AND/OR
+ * OTHER PARTIES PROVIDE THE PROGRAM “AS IS” WITHOUT WARRANTY OF ANY KIND, EITHER EXPRESSED OR
+ * IMPLIED, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE. THE ENTIRE RISK AS TO THE QUALITY AND PERFORMANCE OF THE PROGRAM IS WITH
+ * YOU. SHOULD THE PROGRAM PROVE DEFECTIVE, YOU ASSUME THE COST OF ALL NECESSARY SERVICING, REPAIR
+ * OR CORRECTION. IN NO EVENT UNLESS REQUIRED BY APPLICABLE LAW OR AGREED TO IN WRITING WILL ANY
+ * COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MODIFIES AND/OR CONVEYS THE PROGRAM AS PERMITTED ABOVE,
+ * BE LIABLE TO YOU FOR DAMAGES, INCLUDING ANY GENERAL, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES
+ * ARISING OUT OF THE USE OR INABILITY TO USE THE PROGRAM (INCLUDING BUT NOT LIMITED TO LOSS OF DATA
+ * OR DATA BEING RENDERED INACCURATE OR LOSSES SUSTAINED BY YOU OR THIRD PARTIES OR A FAILURE OF THE
+ * PROGRAM TO OPERATE WITH ANY OTHER PROGRAMS), EVEN IF SUCH HOLDER OR OTHER PARTY HAS BEEN ADVISED
+ * OF THE POSSIBILITY OF SUCH DAMAGES. You should have received a copy of the GPL 3 license with *
+ * this file. If not, visit http://www.gnu.de/documents/gpl-3.0.en.html
  */
 
 package de.ukbonn.mwtek.dashboardlogic.predictiondata.ukb.renalreplacement.logic;
@@ -93,7 +93,7 @@ public class CumulativeRenalReplacementRiskROCThread implements Runnable {
 
     for (CoreBaseDataItem encounter : this.encounters) {
       String caseId = encounter.hisCaseId();
-      log.trace("START: calculation for caseId: " + caseId);
+      log.trace("START: calculation for caseId: {}", caseId);
 
       List<CoreBaseDataItem> currentCvvhItems =
           renalReplacementsByCaseId.getOrDefault(caseId, null);
@@ -110,7 +110,7 @@ public class CumulativeRenalReplacementRiskROCThread implements Runnable {
       // If null value is found then risk can't be calculated. So skipping further steps for this
       // case.
       if (firstCreatinine == null) {
-        log.trace("Missing Creatinine for caseId: " + caseId);
+        log.trace("Missing Creatinine for caseId: {}", caseId);
         log.trace("END: calculation for caseId: " + caseId);
         continue;
       }
@@ -118,7 +118,7 @@ public class CumulativeRenalReplacementRiskROCThread implements Runnable {
       // If no bodyWeight is found then risk can't be calculated. So skipping further steps for this
       // case.
       if (currentBodyWeightItems == null || currentBodyWeightItems.isEmpty()) {
-        log.trace("Missing Body weight for caseId: " + caseId);
+        log.trace("Missing Body weight for caseId: {}", caseId);
         log.trace("END: calculation for caseId: " + caseId);
         continue;
       } else {
@@ -165,35 +165,33 @@ public class CumulativeRenalReplacementRiskROCThread implements Runnable {
           // If the risk is not null then add it as a ROC item
           if (risk != null) {
             if (Double.isInfinite(risk)) {
-              log.error(
-                  String.format(
-                      "Risk is %s for %s",
-                      "infinite",
-                      createLogMessage(
-                          caseId,
-                          risk,
-                          periodFrom,
-                          periodTo,
-                          currentCreatinine,
-                          firstCreatinine,
-                          currentUrea,
-                          currentLactate,
-                          meanUrineOutput)));
-            } else if (risk < OUTLIER_BOTTOM || risk > OUTLIER_TOP) {
-              log.error(
-                  String.format(
-                      "Outlier found for caseId %s for %s",
+              log.warn(
+                  "Risk is {} for {}",
+                  "infinite",
+                  createLogMessage(
                       caseId,
-                      createLogMessage(
-                          caseId,
-                          risk,
-                          periodFrom,
-                          periodTo,
-                          currentCreatinine,
-                          firstCreatinine,
-                          currentUrea,
-                          currentLactate,
-                          meanUrineOutput)));
+                      risk,
+                      periodFrom,
+                      periodTo,
+                      currentCreatinine,
+                      firstCreatinine,
+                      currentUrea,
+                      currentLactate,
+                      meanUrineOutput));
+            } else if (risk < OUTLIER_BOTTOM || risk > OUTLIER_TOP) {
+              log.warn(
+                  "Outlier found for caseId {} for {}",
+                  caseId,
+                  createLogMessage(
+                      caseId,
+                      risk,
+                      periodFrom,
+                      periodTo,
+                      currentCreatinine,
+                      firstCreatinine,
+                      currentUrea,
+                      currentLactate,
+                      meanUrineOutput));
             }
             log.trace(
                 createLogMessage(
@@ -245,11 +243,7 @@ public class CumulativeRenalReplacementRiskROCThread implements Runnable {
           // For ROC curves we are considering released cases only. If encounter.dateTo()!=null but
           // episode.dateTo()==null that means still open episode for a released case.
           if (releaseTimestamp == null) {
-            log.debug(
-                "releaseTimestamp is null for episode "
-                    + episode.toString()
-                    + " in caseId="
-                    + caseId);
+            log.debug("releaseTimestamp is null for episode {} in caseId={}", episode, caseId);
             continue;
           }
 
@@ -285,50 +279,46 @@ public class CumulativeRenalReplacementRiskROCThread implements Runnable {
             // based on maxTimestamp as key
             if (risk != null) {
               if (Double.isInfinite(risk)) {
-                log.error(
-                    String.format(
-                        "Risk is infinite for %s",
-                        createLogMessage(
-                            caseId,
-                            risk,
-                            periodFrom,
-                            periodTo,
-                            currentCreatinine,
-                            firstCreatinine,
-                            currentUrea,
-                            currentLactate,
-                            meanUrineOutput)));
-              } else if (risk < OUTLIER_BOTTOM || risk > OUTLIER_TOP) {
-                log.error(
-                    String.format(
-                        "Outlier found for caseId %s for %s",
+                log.warn(
+                    "Risk is infinite for {}",
+                    createLogMessage(
                         caseId,
-                        createLogMessage(
-                            caseId,
-                            risk,
-                            periodFrom,
-                            periodTo,
-                            currentCreatinine,
-                            firstCreatinine,
-                            currentUrea,
-                            currentLactate,
-                            meanUrineOutput)));
+                        risk,
+                        periodFrom,
+                        periodTo,
+                        currentCreatinine,
+                        firstCreatinine,
+                        currentUrea,
+                        currentLactate,
+                        meanUrineOutput));
+              } else if (risk < OUTLIER_BOTTOM || risk > OUTLIER_TOP) {
+                log.warn(
+                    "Outlier found for caseId {} for {}",
+                    caseId,
+                    createLogMessage(
+                        caseId,
+                        risk,
+                        periodFrom,
+                        periodTo,
+                        currentCreatinine,
+                        firstCreatinine,
+                        currentUrea,
+                        currentLactate,
+                        meanUrineOutput));
               }
-
               log.trace(
-                  String.format(
-                      "Risk = %s for %s",
+                  "Risk = {} for {}",
+                  risk,
+                  createLogMessage(
+                      caseId,
                       risk,
-                      createLogMessage(
-                          caseId,
-                          risk,
-                          periodFrom,
-                          periodTo,
-                          currentCreatinine,
-                          firstCreatinine,
-                          currentUrea,
-                          currentLactate,
-                          meanUrineOutput)));
+                      periodFrom,
+                      periodTo,
+                      currentCreatinine,
+                      firstCreatinine,
+                      currentUrea,
+                      currentLactate,
+                      meanUrineOutput));
 
               ROCItem rocItem = new ROCItem(risk, 0);
               rocItems.add(rocItem);

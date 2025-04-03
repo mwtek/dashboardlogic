@@ -89,6 +89,7 @@ import static de.ukbonn.mwtek.dashboardlogic.logic.DiseaseResultFunctionality.cr
 import static de.ukbonn.mwtek.dashboardlogic.logic.DiseaseResultFunctionality.createIcuMap;
 import static de.ukbonn.mwtek.dashboardlogic.logic.DiseaseResultFunctionality.generateSupplyContactToFacilityContactMap;
 import static de.ukbonn.mwtek.dashboardlogic.logic.DiseaseResultFunctionality.isLocationReferenceExisting;
+import static de.ukbonn.mwtek.dashboardlogic.logic.cumulative.gender.CumulativeGender.translateGenderSpecIntoEnum;
 import static de.ukbonn.mwtek.dashboardlogic.logic.cumulative.lengthofstay.CumulativeLengthOfStayHospital.createLengthOfStayHospitalByVitalstatus;
 import static de.ukbonn.mwtek.dashboardlogic.logic.cumulative.lengthofstay.CumulativeLengthOfStayHospital.createMapDaysHospitalList;
 import static de.ukbonn.mwtek.dashboardlogic.logic.cumulative.lengthofstay.CumulativeLengthOfStayIcu.createIcuLengthListByVitalstatus;
@@ -97,6 +98,7 @@ import static de.ukbonn.mwtek.dashboardlogic.tools.ProcedureFilter.filterProcedu
 
 import de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues;
 import de.ukbonn.mwtek.dashboardlogic.enums.DataItemContext;
+import de.ukbonn.mwtek.dashboardlogic.enums.Gender;
 import de.ukbonn.mwtek.dashboardlogic.enums.KidsRadarDataItemContext;
 import de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels;
 import de.ukbonn.mwtek.dashboardlogic.enums.VitalStatus;
@@ -642,19 +644,31 @@ public class DataItemGenerator {
 
     String cumulativeGenderLabel = determineLabel(dataItemContext, CUMULATIVE_GENDER);
     if (isItemNotExcluded(mapExcludeDataItems, cumulativeGenderLabel, false)) {
-      // cumulative.gender
       Map<String, Number> cumulativeGenderMap = new LinkedHashMap<>();
-      cumulativeGenderMap.put(
-          MALE_SPECIFICATION.getValue(),
-          new DataBuilder().dbData(dbData).gender(MALE).buildGenderCount());
-      cumulativeGenderMap.put(
-          FEMALE_SPECIFICATION.getValue(),
-          new DataBuilder().dbData(dbData).gender(FEMALE).buildGenderCount());
-      cumulativeGenderMap.put(
-          DIVERSE_SPECIFICATION.getValue(),
-          new DataBuilder().dbData(dbData).gender(DIVERSE).buildGenderCount());
+      Map<String, Set<String>> cumulativeGenderPids = debug ? new LinkedHashMap<>() : null;
+
+      for (DashboardLogicFixedValues gender :
+          List.of(MALE_SPECIFICATION, FEMALE_SPECIFICATION, DIVERSE_SPECIFICATION)) {
+        // Compute the list of patient IDs ONCE per gender
+        Set<String> genderPids =
+            new DataBuilder()
+                .dbData(dbData)
+                .gender(translateGenderSpecIntoEnum(gender))
+                .buildGenderListByClass();
+        // Store the count derived from the list size
+        cumulativeGenderMap.put(gender.getValue(), genderPids.size());
+        if (debug) {
+          cumulativeGenderPids.put(gender.getValue(), genderPids);
+        }
+      }
       currentDataList.add(
           new DiseaseDataItem(cumulativeGenderLabel, ITEMTYPE_AGGREGATED, cumulativeGenderMap));
+
+      if (debug) {
+        currentDataList.add(
+            new DiseaseDataItem(
+                addDebugLabel(cumulativeGenderLabel), ITEMTYPE_DEBUG, cumulativeGenderPids));
+      }
     }
 
     // cumulative.age
@@ -928,33 +942,32 @@ public class DataItemGenerator {
         determineLabel(dataItemContext, CUMULATIVE_INPATIENT_GENDER);
     if (isItemNotExcluded(mapExcludeDataItems, cumulativeInpatientGenderLabel, false)) {
       Map<String, Number> cumulativeInpatientGenderMap = new HashMap<>();
-      // cumulativeInpatients gets initialized in the cumulative.maxtreatmentlevel method ->
-      // this method could be excluded
-      cumulativeInpatientGenderMap.put(
-          MALE_SPECIFICATION.getValue(),
-          new DataBuilder()
-              .dbData(dbData)
-              .gender(MALE)
-              .treatmentLevel(INPATIENT)
-              .buildGenderCountByClass());
-      cumulativeInpatientGenderMap.put(
-          FEMALE_SPECIFICATION.getValue(),
-          new DataBuilder()
-              .dbData(dbData)
-              .gender(FEMALE)
-              .treatmentLevel(INPATIENT)
-              .buildGenderCountByClass());
-      cumulativeInpatientGenderMap.put(
-          DIVERSE_SPECIFICATION.getValue(),
-          new DataBuilder()
-              .dbData(dbData)
-              .gender(DIVERSE)
-              .treatmentLevel(INPATIENT)
-              .buildGenderCountByClass());
+      Map<String, Set<String>> cumulativeInpatientGenderPids = debug ? new HashMap<>() : null;
 
+      for (Gender gender : List.of(Gender.MALE, Gender.FEMALE, Gender.DIVERSE)) {
+        // Gather all the patient ids for debug item and count it for the regular item
+        Set<String> genderPids =
+            new DataBuilder()
+                .dbData(dbData)
+                .gender(gender)
+                .treatmentLevel(INPATIENT)
+                .buildGenderListByClass();
+        cumulativeInpatientGenderMap.put(gender.getValue(), genderPids.size());
+
+        if (debug) {
+          cumulativeInpatientGenderPids.put(gender.getValue(), genderPids);
+        }
+      }
       currentDataList.add(
           new DiseaseDataItem(
               cumulativeInpatientGenderLabel, ITEMTYPE_AGGREGATED, cumulativeInpatientGenderMap));
+      if (debug) {
+        currentDataList.add(
+            new DiseaseDataItem(
+                addDebugLabel(cumulativeInpatientGenderLabel),
+                ITEMTYPE_DEBUG,
+                cumulativeInpatientGenderPids));
+      }
     }
 
     // cumulative outpatient gender

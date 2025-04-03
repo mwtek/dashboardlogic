@@ -173,6 +173,11 @@ public class DataBuilder {
         dbData.getFacilityContactEncounters(), dbData.getPatients(), gender, treatmentLevel);
   }
 
+  public Set<String> buildGenderListByClass() {
+    return CumulativeGenderByClass.getGenderPatientIdList(
+        dbData.getFacilityContactEncounters(), dbData.getPatients(), gender);
+  }
+
   public List<Integer> buildAgeDistributionByCaseClass() {
     return CumulativeAge.getAgeDistributionsByCaseClass(
         dbData.getFacilityContactEncounters(), dbData.getPatients(), treatmentLevel);

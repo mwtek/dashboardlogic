@@ -28,6 +28,8 @@ import de.ukbonn.mwtek.utilities.fhir.resources.UkbPatient;
 import de.ukbonn.mwtek.utilities.generic.time.TimerTools;
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
+import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 
@@ -42,24 +44,27 @@ import lombok.extern.slf4j.Slf4j;
 public class CumulativeGenderByClass extends CumulativeGender {
 
   /**
-   * Determination of the number of patients per gender and case status (e.g. inpatient). This
-   * method filters encounters based on the provided case class and counts the number of patients of
-   * a specific gender within those encounters.
+   * Generic method to process patients by gender and encounter case class.
    *
-   * @param gender The gender type (e.g. "male") to be counted.
-   * @param encounterClass The case class (e.g. {@link TreatmentLevels#INPATIENT}) to be counted.
-   * @return Number of patients per gender and case status.
+   * @param ukbEncounters List of encounters.
+   * @param ukbPatients List of patients.
+   * @param gender The gender to filter by.
+   * @param encounterClass The case class to filter by.
+   * @param resultFunction Function that processes the filtered encounters and patients.
+   * @param <T> Return type.
+   * @return Result of processing.
    */
-  public static Number getGenderCountByCaseClass(
+  public static <T> T processGenderByCaseClass(
       List<UkbEncounter> ukbEncounters,
       List<UkbPatient> ukbPatients,
       Gender gender,
-      TreatmentLevels encounterClass) {
+      TreatmentLevels encounterClass,
+      BiFunction<List<UkbEncounter>, List<UkbPatient>, T> resultFunction) {
+
     log.debug(
-        "Started getGenderCountByCaseClass for class: {} and gender: {}", encounterClass, gender);
+        "Started processGenderByCaseClass for class: {} and gender: {}", encounterClass, gender);
     Instant startTimer = TimerTools.startTimer();
 
-    // Filter encounters based on the provided case class
     List<UkbEncounter> filteredEncounterList =
         ukbEncounters.parallelStream()
             .filter(
@@ -73,10 +78,38 @@ public class CumulativeGenderByClass extends CumulativeGender {
                 })
             .collect(Collectors.toList());
 
-    // Calculate the count of patients of the specified gender within the filtered encounters
-    Number genderCount = getGenderCount(filteredEncounterList, ukbPatients, gender);
+    T result = resultFunction.apply(filteredEncounterList, ukbPatients);
 
-    TimerTools.stopTimerAndLog(startTimer, "Finished getGenderCountByCaseClass");
-    return genderCount;
+    TimerTools.stopTimerAndLog(startTimer, "Finished processGenderByCaseClass");
+    return result;
+  }
+
+  public static Number getGenderCountByCaseClass(
+      List<UkbEncounter> ukbEncounters,
+      List<UkbPatient> ukbPatients,
+      Gender gender,
+      TreatmentLevels encounterClass) {
+
+    return processGenderByCaseClass(
+        ukbEncounters,
+        ukbPatients,
+        gender,
+        encounterClass,
+        (filteredEncounters, patients) -> getGenderCount(filteredEncounters, patients, gender));
+  }
+
+  public static Set<String> getGenderPidsByCaseClass(
+      List<UkbEncounter> ukbEncounters,
+      List<UkbPatient> ukbPatients,
+      Gender gender,
+      TreatmentLevels encounterClass) {
+
+    return processGenderByCaseClass(
+        ukbEncounters,
+        ukbPatients,
+        gender,
+        encounterClass,
+        (filteredEncounters, patients) ->
+            getGenderPatientIdList(filteredEncounters, patients, gender));
   }
 }

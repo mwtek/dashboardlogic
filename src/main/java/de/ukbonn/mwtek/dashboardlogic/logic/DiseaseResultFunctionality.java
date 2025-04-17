@@ -560,10 +560,10 @@ public class DiseaseResultFunctionality {
 
   public static long getKickOffDateInSeconds(DataItemContext dataItemContext) {
     // Default is the covid qualifying date
-    long currentDate = Covid.QUALIFYING_DATE_AS_LONG;
+    long currentDate = Covid.QUALIFYING_DATE_SECONDS;
     switch (dataItemContext) {
-      case COVID -> currentDate = Covid.QUALIFYING_DATE_AS_LONG;
-      case INFLUENZA -> currentDate = Influenza.QUALIFYING_DATE_AS_LONG;
+      case COVID -> currentDate = Covid.QUALIFYING_DATE_SECONDS;
+      case INFLUENZA -> currentDate = Influenza.QUALIFYING_DATE_SECONDS;
       case KIDS_RADAR -> currentDate = KidsRadar.QUALIFYING_DATE_AS_LONG;
     }
     return currentDate;

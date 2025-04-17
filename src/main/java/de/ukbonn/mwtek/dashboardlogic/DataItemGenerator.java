@@ -24,6 +24,7 @@ import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.FEM
 import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.MALE_SPECIFICATION;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.NEGATIVE;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.POSITIVE;
+import static de.ukbonn.mwtek.dashboardlogic.enums.DataItemContext.INFLUENZA;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItemTypes.ITEMTYPE_AGGREGATED;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItemTypes.ITEMTYPE_DEBUG;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItemTypes.ITEMTYPE_LIST;
@@ -98,8 +99,9 @@ import static de.ukbonn.mwtek.dashboardlogic.tools.ProcedureFilter.filterProcedu
 
 import de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues;
 import de.ukbonn.mwtek.dashboardlogic.enums.DataItemContext;
-import de.ukbonn.mwtek.dashboardlogic.enums.Gender;
 import de.ukbonn.mwtek.dashboardlogic.enums.KidsRadarDataItemContext;
+import de.ukbonn.mwtek.dashboardlogic.enums.NumDashboardConstants.Covid;
+import de.ukbonn.mwtek.dashboardlogic.enums.NumDashboardConstants.Influenza;
 import de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels;
 import de.ukbonn.mwtek.dashboardlogic.enums.VitalStatus;
 import de.ukbonn.mwtek.dashboardlogic.logic.DashboardData;
@@ -122,7 +124,7 @@ import de.ukbonn.mwtek.utilities.fhir.resources.UkbLocation;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbObservation;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbPatient;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbProcedure;
-import java.util.AbstractMap;
+import java.util.AbstractMap.SimpleEntry;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -131,10 +133,12 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.hl7.fhir.r4.model.Encounter;
+import org.hl7.fhir.r4.model.Enumerations.FHIRAllTypes;
 
 /**
  * Class in which the individual {@link DiseaseDataItem DataItems} of the Json specification are
@@ -223,6 +227,8 @@ public class DataItemGenerator {
     // If there are resources with unfilled mandatory attributes, report them immediately (may give
     // partially reduced result sets)
     reportMissingFields(encounters);
+
+    filterResourcesByDate(encounters, conditions, observations, dataItemContext);
 
     // Group the encounter resources by facility type
     facilityContactEncounters =
@@ -445,8 +451,6 @@ public class DataItemGenerator {
                 .dbData(dbData)
                 .buildCurrentEncounterByIcuLevel();
         mapCurrent.put(ICU_UNDIFF.getValue(), currentIcuUndiffEncounters.size());
-        currentIcuUndiffEncounters.forEach(
-            x -> System.out.println("ICU_UNDIFF: " + x.getCaseId() + " pid: " + x.getPatientId()));
       }
 
       currentDataList.add(
@@ -654,7 +658,7 @@ public class DataItemGenerator {
             new DataBuilder()
                 .dbData(dbData)
                 .gender(translateGenderSpecIntoEnum(gender))
-                .buildGenderListByClass();
+                .buildGenderList();
         // Store the count derived from the list size
         cumulativeGenderMap.put(gender.getValue(), genderPids.size());
         if (debug) {
@@ -907,9 +911,9 @@ public class DataItemGenerator {
               .buildMaxTreatmentTimeline();
       mapResultTreatment.put(SUBITEMTYPE_DATE, getDatesOutputList(dataItemContext));
 
-      for (Map.Entry<TreatmentLevels, Map<Long, Set<String>>> entry :
+      for (Entry<TreatmentLevels, Map<Long, Set<String>>> entry :
           resultMaxTreatmentTimeline.entrySet()) {
-        for (Map.Entry<Long, Set<String>> secondEntry : entry.getValue().entrySet()) {
+        for (Entry<Long, Set<String>> secondEntry : entry.getValue().entrySet()) {
           addValuesToTimelineMaxMap(
               entry.getKey().getValue(), secondEntry.getValue(), mapResultTreatment);
         }
@@ -922,7 +926,7 @@ public class DataItemGenerator {
       if (debug) {
         Map<String, Map<Long, Set<String>>> resultMaxTreatmentCaseNrs = new LinkedHashMap<>();
         // Iterate over the resultMaxTreatmentTimeline while preserving order
-        for (Map.Entry<TreatmentLevels, Map<Long, Set<String>>> entry :
+        for (Entry<TreatmentLevels, Map<Long, Set<String>>> entry :
             resultMaxTreatmentTimeline.entrySet()) {
           resultMaxTreatmentCaseNrs.put(entry.getKey().getValue(), entry.getValue());
         }
@@ -944,14 +948,15 @@ public class DataItemGenerator {
       Map<String, Number> cumulativeInpatientGenderMap = new HashMap<>();
       Map<String, Set<String>> cumulativeInpatientGenderPids = debug ? new HashMap<>() : null;
 
-      for (Gender gender : List.of(Gender.MALE, Gender.FEMALE, Gender.DIVERSE)) {
+      for (DashboardLogicFixedValues gender :
+          List.of(MALE_SPECIFICATION, FEMALE_SPECIFICATION, DIVERSE_SPECIFICATION)) {
         // Gather all the patient ids for debug item and count it for the regular item
         Set<String> genderPids =
             new DataBuilder()
                 .dbData(dbData)
-                .gender(gender)
+                .gender(translateGenderSpecIntoEnum(gender))
                 .treatmentLevel(INPATIENT)
-                .buildGenderListByClass();
+                .buildGenderPidsByCaseClass();
         cumulativeInpatientGenderMap.put(gender.getValue(), genderPids.size());
 
         if (debug) {
@@ -1205,6 +1210,168 @@ public class DataItemGenerator {
     return currentDataList;
   }
 
+  /**
+   * Filters lists of encounters, conditions, and observations by a qualifying date depending on the
+   * data item context (e.g., Influenza or COVID). Logs the count of removed resources and the IDs
+   * of the first removed resource in each category.
+   *
+   * @param encounters List of UkbEncounter resources to filter.
+   * @param conditions List of UkbCondition resources to filter.
+   * @param observations List of UkbObservation resources to filter.
+   * @param dataItemContext The context which determines the qualifying cutoff date.
+   */
+  private void filterResourcesByDate(
+      List<UkbEncounter> encounters,
+      List<UkbCondition> conditions,
+      List<UkbObservation> observations,
+      DataItemContext dataItemContext) {
+    Long cutOffDateMillis =
+        (dataItemContext == INFLUENZA)
+            ? Influenza.QUALIFYING_DATE_MILLISECONDS
+            : Covid.QUALIFYING_DATE_MILLISECONDS;
+
+    String firstRemovedEncounterId = "";
+    String firstRemovedConditionId = "";
+    String firstRemovedObservationId = "";
+
+    List<UkbEncounter> encountersFilteredByDate =
+        filterEncountersAfterDate(encounters, cutOffDateMillis);
+    int encounterDiff = encounters.size() - encountersFilteredByDate.size();
+    if (encounterDiff > 0) {
+      UkbEncounter firstRemovedEncounter =
+          findFirstRemovedElement(encounters, encountersFilteredByDate);
+      firstRemovedEncounterId = firstRemovedEncounter != null ? firstRemovedEncounter.getId() : "";
+      encounters.clear();
+      encounters.addAll(encountersFilteredByDate);
+    }
+
+    List<UkbCondition> conditionsFilteredByDate =
+        filterConditionsAfterDate(conditions, cutOffDateMillis);
+    int condDiff = conditions.size() - conditionsFilteredByDate.size();
+    if (condDiff > 0) {
+      UkbCondition firstRemovedCondition =
+          findFirstRemovedElement(conditions, conditionsFilteredByDate);
+      firstRemovedConditionId = firstRemovedCondition != null ? firstRemovedCondition.getId() : "";
+      conditions.clear();
+      conditions.addAll(conditionsFilteredByDate);
+    }
+
+    List<UkbObservation> observationsFilteredByDate =
+        filterObservationsAfterDate(observations, cutOffDateMillis);
+    int obsDiff = observations.size() - observationsFilteredByDate.size();
+    if (obsDiff > 0) {
+      UkbObservation firstRemovedObservation =
+          findFirstRemovedElement(observations, observationsFilteredByDate);
+      firstRemovedObservationId =
+          firstRemovedObservation != null ? firstRemovedObservation.getId() : "";
+      observations.clear();
+      observations.addAll(observationsFilteredByDate);
+    }
+
+    logFilteredCounts(
+        encounterDiff,
+        firstRemovedEncounterId,
+        condDiff,
+        firstRemovedConditionId,
+        obsDiff,
+        firstRemovedObservationId);
+  }
+
+  /**
+   * Finds the first element removed during filtering by comparing the original and filtered lists.
+   *
+   * @param originalList The original list before filtering.
+   * @param filteredList The list after filtering.
+   * @param <T> The type of elements in the lists.
+   * @return The first removed element, or null if no elements were removed.
+   */
+  private <T> T findFirstRemovedElement(List<T> originalList, List<T> filteredList) {
+    for (T item : originalList) {
+      if (!filteredList.contains(item)) {
+        return item;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Filters encounters to include only those with a start date after the given cutoff date.
+   *
+   * @param encounters List of UkbEncounter resources to filter.
+   * @param cutOffDateMillis The cutoff date for filtering.
+   * @return A list of encounters that occur after the cutoff date.
+   */
+  private List<UkbEncounter> filterEncountersAfterDate(
+      List<UkbEncounter> encounters, Long cutOffDateMillis) {
+
+    return encounters.parallelStream()
+        .filter(
+            e ->
+                e.hasPeriod()
+                    && e.getPeriod().hasStart()
+                    && e.getPeriod().getStart().getTime() >= cutOffDateMillis)
+        .toList();
+  }
+
+  /**
+   * Filters conditions to include only those recorded after the given cutoff date.
+   *
+   * @param conditions List of UkbCondition resources to filter.
+   * @param cutOffDateMillis The cutoff date for filtering.
+   * @return A list of conditions recorded after the cutoff date.
+   */
+  private List<UkbCondition> filterConditionsAfterDate(
+      List<UkbCondition> conditions, Long cutOffDateMillis) {
+    return conditions.parallelStream()
+        .filter(c -> c.hasRecordedDate() && c.getRecordedDate().getTime() >= cutOffDateMillis)
+        .toList();
+  }
+
+  /**
+   * Filters observations to include only those with an effective date after the given cutoff date.
+   *
+   * @param observations List of UkbObservation resources to filter.
+   * @param cutOffDateMillis The cutoff date for filtering.
+   * @return A list of observations effective after the cutoff date.
+   */
+  private List<UkbObservation> filterObservationsAfterDate(
+      List<UkbObservation> observations, Long cutOffDateMillis) {
+    return observations.parallelStream()
+        .filter(
+            o ->
+                o.hasEffective()
+                    && o.getEffectiveDateTimeType().getValue().getTime() > cutOffDateMillis)
+        .toList();
+  }
+
+  private void logFilteredCounts(
+      int encounterDelta,
+      String firstEncounterIdRemoved,
+      int conditionDelta,
+      String firstConditionIdRemoved,
+      int observationDelta,
+      String firstObservationIdRemoved) {
+
+    if (encounterDelta > 0) {
+      logDelta(FHIRAllTypes.ENCOUNTER, encounterDelta, firstEncounterIdRemoved);
+    }
+    if (conditionDelta > 0) {
+      logDelta(FHIRAllTypes.CONDITION, conditionDelta, firstConditionIdRemoved);
+    }
+    if (observationDelta > 0) {
+      logDelta(FHIRAllTypes.OBSERVATION, observationDelta, firstObservationIdRemoved);
+    }
+  }
+
+  private static void logDelta(
+      FHIRAllTypes fhirAllTypes, int observationDelta, String firstObservationIdRemoved) {
+    log.info(
+        "Filtered {} {}s because the date is before the kickoff date. Example: {}",
+        observationDelta,
+        fhirAllTypes.getDisplay(),
+        firstObservationIdRemoved);
+  }
+
   private Map<String, Boolean> getAllDataItemsThatNeedSupplyContacts(
       DataItemContext dataItemContext) {
     Map<String, Boolean> output = new HashMap<>();
@@ -1433,6 +1600,7 @@ public class DataItemGenerator {
       case KIDS_RADAR -> KIDS_RADAR_PREFIX + defaultLabel;
       case KIDS_RADAR_KJP -> KIDS_RADAR_PREFIX_KJP + defaultLabel;
       case KIDS_RADAR_RSV -> KIDS_RADAR_PREFIX_RSV + defaultLabel;
+      //  case ACRIBIS -> KIDS_RADAR_PREFIX_ACRIBIS + defaultLabel;
       default -> defaultLabel;
     };
   }
@@ -1461,21 +1629,20 @@ public class DataItemGenerator {
         createLengthOfStayHospitalByVitalstatus(facilityEncounters, mapDays, vitalStatus);
 
     // Initialize lists to maintain the association between hospital days and case IDs
-    List<Map.Entry<Long, Set<String>>> hospitalEntries = new ArrayList<>();
+    List<Entry<Long, Set<String>>> hospitalEntries = new ArrayList<>();
 
     // Populate hospitalEntries with days and case IDs
     mapDaysFiltered.forEach(
         (patientId, daysMap) ->
             daysMap.forEach(
-                (days, caseIds) ->
-                    hospitalEntries.add(new AbstractMap.SimpleEntry<>(days, caseIds))));
+                (days, caseIds) -> hospitalEntries.add(new SimpleEntry<>(days, caseIds))));
 
     // Sort hospital entries based on hospital days
-    hospitalEntries.sort(Comparator.comparingLong(Map.Entry::getKey));
+    hospitalEntries.sort(Comparator.comparingLong(Entry::getKey));
 
     // Extract hospital days and case IDs maintaining the association
     List<Long> hospitalDays =
-        hospitalEntries.stream().map(Map.Entry::getKey).collect(Collectors.toList());
+        hospitalEntries.stream().map(Entry::getKey).collect(Collectors.toList());
     List<String> caseIdsHospital =
         hospitalEntries.stream()
             .flatMap(entry -> entry.getValue().stream())
@@ -1505,19 +1672,19 @@ public class DataItemGenerator {
               vitalStatus, mapIcuLengthList, mapIcuDiseasePositiveOverall);
     }
     // Initialize lists to maintain the association between ICU hours and case IDs
-    List<Map.Entry<Long, Set<String>>> icuEntries = new ArrayList<>();
+    List<Entry<Long, Set<String>>> icuEntries = new ArrayList<>();
 
     // Populate icuEntries with hours and case IDs
     mapDaysFiltered.forEach(
         (patientId, hoursMap) ->
             hoursMap.forEach(
-                (hours, caseIds) -> icuEntries.add(new AbstractMap.SimpleEntry<>(hours, caseIds))));
+                (hours, caseIds) -> icuEntries.add(new SimpleEntry<>(hours, caseIds))));
 
     // Sort ICU entries based on ICU hours
-    icuEntries.sort(Comparator.comparingLong(Map.Entry::getKey));
+    icuEntries.sort(Comparator.comparingLong(Entry::getKey));
 
     // Extract ICU hours and case IDs maintaining the association
-    List<Long> listHours = icuEntries.stream().map(Map.Entry::getKey).collect(Collectors.toList());
+    List<Long> listHours = icuEntries.stream().map(Entry::getKey).collect(Collectors.toList());
     List<String> caseIds = new ArrayList<>();
     // Ensure case IDs are ordered according to listHours
     icuEntries.forEach(entry -> caseIds.addAll(entry.getValue()));

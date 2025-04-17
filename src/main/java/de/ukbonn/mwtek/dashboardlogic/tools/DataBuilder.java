@@ -132,6 +132,21 @@ public class DataBuilder {
         dbData.getFacilityContactEncounters(), dbData.getPatients(), gender);
   }
 
+  public Set<String> buildGenderList() {
+    return CumulativeGender.getGenderPatientIdList(
+        dbData.getFacilityContactEncounters(), dbData.getPatients(), gender);
+  }
+
+  public Number buildGenderCountByClass() {
+    return CumulativeGenderByClass.getGenderCountByCaseClass(
+        dbData.getFacilityContactEncounters(), dbData.getPatients(), gender, treatmentLevel);
+  }
+
+  public Set<String> buildGenderPidsByCaseClass() {
+    return CumulativeGenderByClass.getGenderPidsByCaseClass(
+        dbData.getFacilityContactEncounters(), dbData.getPatients(), gender, treatmentLevel);
+  }
+
   public List<Integer> buildCumMaxtreatmentlevelAgeList() {
     return new CumulativeMaxTreatmentLevelAge()
         .createMaxTreatmentLevelAgeMap(
@@ -166,16 +181,6 @@ public class DataBuilder {
         dbData.getLocations(),
         dbData.getInputCodeSettings(),
         useIcuUndiff);
-  }
-
-  public Number buildGenderCountByClass() {
-    return CumulativeGenderByClass.getGenderCountByCaseClass(
-        dbData.getFacilityContactEncounters(), dbData.getPatients(), gender, treatmentLevel);
-  }
-
-  public Set<String> buildGenderListByClass() {
-    return CumulativeGenderByClass.getGenderPatientIdList(
-        dbData.getFacilityContactEncounters(), dbData.getPatients(), gender);
   }
 
   public List<Integer> buildAgeDistributionByCaseClass() {

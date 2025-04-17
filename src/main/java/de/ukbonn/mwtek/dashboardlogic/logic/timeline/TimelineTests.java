@@ -168,7 +168,7 @@ public class TimelineTests extends DashboardDataItemLogic implements TimelineFun
           .forEach(
               labEffective -> {
                 Boolean obsFound = false;
-                long checkingDateUnix = Covid.QUALIFYING_DATE_AS_LONG;
+                long checkingDateUnix = Covid.QUALIFYING_DATE_SECONDS;
                 while (checkingDateUnix <= currentUnixTime && !obsFound) {
                   obsFound = addLabTestToTimeline(labEffective, checkingDateUnix, valueDateMap);
                   checkingDateUnix += NumDashboardConstants.DAY_IN_SECONDS; // add one day

@@ -57,7 +57,10 @@ public class NumDashboardConstants {
         DateTools.toDate(QUALIFYING_YEAR, QUALIFYING_MONTH, QUALIFYING_DAY);
 
     /** Unix time equivalent of the effective date */
-    public static final long QUALIFYING_DATE_AS_LONG = DateTools.dateToUnixTime(QUALIFYING_DATE);
+    public static final long QUALIFYING_DATE_SECONDS = DateTools.dateToUnixTime(QUALIFYING_DATE);
+
+    public static final long QUALIFYING_DATE_MILLISECONDS =
+        DateTools.dateToUnixTime(QUALIFYING_DATE) * 1000;
   }
 
   public static class Influenza {
@@ -79,7 +82,10 @@ public class NumDashboardConstants {
         DateTools.toDate(QUALIFYING_YEAR, QUALIFYING_MONTH, QUALIFYING_DAY);
 
     /** Unix time equivalent of the effective date */
-    public static final long QUALIFYING_DATE_AS_LONG = DateTools.dateToUnixTime(QUALIFYING_DATE);
+    public static final long QUALIFYING_DATE_SECONDS = DateTools.dateToUnixTime(QUALIFYING_DATE);
+
+    public static final long QUALIFYING_DATE_MILLISECONDS =
+        DateTools.dateToUnixTime(QUALIFYING_DATE) * 1000;
   }
 
   public static class KidsRadar {

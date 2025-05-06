@@ -88,10 +88,15 @@ public class DataItems {
 
   public static final String KIDS_RADAR_PREFIX_RSV = KIDS_RADAR_PREFIX + "rsv.";
 
+  public static final String KIDS_RADAR_PREFIX_ACRIBIS = "acr.";
+
   // Kids radar related items
   public static final String CUMULATIVE_DIAGS_ZIPCODE = "cumulative.diags.zipcode";
   public static final String CUMULATIVE_DIAGS_GENDER = "cumulative.diags.gender";
   public static final String CUMULATIVE_DIAGS_AGE = "cumulative.diags.age";
   public static final String CUMULATIVE_LENGTHOFSTAY = "cumulative.diags.lengthofstay";
   public static final String TIMELINE_DIAGS_OCCURRENCE = "timeline.diags.occurrence";
+
+  public static final String CURRENT_RECRUITMENT = "current.recruitment";
+  public static final String TIMELINE_RECRUITMENT = "timeline.recruitment";
 }

@@ -23,5 +23,6 @@ public enum DataItemContext {
   KIDS_RADAR,
   KIDS_RADAR_KJP,
   KIDS_RADAR_RSV,
-  UKB_MODEL
+  UKB_MODEL,
+  ACRIBIS
 }

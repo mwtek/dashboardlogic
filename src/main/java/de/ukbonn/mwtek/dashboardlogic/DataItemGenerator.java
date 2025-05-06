@@ -62,6 +62,7 @@ import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.CURRENT_TREATMENTLE
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.DEBUG;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.INFLUENZA_PREFIX;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.KIDS_RADAR_PREFIX;
+import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.KIDS_RADAR_PREFIX_ACRIBIS;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.KIDS_RADAR_PREFIX_KJP;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.KIDS_RADAR_PREFIX_RSV;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.TIMELINE_DEATHS;
@@ -1600,7 +1601,7 @@ public class DataItemGenerator {
       case KIDS_RADAR -> KIDS_RADAR_PREFIX + defaultLabel;
       case KIDS_RADAR_KJP -> KIDS_RADAR_PREFIX_KJP + defaultLabel;
       case KIDS_RADAR_RSV -> KIDS_RADAR_PREFIX_RSV + defaultLabel;
-      //  case ACRIBIS -> KIDS_RADAR_PREFIX_ACRIBIS + defaultLabel;
+      case ACRIBIS -> KIDS_RADAR_PREFIX_ACRIBIS + defaultLabel;
       default -> defaultLabel;
     };
   }

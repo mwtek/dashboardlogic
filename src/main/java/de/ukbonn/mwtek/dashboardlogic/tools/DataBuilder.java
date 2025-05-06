@@ -36,16 +36,20 @@ import de.ukbonn.mwtek.dashboardlogic.logic.cumulative.maxtreatmentlevel.Cumulat
 import de.ukbonn.mwtek.dashboardlogic.logic.cumulative.maxtreatmentlevel.CumulativeMaxTreatmentLevelAge;
 import de.ukbonn.mwtek.dashboardlogic.logic.cumulative.results.CumulativeResult;
 import de.ukbonn.mwtek.dashboardlogic.logic.current.CurrentMaxTreatmentLevel;
+import de.ukbonn.mwtek.dashboardlogic.logic.current.CurrentRecruitment;
 import de.ukbonn.mwtek.dashboardlogic.logic.current.CurrentTreatmentLevel;
 import de.ukbonn.mwtek.dashboardlogic.logic.current.age.CurrentMaxTreatmentLevelAge;
 import de.ukbonn.mwtek.dashboardlogic.logic.timeline.KiraTimelineDisorders;
 import de.ukbonn.mwtek.dashboardlogic.logic.timeline.TimelineDeath;
 import de.ukbonn.mwtek.dashboardlogic.logic.timeline.TimelineMaxTreatmentLevel;
+import de.ukbonn.mwtek.dashboardlogic.logic.timeline.TimelineRecruitment;
 import de.ukbonn.mwtek.dashboardlogic.logic.timeline.TimelineTests;
 import de.ukbonn.mwtek.dashboardlogic.models.ChartListItem;
 import de.ukbonn.mwtek.dashboardlogic.models.CoreCaseData;
 import de.ukbonn.mwtek.dashboardlogic.models.StackedBarChartsItem;
 import de.ukbonn.mwtek.dashboardlogic.models.TimestampedListPair;
+import de.ukbonn.mwtek.dashboardlogic.models.TimestampedListTriple;
+import de.ukbonn.mwtek.utilities.fhir.resources.UkbConsent;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbObservation;
 import java.util.List;
@@ -70,6 +74,8 @@ public class DataBuilder {
   private List<UkbEncounter> currentVentEncounters;
   private List<UkbEncounter> currentEcmoEncounters;
   private List<UkbEncounter> currentIcuUndiffEncounters;
+
+  private List<UkbConsent> consents;
 
   private DashboardLogicFixedValues labResult;
   private DataItemContext dataItemContext;
@@ -235,5 +241,19 @@ public class DataBuilder {
 
   public KiraTimelineDisorders buildKiraTimelineDisorders() {
     return new KiraTimelineDisorders();
+  }
+
+  public StackedBarChartsItem buildCurrentRecruitment() {
+    return new CurrentRecruitment().createStackedBarCharts(consents);
+  }
+
+  public TimestampedListTriple buildTimelineRecruitment() {
+    return new TimelineRecruitment().createTimelineRecruitment(consents, dataItemContext);
+  }
+
+  public Map<String, List<? extends Number>> buildTimelineRecruitmentMap() {
+    return new TimelineRecruitment()
+        .createTimelineRecruitmentMap(
+            new TimelineRecruitment().createTimelineRecruitment(consents, dataItemContext));
   }
 }

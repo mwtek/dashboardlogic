@@ -35,6 +35,7 @@ import static de.ukbonn.mwtek.utilities.fhir.mapping.kdscase.valuesets.KdsEncoun
 import de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues;
 import de.ukbonn.mwtek.dashboardlogic.enums.DataItemContext;
 import de.ukbonn.mwtek.dashboardlogic.enums.NumDashboardConstants;
+import de.ukbonn.mwtek.dashboardlogic.enums.NumDashboardConstants.Acribis;
 import de.ukbonn.mwtek.dashboardlogic.enums.NumDashboardConstants.Covid;
 import de.ukbonn.mwtek.dashboardlogic.enums.NumDashboardConstants.Influenza;
 import de.ukbonn.mwtek.dashboardlogic.enums.NumDashboardConstants.KidsRadar;
@@ -565,6 +566,7 @@ public class DiseaseResultFunctionality {
       case COVID -> currentDate = Covid.QUALIFYING_DATE_SECONDS;
       case INFLUENZA -> currentDate = Influenza.QUALIFYING_DATE_SECONDS;
       case KIDS_RADAR -> currentDate = KidsRadar.QUALIFYING_DATE_AS_LONG;
+      case ACRIBIS -> currentDate = Acribis.QUALIFYING_DATE_SECONDS;
     }
     return currentDate;
   }

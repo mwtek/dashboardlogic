@@ -71,9 +71,12 @@ public class GlobalConfiguration {
    */
   private Boolean generateUkbRenalReplacementModelData = false;
 
+  /** Should the acribis data item generation take place? */
+  private Boolean generateAcribisData = false;
+
   /**
-   * Instead of Encounter.location references, Encounters can be marked as icu-encounter via service
-   * provider IDs
+   * Instead of `Encounter.location` references, Encounters can be marked as icu-encounter via
+   * service provider IDs
    */
   private Set<String> serviceProviderIdentifierOfIcuLocations = new HashSet<>();
 

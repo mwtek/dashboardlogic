@@ -133,7 +133,7 @@ public class DataBuilder {
             dbData.getQualitativeLabCodesSettings());
   }
 
-  public Number buildGenderCount() {
+  public Set<String> buildGenderCountList() {
     return CumulativeGender.getGenderCount(
         dbData.getFacilityContactEncounters(), dbData.getPatients(), gender);
   }
@@ -143,7 +143,7 @@ public class DataBuilder {
         dbData.getFacilityContactEncounters(), dbData.getPatients(), gender);
   }
 
-  public Number buildGenderCountByClass() {
+  public Set<String> buildGenderCountByClass() {
     return CumulativeGenderByClass.getGenderCountByCaseClass(
         dbData.getFacilityContactEncounters(), dbData.getPatients(), gender, treatmentLevel);
   }

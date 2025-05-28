@@ -34,6 +34,11 @@ import org.hl7.fhir.r4.model.Observation;
 import org.hl7.fhir.r4.model.Period;
 
 public class DashboardDataItemLogic {
+  public static String DATE = "date";
+  public static final String ACR_COHORT_K_1 = "acr_cohort_k1";
+  public static final String ACR_COHORT_K_2 = "acr_cohort_k2";
+  public static final String ACR_COHORT_K_3 = "acr_cohort_k3";
+
   public static List<UkbObservation> getObservationsYoungerKickoffDate(
       DataItemContext dataItemContext, Collection<UkbObservation> ukbObservations) {
     return ukbObservations.parallelStream()
@@ -77,5 +82,16 @@ public class DashboardDataItemLogic {
   protected static Period getValidPeriod(
       Encounter.EncounterLocationComponent location, UkbEncounter encounter) {
     return location.hasPeriod() ? location.getPeriod() : encounter.getPeriod();
+  }
+
+  protected boolean isDateInPeriod(
+      KidsRadarDataItemContext kidsRadarDataItemContext, Date admissionDate, String period) {
+    // Currently both items check the date by month; another option was/could be 'isDateInYear'
+    switch (kidsRadarDataItemContext) {
+      case KJP, RSV -> {
+        return isDateInYearMonth(convertToLocalDate(admissionDate), period);
+      }
+    }
+    return false;
   }
 }

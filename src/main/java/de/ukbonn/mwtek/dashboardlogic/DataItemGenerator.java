@@ -158,7 +158,7 @@ public class DataItemGenerator {
   List<UkbPatient> patients;
   List<UkbEncounter> encounters;
   List<UkbEncounter> facilityContactEncounters;
-  List<UkbProcedure> icuProcedures;
+  List<UkbProcedure> procedures;
   List<UkbLocation> locations;
 
   List<UkbEncounter> cumulativeIcuEncounters;
@@ -177,8 +177,7 @@ public class DataItemGenerator {
    * @param patients List of FHIR patient resources based on the Condition and Observation inputs
    * @param encounters List of FHIR encounter resources based on the Condition and Observation
    *     inputs
-   * @param icuProcedures List of FHIR ICU procedures resources based on the Patient/Encounter
-   *     inputs
+   * @param procedures List of FHIR ICU procedures resources based on the Patient/Encounter inputs
    * @param locations List of all FHIR location resources based on the encounter inputs
    */
   public DataItemGenerator(
@@ -186,14 +185,14 @@ public class DataItemGenerator {
       List<UkbObservation> observations,
       List<UkbPatient> patients,
       List<UkbEncounter> encounters,
-      List<UkbProcedure> icuProcedures,
+      List<UkbProcedure> procedures,
       List<UkbLocation> locations) {
     super();
     this.conditions = conditions;
     this.observations = observations;
     this.patients = patients;
     this.encounters = encounters;
-    this.icuProcedures = icuProcedures;
+    this.procedures = procedures;
     this.locations = locations;
   }
 
@@ -288,7 +287,7 @@ public class DataItemGenerator {
             .toList();
 
     if (globalConfiguration.getCheckProceduresIcuStays())
-      icuProcedures = filterProceduresByIcuWardCheck(icuProcedures, icuSupplyContactEncounters);
+      procedures = filterProceduresByIcuWardCheck(procedures, icuSupplyContactEncounters);
 
     Map<TreatmentLevels, List<UkbEncounter>> mapPositiveEncounterByClass =
         createEncounterMapByClass(facilityContactEncounters);
@@ -305,7 +304,7 @@ public class DataItemGenerator {
             encounters,
             icuSupplyContactEncounters,
             locations,
-            icuProcedures,
+            procedures,
             inputCodeSettings,
             useIcuUndiff);
 
@@ -324,7 +323,7 @@ public class DataItemGenerator {
                 observations,
                 conditions,
                 locations,
-                icuProcedures,
+                procedures,
                 dataItemContext);
 
     // Partial lists of current cases broken down by case status
@@ -981,31 +980,42 @@ public class DataItemGenerator {
         determineLabel(dataItemContext, CUMULATIVE_OUTPATIENT_GENDER);
     if (isItemNotExcluded(mapExcludeDataItems, cumulativeOutpatientGenderLabel, false)) {
       Map<String, Number> cumulativeOutpatientGender = new HashMap<>();
-      cumulativeOutpatientGender.put(
-          MALE_SPECIFICATION.getValue(),
+      Set<String> outpatientsMale =
           new DataBuilder()
               .dbData(dbData)
               .gender(MALE)
               .treatmentLevel(OUTPATIENT)
-              .buildGenderCountByClass());
-      cumulativeOutpatientGender.put(
-          FEMALE_SPECIFICATION.getValue(),
+              .buildGenderPidsByCaseClass();
+      Set<String> outpatientsFemale =
           new DataBuilder()
               .dbData(dbData)
               .gender(FEMALE)
               .treatmentLevel(OUTPATIENT)
-              .buildGenderCountByClass());
-      cumulativeOutpatientGender.put(
-          DIVERSE_SPECIFICATION.getValue(),
+              .buildGenderPidsByCaseClass();
+      Set<String> outpatientsDiverse =
           new DataBuilder()
               .dbData(dbData)
               .gender(DIVERSE)
               .treatmentLevel(OUTPATIENT)
-              .buildGenderCountByClass());
-
+              .buildGenderPidsByCaseClass();
+      cumulativeOutpatientGender.put(MALE_SPECIFICATION.getValue(), outpatientsMale.size());
+      cumulativeOutpatientGender.put(FEMALE_SPECIFICATION.getValue(), outpatientsFemale.size());
+      cumulativeOutpatientGender.put(DIVERSE_SPECIFICATION.getValue(), outpatientsDiverse.size());
       currentDataList.add(
           new DiseaseDataItem(
               cumulativeOutpatientGenderLabel, ITEMTYPE_AGGREGATED, cumulativeOutpatientGender));
+      if (debug) {
+        Map<String, Set<String>> outpatientDebugMap =
+            Map.of(
+                MALE_SPECIFICATION.getValue(), outpatientsMale,
+                FEMALE_SPECIFICATION.getValue(), outpatientsFemale,
+                DIVERSE_SPECIFICATION.getValue(), outpatientsDiverse);
+        currentDataList.add(
+            new DiseaseDataItem(
+                addDebugLabel(cumulativeOutpatientGenderLabel),
+                ITEMTYPE_DEBUG,
+                outpatientDebugMap));
+      }
     }
 
     String cumulativeInpatientAge = determineLabel(dataItemContext, CUMULATIVE_INPATIENT_AGE);

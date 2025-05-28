@@ -29,7 +29,6 @@ import de.ukbonn.mwtek.dashboardlogic.models.StackedBarChartsItem;
 import de.ukbonn.mwtek.utilities.generic.time.TimerTools;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -117,17 +116,6 @@ public class KiraTimelineDisorders extends DashboardDataItemLogic
 
     // Order ascending regarding the specification.
     return result;
-  }
-
-  private boolean isDateInPeriod(
-      KidsRadarDataItemContext kidsRadarDataItemContext, Date admissionDate, String period) {
-    // Currently both items check the date by month; another option was/could be 'isDateInYear'
-    switch (kidsRadarDataItemContext) {
-      case KJP, RSV -> {
-        return isDateInYearMonth(convertToLocalDate(admissionDate), period);
-      }
-    }
-    return false;
   }
 
   public Map<String, Map<String, Set<String>>> getDebugData() {

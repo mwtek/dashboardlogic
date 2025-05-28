@@ -102,6 +102,9 @@ public class TimelineRecruitment extends DashboardDataItemLogic implements Timel
 
         tempDateUnix = dayEnd;
       }
+      // Figure out if entries couldn't be assigned because of a timestamp out of the check period.
+      logUnassignedConsentEntries(consents, dateRecruitmentConsentMap);
+
       recruitmentConsentList = divideMapValuesToLists(dateRecruitmentConsentMap);
       recruitmentFollowUpList = divideMapValuesToLists(dateRecruitmentFollowUpMap);
       resultTriple =
@@ -112,6 +115,37 @@ public class TimelineRecruitment extends DashboardDataItemLogic implements Timel
     }
     TimerTools.stopTimerAndLog(startTimer, "finished createTimelineRecruitment");
     return resultTriple;
+  }
+
+  private static void logUnassignedConsentEntries(
+      List<UkbConsent> consents, LinkedHashMap<Long, Long> dateRecruitmentConsentMap) {
+    // Identify consents with valid permit start dates that were not counted in any day window
+    List<Map.Entry<String, Long>> unmatchedPatientsWithTimestamps =
+        consents.stream()
+            .map(
+                c ->
+                    Map.entry(
+                        c.getPatientId(), DateTools.dateToUnixTime(c.getAcribisPermitStartDate())))
+            .filter(entry -> entry.getValue() != null)
+            .filter(
+                entry -> {
+                  long ts = entry.getValue();
+                  // Check if the timestamp was not included in any daily window
+                  return dateRecruitmentConsentMap.entrySet().stream()
+                      .noneMatch(e -> ts >= e.getKey() && ts < (e.getKey() + DAY_IN_SECONDS));
+                })
+            .toList();
+
+    // Log patient IDs and their timestamps not matched in the timeline
+    if (!unmatchedPatientsWithTimestamps.isEmpty()) {
+      unmatchedPatientsWithTimestamps.forEach(
+          entry ->
+              log.warn(
+                  "Consent for patient {} with timestamp={} out of border in the recruitment"
+                      + " timeline.",
+                  entry.getKey(),
+                  entry.getValue()));
+    }
   }
 
   public Map<String, List<? extends Number>> createTimelineRecruitmentMap(

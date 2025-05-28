@@ -71,7 +71,7 @@ public class TimelineVariantTestResults extends DashboardDataItemLogic {
     List<String> observationVariantLoincCodes =
         inputCodeSettings.getCovidObservationVariantLoincCodes();
     // Initialization of a map with counts for each variant for each 24-h-period
-    variantMap.put(DATE.getValue(), new ArrayList<>());
+    variantMap.put(DATE, new ArrayList<>());
     variantMap.put(VARIANT_ALPHA, new ArrayList<>());
     variantMap.put(VARIANT_BETA, new ArrayList<>());
     variantMap.put(VARIANT_GAMMA, new ArrayList<>());
@@ -168,7 +168,7 @@ public class TimelineVariantTestResults extends DashboardDataItemLogic {
 
       startDate += NumDashboardConstants.DAY_IN_SECONDS;
     }
-    variantMap.put(DATE.getValue(), getDatesOutputList(DataItemContext.COVID));
+    variantMap.put(DATE, getDatesOutputList(DataItemContext.COVID));
 
     return variantMap;
   }

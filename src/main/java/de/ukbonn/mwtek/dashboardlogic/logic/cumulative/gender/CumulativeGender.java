@@ -54,9 +54,9 @@ public class CumulativeGender extends DashboardDataItemLogic {
    * @param gender The gender type (e.g. male) to be counted
    * @return Frequency of gender searched across all patients who are covid positive.
    */
-  public static Number getGenderCount(
+  public static Set<String> getGenderCount(
       List<UkbEncounter> filteredEncounters, List<UkbPatient> patients, Gender gender) {
-    return getGenderPatientIdList(filteredEncounters, patients, gender).size();
+    return getGenderPatientIdList(filteredEncounters, patients, gender);
   }
 
   /**

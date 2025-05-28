@@ -18,52 +18,69 @@
 package de.ukbonn.mwtek.dashboardlogic.logic.current;
 
 import de.ukbonn.mwtek.dashboardlogic.DashboardDataItemLogic;
-import de.ukbonn.mwtek.dashboardlogic.models.DiseaseDataItem;
+import de.ukbonn.mwtek.dashboardlogic.models.PidTimestampCohortMap;
 import de.ukbonn.mwtek.dashboardlogic.models.StackedBarChartsItem;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbConsent;
 import de.ukbonn.mwtek.utilities.generic.time.TimerTools;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * This class is used for generating the data item {@link DiseaseDataItem acr.current.recruitment}.
+ * Creation of the "timeline.diags.occurrence" items for kjp and rsv.
  *
  * @author <a href="mailto:david.meyers@ukbonn.de">David Meyers</a>
  */
 @Slf4j
-public class CurrentRecruitment extends DashboardDataItemLogic {
+public class AcribisCurrentDischargeDiags extends DashboardDataItemLogic {
 
-  public static final String ACR_RECRUITMENT_CONSENT = "acr_recruitment_consent";
-  public static final String ACR_RECRUITMENT_FOLLOWUP = "acr_recruitment_followup";
-  public static final String ACR_NUMBER_PATIENTS = "acr_number_patients";
-  public static final String ACR_PROJECT = "acr_project";
+  public static final String ACR_ALL_COHORTS = "acr_all_cohorts";
+  public static final String ACR_NUMBER_PATIENTS_COHORT = "acr_number_patients_cohort";
+  private final PidTimestampCohortMap cohort1Map;
+  private final PidTimestampCohortMap cohort2Map;
+  private final PidTimestampCohortMap cohort3Map;
 
-  public StackedBarChartsItem createStackedBarCharts(Collection<UkbConsent> ukbConsents) {
+  public AcribisCurrentDischargeDiags(
+      PidTimestampCohortMap cohort1Map,
+      PidTimestampCohortMap cohort2Map,
+      PidTimestampCohortMap cohort3Map) {
+    this.cohort1Map = cohort1Map;
+    this.cohort2Map = cohort2Map;
+    this.cohort3Map = cohort3Map;
+  }
 
-    log.debug("started CurrentRecruitment.createStackedBarCharts");
+  /**
+   * Creates a StackedBarChartsItem object containing stacked bar chart data for the Acribis current
+   * discharge dignosis cohort.
+   */
+  public StackedBarChartsItem createStackedBarCharts() {
+
+    log.debug("started AcribisCurrentDischargeDiags.createStackedBarCharts");
     Instant startTimer = TimerTools.startTimer();
 
     StackedBarChartsItem result = new StackedBarChartsItem();
-    result.setCharts(new ArrayList<>(List.of(ACR_PROJECT)));
-
-    // Generate valid date list using the determined format.
-    result.setBars(List.of(List.of(ACR_RECRUITMENT_CONSENT, ACR_RECRUITMENT_FOLLOWUP)));
-    result.setStacks(List.of(List.of(ACR_NUMBER_PATIENTS)));
+    result.setCharts(new ArrayList<>(List.of(ACR_ALL_COHORTS)));
+    result.setBars(List.of(List.of(ACR_COHORT_K_1, ACR_COHORT_K_2, ACR_COHORT_K_3)));
+    result.setStacks(List.of(List.of(ACR_NUMBER_PATIENTS_COHORT)));
     List<List<? extends Number>> resultList = new ArrayList<>();
-    // Each patient gets count once
-    resultList.add(
-        List.of(
-            ukbConsents.stream().map(UkbConsent::getPatientId).collect(Collectors.toSet()).size()));
-    resultList.add(List.of(0));
-
+    resultList.add(List.of(cohort1Map.size()));
+    resultList.add(List.of(cohort2Map.size()));
+    resultList.add(List.of(cohort3Map.size()));
     result.setValues(List.of(resultList));
-    TimerTools.stopTimerAndLog(startTimer, "finished CurrentRecruitment.createStackedBarCharts");
+    TimerTools.stopTimerAndLog(
+        startTimer, "finished AcribisCurrentDischargeDiags.createStackedBarCharts");
 
     // Order ascending regarding the specification.
     return result;
+  }
+
+  public Map<String, List<String>> getDebugData() {
+    Map<String, List<String>> output = new LinkedHashMap<>();
+    output.put(ACR_COHORT_K_1, new ArrayList<>(cohort1Map.keySet()));
+    output.put(ACR_COHORT_K_2, new ArrayList<>(cohort2Map.keySet()));
+    output.put(ACR_COHORT_K_3, new ArrayList<>(cohort3Map.keySet()));
+    return output;
   }
 }

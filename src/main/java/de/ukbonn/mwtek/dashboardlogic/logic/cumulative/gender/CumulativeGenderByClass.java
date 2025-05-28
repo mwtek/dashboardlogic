@@ -84,7 +84,7 @@ public class CumulativeGenderByClass extends CumulativeGender {
     return result;
   }
 
-  public static Number getGenderCountByCaseClass(
+  public static Set<String> getGenderCountByCaseClass(
       List<UkbEncounter> ukbEncounters,
       List<UkbPatient> ukbPatients,
       Gender gender,

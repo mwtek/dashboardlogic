@@ -19,7 +19,7 @@
 package de.ukbonn.mwtek.dashboardlogic.enums;
 
 /**
- * Class with constants names for the different data items
+ * Class with constant's names for the different data items
  *
  * @author <a href="mailto:david.meyers@ukbonn.de">David Meyers</a>
  */
@@ -83,9 +83,7 @@ public class DataItems {
 
   // The prefix for the kids radar data items
   public static final String KIDS_RADAR_PREFIX = "kira.";
-
   public static final String KIDS_RADAR_PREFIX_KJP = KIDS_RADAR_PREFIX + "kjp.";
-
   public static final String KIDS_RADAR_PREFIX_RSV = KIDS_RADAR_PREFIX + "rsv.";
 
   public static final String KIDS_RADAR_PREFIX_ACRIBIS = "acr.";
@@ -99,4 +97,6 @@ public class DataItems {
 
   public static final String CURRENT_RECRUITMENT = "current.recruitment";
   public static final String TIMELINE_RECRUITMENT = "timeline.recruitment";
+  public static final String CURRENT_DISCHARGEDIAGS_COHORTS = "current.dischargediags.cohorts";
+  public static final String TIMELINE_DISCHARGEDIAGS_COHORTS = "timeline.dischargediags.cohorts";
 }

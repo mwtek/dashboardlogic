@@ -215,7 +215,7 @@ public class KidsRadarDataItemGenerator extends DataItemGenerator {
         observations,
         conditionsFiltered,
         locations,
-        icuProcedures,
+        procedures,
         dataItemContext);
     // The rsv data items rely on less filter (and merging steps) than the items that are based
     // on disorder groups.

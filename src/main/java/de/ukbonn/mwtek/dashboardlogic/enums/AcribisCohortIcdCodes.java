@@ -1,0 +1,77 @@
+/*
+ * Copyright (C) 2021 University Hospital Bonn - All Rights Reserved You may use, distribute and
+ * modify this code under the GPL 3 license. THERE IS NO WARRANTY FOR THE PROGRAM, TO THE EXTENT
+ * PERMITTED BY APPLICABLE LAW. EXCEPT WHEN OTHERWISE STATED IN WRITING THE COPYRIGHT HOLDERS AND/OR
+ * OTHER PARTIES PROVIDE THE PROGRAM “AS IS” WITHOUT WARRANTY OF ANY KIND, EITHER EXPRESSED OR
+ * IMPLIED, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE. THE ENTIRE RISK AS TO THE QUALITY AND PERFORMANCE OF THE PROGRAM IS WITH
+ * YOU. SHOULD THE PROGRAM PROVE DEFECTIVE, YOU ASSUME THE COST OF ALL NECESSARY SERVICING, REPAIR
+ * OR CORRECTION. IN NO EVENT UNLESS REQUIRED BY APPLICABLE LAW OR AGREED TO IN WRITING WILL ANY
+ * COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MODIFIES AND/OR CONVEYS THE PROGRAM AS PERMITTED ABOVE,
+ * BE LIABLE TO YOU FOR DAMAGES, INCLUDING ANY GENERAL, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES
+ * ARISING OUT OF THE USE OR INABILITY TO USE THE PROGRAM (INCLUDING BUT NOT LIMITED TO LOSS OF DATA
+ * OR DATA BEING RENDERED INACCURATE OR LOSSES SUSTAINED BY YOU OR THIRD PARTIES OR A FAILURE OF THE
+ * PROGRAM TO OPERATE WITH ANY OTHER PROGRAMS), EVEN IF SUCH HOLDER OR OTHER PARTY HAS BEEN ADVISED
+ * OF THE POSSIBILITY OF SUCH DAMAGES. You should have received a copy of the GPL 3 license with *
+ * this file. If not, visit http://www.gnu.de/documents/gpl-3.0.en.html
+ */ package de.ukbonn.mwtek.dashboardlogic.enums;
+
+import de.ukbonn.mwtek.dashboardlogic.tools.CodeUtils;
+import java.util.List;
+
+public class AcribisCohortIcdCodes {
+
+  // ICD code constants
+  public static final String CHRONIC_HEART_FAILURE = "I50";
+  public static final String ATRIAL_FIBRILLATION = "I48";
+  public static final String CARDIOGENIC_SHOCK = "R57.0";
+  public static final String MITRAL_VALVE_STENOSIS_0 = "I05.0";
+  public static final String MITRAL_VALVE_STENOSIS_2 = "I05.2";
+  public static final String CONGENITAL_AORTIC_MITRAL_DEFECTS = "Q23";
+  public static final String CONGENITAL_CHAMBER_DEFECTS = "Q20";
+  public static final String CONGENITAL_SEPTAL_DEFECTS = "Q21";
+  public static final String CONGENITAL_PULMONARY_TRICUSPID_DEFECTS = "Q22";
+  public static final String OTHER_CONGENITAL_HEART_DEFECTS = "Q24";
+  public static final String ACUTE_MYOCARDIAL_INFARCTION = "I21";
+  public static final String ACUTE_CORONARY_SYNDROME = "I24";
+  public static final String STROKE = "I63";
+  public static final String TIA = "G45.9";
+  public static final String AORTIC_ANEURYSM = "I71";
+  public static final String PAD = "I70.2";
+
+  // Automatically gathered list of all ICD codes via reflection
+  public static final List<String> ALL_CODES;
+
+  public static final List<String> INCLUSION_CRITERIA_COHORT_1 = List.of(CHRONIC_HEART_FAILURE);
+
+  public static final List<String> EXCLUSION_CRITERIA_COHORT_1 =
+      List.of(
+          CARDIOGENIC_SHOCK,
+          MITRAL_VALVE_STENOSIS_0,
+          MITRAL_VALVE_STENOSIS_2,
+          CONGENITAL_AORTIC_MITRAL_DEFECTS,
+          CONGENITAL_CHAMBER_DEFECTS,
+          CONGENITAL_SEPTAL_DEFECTS,
+          CONGENITAL_PULMONARY_TRICUSPID_DEFECTS,
+          OTHER_CONGENITAL_HEART_DEFECTS);
+
+  public static final List<String> INCLUSION_CRITERIA_COHORT_2 = List.of(ATRIAL_FIBRILLATION);
+
+  public static final List<String> EXCLUSION_CRITERIA_COHORT_2 =
+      List.of(
+          CONGENITAL_AORTIC_MITRAL_DEFECTS,
+          CONGENITAL_CHAMBER_DEFECTS,
+          CONGENITAL_SEPTAL_DEFECTS,
+          CONGENITAL_PULMONARY_TRICUSPID_DEFECTS,
+          OTHER_CONGENITAL_HEART_DEFECTS);
+
+  public static final List<String> INCLUSION_CRITERIA_COHORT_3 =
+      List.of(
+          ACUTE_MYOCARDIAL_INFARCTION, ACUTE_CORONARY_SYNDROME, STROKE, TIA, AORTIC_ANEURYSM, PAD);
+
+  public static final List<String> EXCLUSION_CRITERIA_COHORT_3 = EXCLUSION_CRITERIA_COHORT_2;
+
+  static {
+    ALL_CODES = CodeUtils.extractAllCodes(AcribisCohortIcdCodes.class);
+  }
+}

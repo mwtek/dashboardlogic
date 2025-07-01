@@ -18,6 +18,11 @@
 
 package de.ukbonn.mwtek.dashboardlogic.settings;
 
+import static de.ukbonn.mwtek.dashboardlogic.enums.NumDashboardConstants.YEAR_MONTH_DATE_FORMAT;
+
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -85,4 +90,27 @@ public class GlobalConfiguration {
    * href="https://simplifier.net/medizininformatikinitiative-modullabor/valuesetqualitativelaborergebnisse">here</a>.
    */
   private Map<String, List<String>> qualitativeLabCodes = new HashMap<>();
+
+  /** Handle outpatient encounters with status = UNKNOWN as FINISHED */
+  private Boolean useOutpatientEncounterWithStatusUnknown = false;
+
+  /** Threat in-progress encounter that got a `period.end` set as `FINISHED` */
+  private Boolean checkInProgressPeriodEnd = false;
+
+  private CheckInProgressPeriodStart checkInProgressPeriodStart = new CheckInProgressPeriodStart();
+
+  @Getter
+  @Setter
+  public static class CheckInProgressPeriodStart {
+    private Integer olderThanXDays;
+    private String baseDate;
+
+    public Date getBaseDateType() {
+      try {
+        return new SimpleDateFormat(YEAR_MONTH_DATE_FORMAT).parse(baseDate);
+      } catch (ParseException e) {
+        throw new IllegalArgumentException("Invalid date format in YAML: " + baseDate, e);
+      }
+    }
+  }
 }

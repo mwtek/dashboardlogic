@@ -91,7 +91,7 @@ public class CumulativeMaxTreatmentLevel extends DashboardData {
         case INPATIENT -> // Check if the encounter is not part of any icu+ treatmentlevel
             normalWardPidSet.addAll(
                 value.stream()
-                    .filter(UkbEncounter::isCaseClassInpatient)
+                    .filter(UkbEncounter::isCaseClassInpatientOrShortStay)
                     .filter(e -> isMaxTreatmentlevelNormalWard(mapIcu, e))
                     .map(UkbEncounter::getPatientId)
                     .collect(Collectors.toSet()));

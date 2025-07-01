@@ -124,7 +124,7 @@ public class TimelineMaxTreatmentLevel extends DashboardDataItemLogic
     Set<UkbEncounter> positiveSupplyContactEncounters =
         supplyContactEncounters.parallelStream()
             .filter(EncounterFilter::isDiseasePositive)
-            .filter(UkbEncounter::isCaseClassInpatient)
+            .filter(UkbEncounter::isCaseClassInpatientOrShortStay)
             .collect(Collectors.toSet());
 
     List<UkbEncounter> positiveOutpatientEncounters =
@@ -234,7 +234,7 @@ public class TimelineMaxTreatmentLevel extends DashboardDataItemLogic
                       }
                     }
                     // At this stage it is clear that it is a stationary supplyContactEncounter
-                    else if (supplyContactEncounter.isCaseClassInpatient()) {
+                    else if (supplyContactEncounter.isCaseClassInpatientOrShortStay()) {
                       handleInpatientEncounter(
                           icuProcedures,
                           inputCodeSettings,

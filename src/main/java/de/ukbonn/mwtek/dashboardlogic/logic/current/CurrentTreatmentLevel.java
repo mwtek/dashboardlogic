@@ -85,7 +85,7 @@ public class CurrentTreatmentLevel extends DashboardDataItemLogic {
           // Process encounters for normal ward, excluding ICU, Ventilation, and ECMO encounters
           return facilityEncounters.parallelStream()
               .filter(EncounterFilter::isDiseasePositive)
-              .filter(UkbEncounter::isCaseClassInpatient)
+              .filter(UkbEncounter::isCaseClassInpatientOrShortStay)
               .filter(UkbEncounter::isActive)
               // No higher treatmentlevel found
               .filter(x -> !positiveCurrentlyOnIcuWardFacilityContactIds.contains(x.getId()))
@@ -154,7 +154,7 @@ public class CurrentTreatmentLevel extends DashboardDataItemLogic {
           // Process encounters for normal ward, excluding ICU, Ventilation, and ECMO encounters
           facilityEncounters.parallelStream()
               .filter(EncounterFilter::isDiseasePositive)
-              .filter(UkbEncounter::isCaseClassInpatient)
+              .filter(UkbEncounter::isCaseClassInpatientOrShortStay)
               .filter(UkbEncounter::isActive)
               .filter(x -> !positiveCurrentlyOnIcuWardFacilityContactIds.contains(x.getId()))
               .filter(x -> !currentActiveVentFacilityContactIds.contains(x.getId()))
@@ -210,7 +210,7 @@ public class CurrentTreatmentLevel extends DashboardDataItemLogic {
         standardWardEncounters.stream()
             .filter(
                 encounter ->
-                    encounter.isCaseClassInpatient()
+                    encounter.isCaseClassInpatientOrShortStay()
                         && encounter.hasExtension(POSITIVE_RESULT.getValue()))
             .map(UkbEncounter::getId)
             .toList();

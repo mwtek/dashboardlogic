@@ -83,7 +83,7 @@ public class CumulativeAge extends DashboardDataItemLogic {
     Map<String, Date> pidAgeMap = createPidAgeMap(mapEncounterPos);
 
     for (UkbEncounter encounter : encountersPositive) {
-      if (encounter.isCaseClassInpatient()) {
+      if (encounter.isCaseClassInpatientOrShortStay()) {
         stationaryPidSet.add(encounter.getPatientId());
       } else if (encounter.isCaseClassOutpatient()
           && !encounter.hasExtension(TWELVE_DAYS_LOGIC.getValue())) {

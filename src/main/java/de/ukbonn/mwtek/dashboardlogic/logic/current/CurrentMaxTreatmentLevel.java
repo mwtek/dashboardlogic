@@ -71,7 +71,7 @@ public class CurrentMaxTreatmentLevel extends DashboardDataItemLogic {
     if (facilityContactsInpatientPositive == null) {
       facilityContactsInpatientPositive =
           facilityContacts.stream()
-              .filter(UkbEncounter::isCaseClassInpatient)
+              .filter(UkbEncounter::isCaseClassInpatientOrShortStay)
               .filter(UkbEncounter::isActive)
               .filter(EncounterFilter::isDiseasePositive)
               .collect(Collectors.toList());

@@ -73,7 +73,7 @@ public class CumulativeLengthOfStayHospital extends DashboardDataItemLogic {
     // Filter encounters to include only inpatient cases with positive disease status
     Map<String, Map<Long, Set<String>>> mapResult =
         facilityEncounters.stream()
-            .filter(UkbEncounter::isCaseClassInpatient)
+            .filter(UkbEncounter::isCaseClassInpatientOrShortStay)
             .filter(EncounterFilter::isDiseasePositive)
             .filter(UkbEncounter::isPeriodStartExistent)
             // Group encounters by patient ID

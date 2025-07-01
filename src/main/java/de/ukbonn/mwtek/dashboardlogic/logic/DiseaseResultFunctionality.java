@@ -112,7 +112,7 @@ public class DiseaseResultFunctionality {
     List<UkbEncounter> inpatientPositiveEncounters =
         encounters.parallelStream()
             .filter(EncounterFilter::isDiseasePositive)
-            .filter(UkbEncounter::isCaseClassInpatient)
+            .filter(UkbEncounter::isCaseClassInpatientOrShortStay)
             .toList();
 
     List<UkbEncounter> supplyContactEncountersPositive =
@@ -388,7 +388,7 @@ public class DiseaseResultFunctionality {
           // the
           // inpatient case is a prestationary or normalstationary one
           // check if encounter is stationary (without the prestationary ones!)
-          if (e.isCaseClassInpatient()) {
+          if (e.isCaseClassInpatientOrShortStay()) {
             encounterMap.get(INPATIENT).add(e);
           }
           // check if encounter is ambulant

@@ -152,7 +152,7 @@ public class DiseaseDetectionManagement {
     Map<String, List<UkbEncounter>> inpatientEncountersByPatientId =
         encountersAll.stream()
             .filter(encounter -> positiveOutpatientPatientIds.contains(encounter.getPatientId()))
-            .filter(UkbEncounter::isCaseClassInpatient)
+            .filter(UkbEncounter::isCaseClassInpatientOrShortStay)
             .collect(Collectors.groupingBy(UkbEncounter::getPatientId));
 
     // Loop through flagged encounters

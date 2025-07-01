@@ -70,9 +70,11 @@ public class CumulativeGenderByClass extends CumulativeGender {
             .filter(
                 encounter -> {
                   if (encounterClass == OUTPATIENT) {
+                    // Definition outpatient for this item: ambulant or prestationary
                     return encounter.isCaseClassOutpatient();
                   } else if (encounterClass == INPATIENT) {
-                    return encounter.isCaseClassInpatient();
+                    // Definition inpatient for this item: (post-)stationary or semi-stationary
+                    return isInpatientBasedOnDsd(encounter);
                   }
                   return false;
                 })
@@ -82,6 +84,12 @@ public class CumulativeGenderByClass extends CumulativeGender {
 
     TimerTools.stopTimerAndLog(startTimer, "Finished processGenderByCaseClass");
     return result;
+  }
+
+  private static boolean isInpatientBasedOnDsd(UkbEncounter encounter) {
+    return encounter.isCaseClassInpatient()
+        || encounter.isCaseTypePostStationary()
+        || encounter.isSemiStationary();
   }
 
   public static Set<String> getGenderCountByCaseClass(

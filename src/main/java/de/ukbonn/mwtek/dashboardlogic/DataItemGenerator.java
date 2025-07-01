@@ -114,6 +114,7 @@ import de.ukbonn.mwtek.dashboardlogic.models.DiseaseDataItem;
 import de.ukbonn.mwtek.dashboardlogic.models.FacilityEncounterToIcuSupplyContactsMap;
 import de.ukbonn.mwtek.dashboardlogic.models.TimestampedListPair;
 import de.ukbonn.mwtek.dashboardlogic.settings.GlobalConfiguration;
+import de.ukbonn.mwtek.dashboardlogic.settings.GlobalConfiguration.CheckInProgressPeriodStart;
 import de.ukbonn.mwtek.dashboardlogic.settings.InputCodeSettings;
 import de.ukbonn.mwtek.dashboardlogic.settings.QualitativeLabCodesSettings;
 import de.ukbonn.mwtek.dashboardlogic.settings.VariantSettings;
@@ -125,10 +126,14 @@ import de.ukbonn.mwtek.utilities.fhir.resources.UkbLocation;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbObservation;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbPatient;
 import de.ukbonn.mwtek.utilities.fhir.resources.UkbProcedure;
+import de.ukbonn.mwtek.utilities.generic.time.DateTools;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.AbstractMap.SimpleEntry;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -139,6 +144,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.hl7.fhir.r4.model.Encounter;
+import org.hl7.fhir.r4.model.Encounter.EncounterStatus;
 import org.hl7.fhir.r4.model.Enumerations.FHIRAllTypes;
 
 /**
@@ -230,6 +236,14 @@ public class DataItemGenerator {
 
     filterResourcesByDate(encounters, conditions, observations, dataItemContext);
 
+    // Filters out encounters with invalid status, unless explicitly allowed via configuration.
+    // (should be done in the data-retrieval step before anyway but this step here will do the same
+    // for unit tests)
+    encounters = filterEncounterByStatus(encounters, globalConfiguration);
+
+    // Updating the encounter status to FINISHED if IN-PROGRESS and period.end is set
+    updateInProgressEncounterStatusByDemand(globalConfiguration);
+
     // Group the encounter resources by facility type
     facilityContactEncounters =
         encounters.parallelStream().filter(UkbEncounter::isFacilityContact).toList();
@@ -241,14 +255,14 @@ public class DataItemGenerator {
     List<UkbEncounter> supplyContactEncounters =
         encounters.parallelStream()
             .filter(UkbEncounter::isSupplyContact)
-            .filter(UkbEncounter::isCaseClassInpatient)
+            .filter(UkbEncounter::isCaseClassInpatientOrShortStay)
             .toList();
 
     // Department contacts are just needed if we need to determine encounter hierarchy via .partOf
     List<UkbEncounter> departmentContactEncounters =
         encounters.parallelStream()
             .filter(UkbEncounter::isDepartmentContact)
-            .filter(UkbEncounter::isCaseClassInpatient)
+            .filter(UkbEncounter::isCaseClassInpatientOrShortStay)
             .toList();
 
     // If no Encounter of type 'Versorgungsstellenkontakt' could be found, many data items cannot
@@ -271,6 +285,7 @@ public class DataItemGenerator {
               + " filtered.");
       mapExcludeDataItems.putAll(getAllDataItemsThatNeedSupplyContacts(dataItemContext));
     }
+
     // Marking encounter resources as positive via setting of extensions
     DiseaseDetectionManagement.flagEncounters(
         encounters,
@@ -294,7 +309,7 @@ public class DataItemGenerator {
 
     // List of stationary Cases
     List<UkbEncounter> inpatientEncounters =
-        encounters.parallelStream().filter(UkbEncounter::isCaseClassInpatient).toList();
+        encounters.parallelStream().filter(UkbEncounter::isCaseClassInpatientOrShortStay).toList();
 
     FacilityEncounterToIcuSupplyContactsMap facilityEncounterIdToIcuSupplyContactsMap =
         assignSupplyEncountersToFacilityEncounter(icuSupplyContactEncounters, inpatientEncounters);
@@ -693,7 +708,6 @@ public class DataItemGenerator {
         determineLabel(dataItemContext, CUMULATIVE_MAXTREATMENTLEVEL);
     if (isItemNotExcluded(mapExcludeDataItems, cumulativeMaxTreatmentLevelLabel, false)) {
       Map<String, Number> mapCumulativeMaxtreatmentlevel = new LinkedHashMap<>();
-
       mapCumulativeMaxtreatmentlevel.put(
           OUTPATIENT.getValue(), cumulativeOutpatientEncounters.size());
       mapCumulativeMaxtreatmentlevel.put(
@@ -1221,6 +1235,73 @@ public class DataItemGenerator {
     return currentDataList;
   }
 
+  private void updateInProgressEncounterStatusByDemand(GlobalConfiguration globalConfiguration) {
+    updateInProgressEncounterStatusByPeriodEnd(globalConfiguration);
+    updateInProgressEncounterStatusByDate(globalConfiguration);
+  }
+
+  private void updateInProgressEncounterStatusByDate(GlobalConfiguration globalConfiguration) {
+    if (globalConfiguration.getCheckInProgressPeriodStart().getOlderThanXDays() != null)
+      updateInProgressEncounterStatusByDate(globalConfiguration.getCheckInProgressPeriodStart());
+  }
+
+  private void updateInProgressEncounterStatusByPeriodEnd(GlobalConfiguration globalConfiguration) {
+    if (globalConfiguration.getCheckInProgressPeriodEnd())
+      encounters.stream()
+          .filter(UkbEncounter::isActive)
+          .filter(x -> x.hasPeriod() && x.getPeriod().hasEnd())
+          .forEach(x -> x.setStatus(EncounterStatus.FINISHED));
+  }
+
+  /**
+   * Filters the list of in-progress encounters by comparing their start dates against a configured
+   * reference date and cutoff duration.
+   *
+   * <p>Encounters are removed if their start date is before both: - the reference (base) date - and
+   * the base date minus the configured number of days.
+   *
+   * @param checkInProgressPeriodStart configuration object containing base date and day offset
+   * @throws IllegalArgumentException if the configuration or required fields are null
+   */
+  private void updateInProgressEncounterStatusByDate(
+      CheckInProgressPeriodStart checkInProgressPeriodStart) {
+    if (checkInProgressPeriodStart == null
+        || checkInProgressPeriodStart.getOlderThanXDays() == null) {
+      throw new IllegalArgumentException(
+          "InProgressEncounterFilterConfig and olderThanXDays must not be null");
+    }
+
+    // Use current date as fallback if baseDate is not set
+    Date baseDate = checkInProgressPeriodStart.getBaseDateType();
+    if (baseDate == null) {
+      baseDate = DateTools.getCurrentDateTime();
+    }
+
+    LocalDate referenceDate = baseDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+
+    LocalDate cutoffDate = referenceDate.minusDays(checkInProgressPeriodStart.getOlderThanXDays());
+
+    // Remove encounters whose start date is before both the reference date and the cutoff
+    encounters =
+        encounters.stream()
+            .filter(
+                encounter -> {
+                  if (!encounter.isActive()
+                      || !encounter.hasPeriod()
+                      || !encounter.getPeriod().hasStart()) {
+                    return true; // keep encounters with missing or inactive period
+                  }
+
+                  Date startDate = encounter.getPeriod().getStart();
+                  LocalDate startLocalDate =
+                      startDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+
+                  return !(startLocalDate.isBefore(referenceDate)
+                      && startLocalDate.isBefore(cutoffDate));
+                })
+            .collect(Collectors.toList());
+  }
+
   /**
    * Filters lists of encounters, conditions, and observations by a qualifying date depending on the
    * data item context (e.g., Influenza or COVID). Logs the count of removed resources and the IDs
@@ -1458,7 +1539,7 @@ public class DataItemGenerator {
     // Pre-stationary and post-stationary encounter must have class = AMB
     List<String> preOrPostEncounterNotOutpatient =
         encounters.parallelStream()
-            .filter(UkbEncounter::isCaseClassInpatient)
+            .filter(UkbEncounter::isCaseClassInpatientOrShortStay)
             .filter(x -> x.isCaseTypePreStationary() || x.isCaseTypePostStationary())
             .map(UkbEncounter::getId)
             .toList();
@@ -1500,6 +1581,49 @@ public class DataItemGenerator {
               + " the transfer history are therefore excluded from the output.");
     }
     return supplyContactsFound;
+  }
+
+  /**
+   * Filters out encounters with invalid status, unless explicitly allowed via configuration.
+   *
+   * <p>This method should theoretically never exclude any encounters in production, since encounter
+   * status validation is already enforced during data retrieval. It exists primarily as a safeguard
+   * and is especially relevant for unit tests. An encounter is considered valid if:
+   *
+   * <ul>
+   *   <li>{@code isEncounterStatusValid()} returns {@code true}, or
+   *   <li>{@code getStatus() == UNKNOWN} and the global flag {@code
+   *       useOutpatientEncounterWithStatusUnknown} is enabled
+   * </ul>
+   *
+   * @param encounters the full list of encounters to validate
+   * @param globalConfiguration global config containing feature flags
+   * @return list of encounters considered valid for further processing
+   */
+  protected List<UkbEncounter> filterEncounterByStatus(
+      List<UkbEncounter> encounters, GlobalConfiguration globalConfiguration) {
+
+    // Partition the encounters into valid (true) and invalid (false) groups
+    Map<Boolean, List<UkbEncounter>> partitioned =
+        encounters.stream()
+            .collect(
+                Collectors.partitioningBy(
+                    encounter ->
+                        encounter.isEncounterStatusValid()
+                            || (globalConfiguration.getUseOutpatientEncounterWithStatusUnknown()
+                                && encounter.getStatus() == EncounterStatus.UNKNOWN)));
+
+    List<UkbEncounter> validEncounters = partitioned.get(true);
+    List<UkbEncounter> filteredOut = partitioned.get(false);
+
+    // Defensive logging for unexpected cases — mostly for unit testing or fallback scenarios
+    if (!filteredOut.isEmpty()) {
+      log.debug(
+          "Warning: {} encounters with invalid status were filtered out [e.g. case ID: {}]",
+          filteredOut.size(),
+          filteredOut.get(0).getId());
+    }
+    return validEncounters;
   }
 
   private void addValuesToTimelineMaxMap(

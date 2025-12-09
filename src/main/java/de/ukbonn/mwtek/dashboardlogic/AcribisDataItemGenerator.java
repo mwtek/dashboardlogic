@@ -353,18 +353,14 @@ public class AcribisDataItemGenerator extends DataItemGenerator {
    *
    * @param validAcribisConsents The list of Acribis consents to be filtered.
    * @param validPatDataUsage The list of valid consents for PatDataUsage.
-   * @param validRecontacting The list of valid consents for Recontacting.
    * @return A filtered list of Acribis consents that have valid PatientIds in both PatDataUsage and
    *     Recontacting consents.
    */
   public List<UkbConsent> filterAcribisConsentWithValidMainConsent(
-      List<UkbConsent> validAcribisConsents,
-      List<UkbConsent> validPatDataUsage,
-      List<UkbConsent> validRecontacting) {
+      List<UkbConsent> validAcribisConsents, List<UkbConsent> validPatDataUsage) {
 
-    // Extract patient IDs from validPatDataUsage and validRecontacting
+    // Extract patient IDs from validPatDataUsage
     Set<String> patDataUsageIds = extractPatientIds(validPatDataUsage);
-    Set<String> recontactingIds = extractPatientIds(validRecontacting);
 
     // Save initial size before filtering
     int beforeFilterCount = validAcribisConsents.size();
@@ -372,21 +368,15 @@ public class AcribisDataItemGenerator extends DataItemGenerator {
     // Find an example PatientId that would be removed by this filter
     Optional<String> exampleRemovedPatientId =
         validAcribisConsents.stream()
-            .filter(
-                c ->
-                    !(patDataUsageIds.contains(c.getPatientId())
-                        && recontactingIds.contains(c.getPatientId())))
+            // Keep only if PatientId exists in patDataUsageIds
             .map(UkbConsent::getPatientId)
+            .filter(patientId -> !patDataUsageIds.contains(patientId))
             .findFirst();
 
-    // Filter validAcribisConsents: keep only if PatientId exists in both patDataUsageIds and
-    // recontactingIds
+    // Filter validAcribisConsents: keep only if PatientId exists in patDataUsageIds
     List<UkbConsent> filteredConsents =
         validAcribisConsents.stream()
-            .filter(
-                c ->
-                    patDataUsageIds.contains(c.getPatientId())
-                        && recontactingIds.contains(c.getPatientId()))
+            .filter(c -> patDataUsageIds.contains(c.getPatientId()))
             .collect(Collectors.toList());
 
     // Log the number of removed entries and optionally an example PatientId
@@ -394,19 +384,17 @@ public class AcribisDataItemGenerator extends DataItemGenerator {
     if (removedCount > 0) {
       if (exampleRemovedPatientId.isPresent()) {
         log.info(
-            "{} consents were removed because no PatDataUsage or Recontacting consent was found."
-                + " Example PatientId: {}",
+            "{} consents were removed because no PatDataUsage consent was found. Example PatientId:"
+                + " {}",
             removedCount,
             exampleRemovedPatientId.get());
       } else {
         log.info(
-            "{} consents were removed because no PatDataUsage or Recontacting consent was found.",
-            removedCount);
+            "{} consents were removed because no PatDataUsage consent was found.", removedCount);
       }
     } else {
       log.info("No consents had to be removed.");
     }
-
     return filteredConsents;
   }
 
@@ -418,9 +406,7 @@ public class AcribisDataItemGenerator extends DataItemGenerator {
     List<UkbConsent> acribis =
         filterConsentByValidity(consents, UkbConsent::isAcribisConsentAllowed);
     List<UkbConsent> patData = filterConsentByValidity(consents, UkbConsent::isPatDataUsageAllowed);
-    List<UkbConsent> recontact =
-        filterConsentByValidity(consents, UkbConsent::isRecontactingAllowed);
-    // Determine all consent forms that have agreed to all 3 fields.
-    return filterAcribisConsentWithValidMainConsent(acribis, patData, recontact);
+    // Determine all consent forms that have agreed to the two fields.
+    return filterAcribisConsentWithValidMainConsent(acribis, patData);
   }
 }

@@ -22,7 +22,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>de.ukbonn.mwtek</groupId>
   <artifactId>dashboardlogic</artifactId>
-  <version>0.5.4+update.12</version>
+  <version>0.5.4+update.13</version>
   <name>dashboard-logic</name>
   <description>Dashboard Logic</description>
   <properties>

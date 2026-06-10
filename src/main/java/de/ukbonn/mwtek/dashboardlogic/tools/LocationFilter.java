@@ -17,7 +17,7 @@
  */
 package de.ukbonn.mwtek.dashboardlogic.tools;
 
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbLocation;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiLocation;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -25,15 +25,15 @@ import java.util.stream.Collectors;
 /** Various auxiliary methods that affect the location resources. */
 public class LocationFilter {
 
-  public static List<UkbLocation> getIcuLocations(List<UkbLocation> locations) {
+  public static List<MiiLocation> getIcuLocations(List<MiiLocation> locations) {
     return locations.stream()
         .filter(x -> !x.getType().isEmpty())
-        .filter(UkbLocation::isLocationWard)
-        .filter(UkbLocation::isLocationIcu)
+        .filter(MiiLocation::isLocationWard)
+        .filter(MiiLocation::isLocationIcu)
         .toList();
   }
 
-  public static Set<String> getIcuLocationIds(List<UkbLocation> locations) {
-    return getIcuLocations(locations).stream().map(UkbLocation::getId).collect(Collectors.toSet());
+  public static Set<String> getIcuLocationIds(List<MiiLocation> locations) {
+    return getIcuLocations(locations).stream().map(MiiLocation::getId).collect(Collectors.toSet());
   }
 }

@@ -31,8 +31,8 @@ import de.ukbonn.mwtek.dashboardlogic.DashboardDataItemLogic;
 import de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels;
 import de.ukbonn.mwtek.dashboardlogic.logic.CoronaResultFunctionality;
 import de.ukbonn.mwtek.dashboardlogic.models.DiseaseDataItem;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbPatient;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiEncounter;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiPatient;
 import de.ukbonn.mwtek.utilities.generic.time.TimerTools;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -66,15 +66,15 @@ public class CumulativeMaxTreatmentLevelAge extends DashboardDataItemLogic {
   private Set<String> icuPatientIds;
   private Set<String> icuVentPatientIds;
   private Set<String> ecmoPatientIds;
-  Map<String, UkbEncounter> pidAdmissionMap = new ConcurrentHashMap<>();
-  Set<UkbEncounter> encountersOverall = ConcurrentHashMap.newKeySet();
-  Map<String, UkbPatient> patientMap = null;
+  Map<String, MiiEncounter> pidAdmissionMap = new ConcurrentHashMap<>();
+  Set<MiiEncounter> encountersOverall = ConcurrentHashMap.newKeySet();
+  Map<String, MiiPatient> patientMap = null;
   private boolean initialized = false;
 
   public List<Integer> createMaxTreatmentLevelAgeMap(
-      Map<TreatmentLevels, List<UkbEncounter>> mapPositiveEncounterByClass,
-      Map<TreatmentLevels, List<UkbEncounter>> mapIcuOverall,
-      List<UkbPatient> patients,
+      Map<TreatmentLevels, List<MiiEncounter>> mapPositiveEncounterByClass,
+      Map<TreatmentLevels, List<MiiEncounter>> mapIcuOverall,
+      List<MiiPatient> patients,
       TreatmentLevels treatmentLevel,
       Boolean useIcuUndiff) {
 
@@ -85,8 +85,8 @@ public class CumulativeMaxTreatmentLevelAge extends DashboardDataItemLogic {
 
     List<Integer> resultList = new ArrayList<>();
 
-    for (Map.Entry<String, UkbEncounter> entry : pidAdmissionMap.entrySet()) {
-      UkbPatient patient = patientMap.get(entry.getKey());
+    for (Map.Entry<String, MiiEncounter> entry : pidAdmissionMap.entrySet()) {
+      MiiPatient patient = patientMap.get(entry.getKey());
 
       if (patient == null) {
         log.debug("Skipping unknown patient with ID: " + entry.getKey());
@@ -98,7 +98,7 @@ public class CumulativeMaxTreatmentLevelAge extends DashboardDataItemLogic {
         continue;
       }
 
-      UkbEncounter encounter = entry.getValue();
+      MiiEncounter encounter = entry.getValue();
       Date validAdmissionDate =
           encounter.getPeriod() != null ? encounter.getPeriod().getStart() : null;
 
@@ -117,9 +117,9 @@ public class CumulativeMaxTreatmentLevelAge extends DashboardDataItemLogic {
   }
 
   private void initializeIfNeeded(
-      Map<TreatmentLevels, List<UkbEncounter>> mapPositiveEncounterByClass,
-      Map<TreatmentLevels, List<UkbEncounter>> mapIcuOverall,
-      List<UkbPatient> patients,
+      Map<TreatmentLevels, List<MiiEncounter>> mapPositiveEncounterByClass,
+      Map<TreatmentLevels, List<MiiEncounter>> mapIcuOverall,
+      List<MiiPatient> patients,
       Boolean useIcuUndiff) {
     if (!initialized) {
       pidAdmissionMap = new ConcurrentHashMap<>();
@@ -156,7 +156,7 @@ public class CumulativeMaxTreatmentLevelAge extends DashboardDataItemLogic {
               CoronaResultFunctionality.assignFirstAdmissionDateToPid(encounter, pidAdmissionMap));
 
       patientMap =
-          patients.stream().collect(Collectors.toMap(UkbPatient::getId, Function.identity()));
+          patients.stream().collect(Collectors.toMap(MiiPatient::getId, Function.identity()));
       initialized = true;
     }
   }
@@ -186,7 +186,7 @@ public class CumulativeMaxTreatmentLevelAge extends DashboardDataItemLogic {
   }
 
   private void addPatientIfEligible(
-      UkbPatient patient,
+      MiiPatient patient,
       Date admissionDate,
       List<Integer> resultList,
       TreatmentLevels treatmentLevel) {
@@ -208,15 +208,15 @@ public class CumulativeMaxTreatmentLevelAge extends DashboardDataItemLogic {
   }
 
   private static Set<String> getPatientIds(
-      Map<TreatmentLevels, List<UkbEncounter>> mapPositiveEncounterByClass,
+      Map<TreatmentLevels, List<MiiEncounter>> mapPositiveEncounterByClass,
       TreatmentLevels treatmentLevel) {
     return mapPositiveEncounterByClass.get(treatmentLevel).stream()
-        .map(UkbEncounter::getPatientId)
+        .map(MiiEncounter::getPatientId)
         .collect(Collectors.toSet());
   }
 
   private Integer addCohortAgeToList(
-      UkbPatient patient, Date validAdmissionDate, List<Integer> resultList) {
+      MiiPatient patient, Date validAdmissionDate, List<Integer> resultList) {
     if (patient.hasBirthDate()) {
       int age = calculateAge(patient.getBirthDate(), validAdmissionDate);
       resultList.add(checkAgeGroup(age));

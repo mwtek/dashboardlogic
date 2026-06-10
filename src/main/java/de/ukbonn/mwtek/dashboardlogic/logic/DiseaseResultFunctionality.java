@@ -36,6 +36,7 @@ import de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues;
 import de.ukbonn.mwtek.dashboardlogic.enums.DataItemContext;
 import de.ukbonn.mwtek.dashboardlogic.enums.NumDashboardConstants;
 import de.ukbonn.mwtek.dashboardlogic.enums.NumDashboardConstants.Acribis;
+import de.ukbonn.mwtek.dashboardlogic.enums.NumDashboardConstants.Bct;
 import de.ukbonn.mwtek.dashboardlogic.enums.NumDashboardConstants.Covid;
 import de.ukbonn.mwtek.dashboardlogic.enums.NumDashboardConstants.Influenza;
 import de.ukbonn.mwtek.dashboardlogic.enums.NumDashboardConstants.KidsRadar;
@@ -44,11 +45,11 @@ import de.ukbonn.mwtek.dashboardlogic.models.FacilityEncounterToIcuSupplyContact
 import de.ukbonn.mwtek.dashboardlogic.settings.InputCodeSettings;
 import de.ukbonn.mwtek.dashboardlogic.settings.QualitativeLabCodesSettings;
 import de.ukbonn.mwtek.dashboardlogic.tools.EncounterFilter;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbCondition;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbLocation;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbObservation;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbProcedure;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiCondition;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiEncounter;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiLocation;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiObservation;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiProcedure;
 import de.ukbonn.mwtek.utilities.generic.time.DateTools;
 import de.ukbonn.mwtek.utilities.generic.time.TimerTools;
 import java.time.Instant;
@@ -86,10 +87,10 @@ public class DiseaseResultFunctionality {
   /**
    * same procedure as createCurrentIcuMap, just for everything besides the current logic
    *
-   * @param encounters A list with {@linkplain UkbEncounter} resources.
-   * @param locations A list with {@linkplain UkbLocation} resources, to figure out which location
+   * @param encounters A list with {@linkplain MiiEncounter} resources.
+   * @param locations A list with {@linkplain MiiLocation} resources, to figure out which location
    *     is an icu location.
-   * @param icuProcedures The {@link UkbProcedure} resources, which include information about ECMO /
+   * @param icuProcedures The {@link MiiProcedure} resources, which include information about ECMO /
    *     artificial ventilation periods.
    * @param inputCodeSettings The configuration of the parameterizable codes such as the observation
    *     codes or procedure codes.
@@ -99,23 +100,23 @@ public class DiseaseResultFunctionality {
    *     TreatmentLevels#ICU_VENTILATION}, and {@link TreatmentLevels#ICU_ECMO}.
    * @return Map on which ICU cases are separated according to ICU, ventilation and Ecmo
    */
-  public static Map<TreatmentLevels, List<UkbEncounter>> createIcuMap(
-      List<UkbEncounter> encounters,
-      List<UkbEncounter> supplyContactEncounters,
-      List<UkbLocation> locations,
-      List<UkbProcedure> icuProcedures,
+  public static Map<TreatmentLevels, List<MiiEncounter>> createIcuMap(
+      List<MiiEncounter> encounters,
+      List<MiiEncounter> supplyContactEncounters,
+      List<MiiLocation> locations,
+      List<MiiProcedure> icuProcedures,
       InputCodeSettings inputCodeSettings,
       boolean useIcuUndiff) {
     log.debug("started createIcuMap");
 
     // List of stationary Cases
-    List<UkbEncounter> inpatientPositiveEncounters =
+    List<MiiEncounter> inpatientPositiveEncounters =
         encounters.parallelStream()
             .filter(EncounterFilter::isDiseasePositive)
-            .filter(UkbEncounter::isCaseClassInpatientOrShortStay)
+            .filter(MiiEncounter::isCaseClassInpatientOrShortStay)
             .toList();
 
-    List<UkbEncounter> supplyContactEncountersPositive =
+    List<MiiEncounter> supplyContactEncountersPositive =
         supplyContactEncounters.stream().filter(EncounterFilter::isDiseasePositive).toList();
 
     Instant start = TimerTools.startTimer();
@@ -124,15 +125,15 @@ public class DiseaseResultFunctionality {
     Set<String> icuLocationIds = locations != null ? getIcuLocationIds(locations) : new HashSet<>();
 
     // Filter procedure resources to usable ones (e.g. encounter id must be set)
-    List<UkbProcedure> icuProceduresWithEncRef =
+    List<MiiProcedure> icuProceduresWithEncRef =
         icuProcedures.stream().filter(x -> x.getCaseId() != null).toList();
     Set<String> facilityContactsOnIcu =
         supplyContactEncountersPositive.stream()
             .filter(x -> x.isIcuCase(icuLocationIds, false))
-            .map(UkbEncounter::getFacilityContactId)
+            .map(MiiEncounter::getFacilityContactId)
             .collect(Collectors.toSet());
 
-    List<UkbEncounter> icuEncounters =
+    List<MiiEncounter> icuEncounters =
         inpatientPositiveEncounters.stream()
             .filter(x -> facilityContactsOnIcu.contains(x.getId()))
             .toList();
@@ -143,10 +144,10 @@ public class DiseaseResultFunctionality {
                 x ->
                     x.isCodeExistingInValueSet(
                         inputCodeSettings.getProcedureVentilationCodes(), SNOMED, false))
-            .map(UkbProcedure::getCaseId)
+            .map(MiiProcedure::getCaseId)
             .collect(Collectors.toSet());
 
-    List<UkbEncounter> ventEncounters =
+    List<MiiEncounter> ventEncounters =
         inpatientPositiveEncounters.stream()
             .filter(x -> facilityContactsWithVent.contains(x.getId()))
             .toList();
@@ -157,19 +158,19 @@ public class DiseaseResultFunctionality {
                 x ->
                     x.isCodeExistingInValueSet(
                         inputCodeSettings.getProcedureEcmoCodes(), SNOMED, false))
-            .map(UkbProcedure::getCaseId)
+            .map(MiiProcedure::getCaseId)
             .collect(Collectors.toSet());
 
-    List<UkbEncounter> ecmoEncounters =
+    List<MiiEncounter> ecmoEncounters =
         inpatientPositiveEncounters.stream()
             .filter(x -> facilityContactsWithEcmo.contains(x.getId()))
             .toList();
 
-    Map<TreatmentLevels, List<UkbEncounter>> resultMap = new ConcurrentHashMap<>();
+    Map<TreatmentLevels, List<MiiEncounter>> resultMap = new ConcurrentHashMap<>();
 
     if (useIcuUndiff) {
       // Merge all ICU-related cases into ICU_UNDIFFERENTIATED
-      List<UkbEncounter> totalIcuEncounters = new ArrayList<>();
+      List<MiiEncounter> totalIcuEncounters = new ArrayList<>();
       totalIcuEncounters.addAll(icuEncounters);
       totalIcuEncounters.addAll(ventEncounters);
       totalIcuEncounters.addAll(ecmoEncounters);
@@ -186,13 +187,13 @@ public class DiseaseResultFunctionality {
   }
 
   public static FacilityEncounterToIcuSupplyContactsMap assignSupplyEncountersToFacilityEncounter(
-      List<UkbEncounter> icuSupplyContactEncounters, List<UkbEncounter> inpatientEncounters) {
+      List<MiiEncounter> icuSupplyContactEncounters, List<MiiEncounter> inpatientEncounters) {
 
     // Initialize output map
     FacilityEncounterToIcuSupplyContactsMap output = new FacilityEncounterToIcuSupplyContactsMap();
 
     // Group ICU supply contacts by official identifier value
-    Map<String, List<UkbEncounter>> icuSupplyContactsMap =
+    Map<String, List<MiiEncounter>> icuSupplyContactsMap =
         icuSupplyContactEncounters.stream()
             .filter(
                 enc -> {
@@ -202,13 +203,13 @@ public class DiseaseResultFunctionality {
                   }
                   return hasValue;
                 })
-            .collect(Collectors.groupingBy(UkbEncounter::getVisitNumberIdentifierValue));
+            .collect(Collectors.groupingBy(MiiEncounter::getVisitNumberIdentifierValue));
 
-    List<UkbEncounter> facilityContacts =
-        inpatientEncounters.parallelStream().filter(UkbEncounter::isFacilityContact).toList();
+    List<MiiEncounter> facilityContacts =
+        inpatientEncounters.parallelStream().filter(MiiEncounter::isFacilityContact).toList();
 
     // Iterate over facility contacts and map supply contacts
-    for (UkbEncounter facilityContact : facilityContacts) {
+    for (MiiEncounter facilityContact : facilityContacts) {
       try {
         String visitNumber = facilityContact.getVisitNumberIdentifierValue();
         // Skipping element if visit number is empty
@@ -217,7 +218,7 @@ public class DiseaseResultFunctionality {
           continue;
         }
         // Get supply contacts for the facility contact
-        List<UkbEncounter> supplyContacts =
+        List<MiiEncounter> supplyContacts =
             icuSupplyContactsMap.getOrDefault(visitNumber, Collections.emptyList());
         // Add the mapping to the output, using an empty list if no supply contacts are present
         output
@@ -239,22 +240,22 @@ public class DiseaseResultFunctionality {
    * @param supplyContactEncounters The list of supply contacts.
    * @param departmentEncounters The list of department contacts.
    * @param facilityEncounters The list of facility contacts.
-   * @param usePartOf Use {@link UkbEncounter#getPartOf()} attribute instead the visit number in
-   *     {@link UkbEncounter#getIdentifier()}
+   * @param usePartOf Use {@link MiiEncounter#getPartOf()} attribute instead the visit number in
+   *     {@link MiiEncounter#getIdentifier()}
    * @return A mapping from supply contacts to facility contacts.
    * @throws RuntimeException if no encounter with an identifier.slice 'Aufnahmenummer' was found.
    */
   public static Map<String, String> generateSupplyContactToFacilityContactMap(
-      List<UkbEncounter> supplyContactEncounters,
-      List<UkbEncounter> departmentEncounters,
-      List<UkbEncounter> facilityEncounters,
+      List<MiiEncounter> supplyContactEncounters,
+      List<MiiEncounter> departmentEncounters,
+      List<MiiEncounter> facilityEncounters,
       boolean usePartOf) {
 
     // Initialize output map
     Map<String, String> output = new ConcurrentHashMap<>();
 
     // Index facility encounters by visit number
-    Map<String, UkbEncounter> facilityEncounterMap = new ConcurrentHashMap<>();
+    Map<String, MiiEncounter> facilityEncounterMap = new ConcurrentHashMap<>();
     facilityEncounters.forEach(
         facilityEncounter -> {
           String visitNumber = facilityEncounter.getVisitNumberIdentifierValue();
@@ -274,7 +275,7 @@ public class DiseaseResultFunctionality {
               try {
                 String visitNumber = supplyContactEncounter.getVisitNumberIdentifierValue();
                 if (visitNumber != null) {
-                  UkbEncounter facilityEncounter = facilityEncounterMap.get(visitNumber);
+                  MiiEncounter facilityEncounter = facilityEncounterMap.get(visitNumber);
                   if (facilityEncounter != null) {
                     supplyContactEncounter.setFacilityContactId(facilityEncounter.getId());
                     output.put(supplyContactEncounter.getId(), facilityEncounter.getId());
@@ -298,7 +299,7 @@ public class DiseaseResultFunctionality {
               if (supplyContact.getPartOf().hasReference()) {
                 String supplyContactPartOf = extractIdFromReference(supplyContact.getPartOf());
                 if (supplyContactPartOf != null) {
-                  UkbEncounter departmentContact =
+                  MiiEncounter departmentContact =
                       departmentEncounters.stream()
                           .filter(x -> x.getId().equals(supplyContactPartOf))
                           .findFirst()
@@ -307,7 +308,7 @@ public class DiseaseResultFunctionality {
                     String departmentContactPartOf =
                         extractIdFromReference(departmentContact.getPartOf());
                     if (departmentContactPartOf != null) {
-                      UkbEncounter facilityContact =
+                      MiiEncounter facilityContact =
                           facilityEncounters.stream()
                               .filter(x -> x.getId().equals(departmentContactPartOf))
                               .findFirst()
@@ -354,7 +355,7 @@ public class DiseaseResultFunctionality {
     return output;
   }
 
-  private static Identifier createIdentifierVisitNumber(UkbEncounter facilityContact) {
+  private static Identifier createIdentifierVisitNumber(MiiEncounter facilityContact) {
     return new Identifier()
         .setType(IDENTIFIER_TYPE_VISIT_NUMBER_CC)
         .setValue(facilityContact.getId());
@@ -364,17 +365,17 @@ public class DiseaseResultFunctionality {
    * Create a map that sorts the encounters according to whether they are an inpatient or
    * outpatient.
    *
-   * @param encounters A list with {@linkplain UkbEncounter} resources
+   * @param encounters A list with {@linkplain MiiEncounter} resources
    * @return A map where encounter is sorted after stationary and ambulant
    */
-  public static Map<TreatmentLevels, List<UkbEncounter>> createEncounterMapByClass(
-      List<UkbEncounter> encounters) {
-    Map<TreatmentLevels, List<UkbEncounter>> encounterMap = new HashMap<>();
+  public static Map<TreatmentLevels, List<MiiEncounter>> createEncounterMapByClass(
+      List<MiiEncounter> encounters) {
+    Map<TreatmentLevels, List<MiiEncounter>> encounterMap = new HashMap<>();
 
     log.debug("started createEncounterMapByClass");
     Instant startTimer = TimerTools.startTimer();
 
-    List<UkbEncounter> positiveEncounters =
+    List<MiiEncounter> positiveEncounters =
         encounters.stream().filter(EncounterFilter::isDiseasePositive).toList();
 
     encounterMap.put(OUTPATIENT, new ArrayList<>());
@@ -412,18 +413,18 @@ public class DiseaseResultFunctionality {
    * @param useIcuUndiff Merge ICU+ items to {@link TreatmentLevels#ICU_UNDIFF}?
    * @return Map Containing encounter which are currently in icu
    */
-  public static Map<TreatmentLevels, List<UkbEncounter>> createCurrentIcuMap(
-      Map<TreatmentLevels, List<UkbEncounter>> mapIcuOverall, boolean useIcuUndiff) {
+  public static Map<TreatmentLevels, List<MiiEncounter>> createCurrentIcuMap(
+      Map<TreatmentLevels, List<MiiEncounter>> mapIcuOverall, boolean useIcuUndiff) {
 
     log.debug("Started createCurrentIcuMap");
     Instant startTimer = TimerTools.startTimer();
 
-    Map<TreatmentLevels, List<UkbEncounter>> resultMap = new ConcurrentHashMap<>();
+    Map<TreatmentLevels, List<MiiEncounter>> resultMap = new ConcurrentHashMap<>();
 
     if (useIcuUndiff) {
-      List<UkbEncounter> currentActiveIcuUndiff =
+      List<MiiEncounter> currentActiveIcuUndiff =
           mapIcuOverall.get(ICU_UNDIFF).stream()
-              .filter(UkbEncounter::isActive)
+              .filter(MiiEncounter::isActive)
               .filter(EncounterFilter::isDiseasePositive)
               .toList();
 
@@ -432,19 +433,19 @@ public class DiseaseResultFunctionality {
       resultMap.put(
           ICU,
           mapIcuOverall.get(ICU).stream()
-              .filter(UkbEncounter::isActive)
+              .filter(MiiEncounter::isActive)
               .filter(EncounterFilter::isDiseasePositive)
               .toList());
       resultMap.put(
           ICU_VENTILATION,
           mapIcuOverall.get(ICU_VENTILATION).stream()
-              .filter(UkbEncounter::isActive)
+              .filter(MiiEncounter::isActive)
               .filter(EncounterFilter::isDiseasePositive)
               .toList());
       resultMap.put(
           ICU_ECMO,
           mapIcuOverall.get(ICU_ECMO).stream()
-              .filter(UkbEncounter::isActive)
+              .filter(MiiEncounter::isActive)
               .filter(EncounterFilter::isDiseasePositive)
               .toList());
     }
@@ -465,7 +466,7 @@ public class DiseaseResultFunctionality {
    *     execution of the method.
    */
   public static void createCumulativeMaxDebug(
-      List<UkbEncounter> listCumulativeEncounter,
+      List<MiiEncounter> listCumulativeEncounter,
       String treatmentLevel,
       Map<String, Map<String, List<String>>> resultMaxTreatmentCaseNrs) {
     listCumulativeEncounter.forEach(
@@ -506,7 +507,7 @@ public class DiseaseResultFunctionality {
   /**
    * Identification of all patients who have at least one case with a positive lab result.
    *
-   * @param ukbObservations List with the {@link UkbObservation lab findings}.
+   * @param ukbObservations List with the {@link MiiObservation lab findings}.
    * @param inputCodeSettings The configuration of the parameterizable codes such as the observation
    *     codes or procedure codes.
    * @param dataItemContext The given data item context (e.g. {@link DataItemContext#COVID}.
@@ -514,13 +515,13 @@ public class DiseaseResultFunctionality {
    *     SARS-CoV-2 pcr tests
    */
   public static Collection<String> getPidsWithPosLabResult(
-      List<UkbObservation> ukbObservations,
+      List<MiiObservation> ukbObservations,
       InputCodeSettings inputCodeSettings,
       DataItemContext dataItemContext,
       QualitativeLabCodesSettings qualitativeLabCodesSettings) {
 
     // The extraction is based on a subset of the observations, namely just the covid related ones.
-    Set<UkbObservation> positiveObservations =
+    Set<MiiObservation> positiveObservations =
         getObservationsByContext(ukbObservations, inputCodeSettings, dataItemContext);
 
     // 1) Identification by Observation.value
@@ -567,6 +568,7 @@ public class DiseaseResultFunctionality {
       case INFLUENZA -> currentDate = Influenza.QUALIFYING_DATE_SECONDS;
       case KIDS_RADAR -> currentDate = KidsRadar.QUALIFYING_DATE_AS_LONG;
       case ACRIBIS -> currentDate = Acribis.QUALIFYING_DATE_SECONDS;
+      case BCT -> currentDate = Bct.QUALIFYING_DATE_SECONDS;
     }
     return currentDate;
   }
@@ -602,8 +604,7 @@ public class DiseaseResultFunctionality {
   public static List<Long> getDatesOutputList(DataItemContext dataItemContext) {
     // Generate the date output list if needed (initially or when its outdated since the
     // server ran over 2 days)
-    if (datesOutput == null
-        || (DateTools.getCurrentUnixTime() > datesOutput.get(datesOutput.size() - 1))) {
+    if (datesOutput == null || (DateTools.getCurrentUnixTime() > datesOutput.getLast())) {
       datesOutput = createDateList(dataItemContext);
     }
 
@@ -614,16 +615,16 @@ public class DiseaseResultFunctionality {
    * Determination of all patient Ids that have at least one case with a disease-positive PCR
    * laboratory result and/or disease-context-related diagnosis (e.g. U07.1).
    *
-   * @param ukbObservations List with {@link UkbObservation disease-context-related lab findings}.
-   * @param ukbConditions List with {@link UkbCondition disease-context-related conditions}.
+   * @param ukbObservations List with {@link MiiObservation disease-context-related lab findings}.
+   * @param ukbConditions List with {@link MiiCondition disease-context-related conditions}.
    * @param inputCodeSettings The configuration of the parameterizable codes such as the observation
    *     codes or procedure codes.
    * @return {@link HashSet} with patient Ids that have at least one case with a positive
    *     disease-context-related PCR laboratory result and/or disease-context-related diagnosis.
    */
   public static Set<String> getPidsPosFinding(
-      List<UkbObservation> ukbObservations,
-      List<UkbCondition> ukbConditions,
+      List<MiiObservation> ukbObservations,
+      List<MiiCondition> ukbConditions,
       InputCodeSettings inputCodeSettings,
       DataItemContext dataItemContext,
       QualitativeLabCodesSettings qualitativeLabCodesSettings) {
@@ -641,7 +642,7 @@ public class DiseaseResultFunctionality {
   /**
    * Identification of all patients who have at least one case with a given icd condition resource.
    *
-   * @param ukbConditions List with the {@link UkbCondition icd condition resources}.
+   * @param ukbConditions List with the {@link MiiCondition icd condition resources}.
    * @param inputCodeSettings The configuration of the parameterizable codes such as the observation
    *     codes or procedure codes.
    * @param dataItemContext The given data item context (e.g. {@link DataItemContext#COVID}.
@@ -649,7 +650,7 @@ public class DiseaseResultFunctionality {
    *     given diagnoses.
    */
   public static Set<String> getPidsWithGivenIcdCodes(
-      List<UkbCondition> ukbConditions,
+      List<MiiCondition> ukbConditions,
       InputCodeSettings inputCodeSettings,
       DataItemContext dataItemContext) {
     Set<String> pidsWithGivenIcdCodes = new HashSet<>();
@@ -676,12 +677,12 @@ public class DiseaseResultFunctionality {
    * Finds the first recorded encounter resource the patient had, and saves it together with the
    * patient resource.
    *
-   * @param encounter The {@link UkbEncounter} to be checked.
+   * @param encounter The {@link MiiEncounter} to be checked.
    * @param pidAdmissionMap Map containing patient ids and the first encounter resource attached to
    *     it.
    */
   public static void assignFirstAdmissionDateToPid(
-      UkbEncounter encounter, Map<String, UkbEncounter> pidAdmissionMap) {
+      MiiEncounter encounter, Map<String, MiiEncounter> pidAdmissionMap) {
     String pid = encounter.getPatientId();
     if (encounter.isPeriodStartExistent()) {
       Date encounterStartDate = encounter.getPeriod().getStart();
@@ -771,7 +772,7 @@ public class DiseaseResultFunctionality {
    * </code> got a code that is part of the given value set.
    *
    * @param codeableConcept The codings that need to be checked (e.g. {@link
-   *     UkbObservation#getCode()}).
+   *     MiiObservation#getCode()}).
    * @param system The system that should be checked.
    * @param validCodes The codes that should be checked.
    * @return <code>True</code> if the system and a valid code are part of the coding.

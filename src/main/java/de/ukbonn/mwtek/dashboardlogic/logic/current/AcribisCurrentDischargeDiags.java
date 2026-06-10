@@ -53,25 +53,25 @@ public class AcribisCurrentDischargeDiags extends DashboardDataItemLogic {
 
   /**
    * Creates a StackedBarChartsItem object containing stacked bar chart data for the Acribis current
-   * discharge dignosis cohort.
+   * discharge diagnosis cohort.
    */
-  public StackedBarChartsItem createStackedBarCharts() {
+  public StackedBarChartsItem<Integer> createStackedBarCharts() {
 
     log.debug("started AcribisCurrentDischargeDiags.createStackedBarCharts");
     Instant startTimer = TimerTools.startTimer();
 
-    StackedBarChartsItem result = new StackedBarChartsItem();
+    StackedBarChartsItem<Integer> result = new StackedBarChartsItem();
     result.setCharts(new ArrayList<>(List.of(ACR_ALL_COHORTS)));
     result.setBars(List.of(List.of(ACR_COHORT_K_1, ACR_COHORT_K_2, ACR_COHORT_K_3)));
     result.setStacks(List.of(List.of(ACR_NUMBER_PATIENTS_COHORT)));
-    List<List<? extends Number>> resultList = new ArrayList<>();
+
+    List<List<Integer>> resultList = new ArrayList<>();
     resultList.add(List.of(cohort1Map.size()));
     resultList.add(List.of(cohort2Map.size()));
     resultList.add(List.of(cohort3Map.size()));
     result.setValues(List.of(resultList));
     TimerTools.stopTimerAndLog(
         startTimer, "finished AcribisCurrentDischargeDiags.createStackedBarCharts");
-
     // Order ascending regarding the specification.
     return result;
   }

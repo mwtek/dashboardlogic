@@ -209,3 +209,4 @@ nbdist/
 
 # End of https://www.toptal.com/developers/gitignore/api/eclipse,netbeans,intellij,maven
 /config/
+/google-java-format-1.33.0-all-deps.jar

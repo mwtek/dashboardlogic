@@ -14,22 +14,35 @@
  * PROGRAM TO OPERATE WITH ANY OTHER PROGRAMS), EVEN IF SUCH HOLDER OR OTHER PARTY HAS BEEN ADVISED
  * OF THE POSSIBILITY OF SUCH DAMAGES. You should have received a copy of the GPL 3 license with *
  * this file. If not, visit http://www.gnu.de/documents/gpl-3.0.en.html
- */
-package de.ukbonn.mwtek.dashboardlogic.models;
+ */ package de.ukbonn.mwtek.dashboardlogic.enums;
 
+import static de.ukbonn.mwtek.dashboardlogic.enums.KiraAgeCluster.Period.MONTHS;
+import static de.ukbonn.mwtek.dashboardlogic.enums.KiraAgeCluster.Period.YEARS;
+
+import java.util.Arrays;
 import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
 
 @Getter
-@Setter
-@NoArgsConstructor
 @AllArgsConstructor
-public class PieChartsItem {
+public enum KiraAgePedCluster implements KiraAgeCluster {
+  AGE_0_3_M(label("0-3", MONTHS), 0, 3, MONTHS),
+  AGE_4_12_M(label("4-12", MONTHS), 4, 12, MONTHS),
+  AGE_1_2_Y(label("1-2", YEARS), 1, 2, YEARS),
+  AGE_3_5_Y(label("3-5", YEARS), 3, 5, YEARS),
+  AGE_6_12_Y(label("6-12", YEARS), 6, 12, YEARS),
+  AGE_13_18_Y(label("13-17", YEARS), 13, 18, YEARS);
 
-  List<String> charts;
-  List<String> pies;
-  List<CustomPair<Integer, Integer>> values;
+  final String label;
+  final Integer lowerBorder;
+  final Integer upperBorder;
+  final Period period;
+
+  private static String label(String range, Period period) {
+    return String.format("age_pediatric_%s%s", range, period == Period.YEARS ? "y" : "m");
+  }
+
+  public static final List<String> BARS =
+      Arrays.stream(KiraAgePedCluster.values()).map(KiraAgePedCluster::getLabel).toList();
 }

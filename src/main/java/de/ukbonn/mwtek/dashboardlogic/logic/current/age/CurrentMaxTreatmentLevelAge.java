@@ -20,8 +20,8 @@ package de.ukbonn.mwtek.dashboardlogic.logic.current.age;
 import de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels;
 import de.ukbonn.mwtek.dashboardlogic.logic.CoronaResultFunctionality;
 import de.ukbonn.mwtek.dashboardlogic.models.DiseaseDataItem;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbPatient;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiEncounter;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiPatient;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Date;
@@ -39,7 +39,7 @@ import java.util.stream.Collectors;
  * @author <a href="mailto:berke_enes.dincel@ukbonn.de">Berke Enes Dincel</a>
  */
 public record CurrentMaxTreatmentLevelAge(
-    List<UkbPatient> listPatients, List<UkbEncounter> listCurrentMaxEncounter) {
+    List<MiiPatient> patients, List<MiiEncounter> currentMaxEncounters) {
 
   /**
    * Creates a list of ages for patients with encounters in the current maximum encounter list.
@@ -48,18 +48,16 @@ public record CurrentMaxTreatmentLevelAge(
    * @return List of ages for patients with encounters in the current maximum encounter list.
    */
   public List<Long> createCurrentMaxAgeMap(
-      Map<TreatmentLevels, List<UkbEncounter>> mapPositiveEncounterByClass) {
+      Map<TreatmentLevels, List<MiiEncounter>> mapPositiveEncounterByClass) {
     // Result list to store ages
     List<Long> resultList = new ArrayList<>();
 
     // Map to store the first admission date for each patient in the current maximum encounter list
-    Map<String, UkbEncounter> currentMaxPidAdmissionMap = new HashMap<>();
+    Map<String, MiiEncounter> currentMaxPidAdmissionMap = new HashMap<>();
 
     // Convert the list of current maximum encounter PIDs to a set for efficient containment checks
     Set<String> currentMaxEncounterPidSet =
-        listCurrentMaxEncounter.stream()
-            .map(UkbEncounter::getPatientId)
-            .collect(Collectors.toSet());
+        currentMaxEncounters.stream().map(MiiEncounter::getPatientId).collect(Collectors.toSet());
 
     // Iterate over encounters in the positive encounter map and assign first admission dates
     mapPositiveEncounterByClass.values().stream()
@@ -71,7 +69,7 @@ public record CurrentMaxTreatmentLevelAge(
                     encounter, currentMaxPidAdmissionMap));
 
     // Calculate and check the age group for patients in the current maximum encounter list
-    calculateAndCheckAgeGroup(currentMaxPidAdmissionMap, resultList, listPatients);
+    calculateAndCheckAgeGroup(currentMaxPidAdmissionMap, resultList, patients);
 
     // Sort the result list in ascending order
     resultList.sort(Comparator.naturalOrder());
@@ -88,12 +86,12 @@ public record CurrentMaxTreatmentLevelAge(
    * @param listPatients List of patients for additional information.
    */
   private static void calculateAndCheckAgeGroup(
-      Map<String, UkbEncounter> pidAdmissionMap,
+      Map<String, MiiEncounter> pidAdmissionMap,
       List<Long> resultList,
-      List<UkbPatient> listPatients) {
+      List<MiiPatient> listPatients) {
     // Filter the patients with a valid birthday
-    List<UkbPatient> validPatientsWithBirthday =
-        listPatients.stream().filter(UkbPatient::hasBirthDate).toList();
+    List<MiiPatient> validPatientsWithBirthday =
+        listPatients.stream().filter(MiiPatient::hasBirthDate).toList();
 
     pidAdmissionMap.forEach(
         (pid, encounter) -> {
@@ -117,10 +115,10 @@ public record CurrentMaxTreatmentLevelAge(
    * @return The birthday of the patient or {@code null} if not found.
    */
   private static Date findBirthdayForPatient(
-      String patientId, List<UkbPatient> validPatientsWithBirthday) {
+      String patientId, List<MiiPatient> validPatientsWithBirthday) {
     return validPatientsWithBirthday.stream()
         .filter(patient -> patientId.equals(patient.getId()))
-        .map(UkbPatient::getBirthDate)
+        .map(MiiPatient::getBirthDate)
         .findFirst()
         .orElseGet(() -> null);
   }

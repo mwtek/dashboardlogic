@@ -20,20 +20,20 @@ package de.ukbonn.mwtek.dashboardlogic.logic;
 import static de.ukbonn.mwtek.dashboardlogic.enums.KidsRadarConstants.ALL_DISORDERS;
 import static de.ukbonn.mwtek.dashboardlogic.enums.KidsRadarConstants.ALL_ICD_CODES;
 import static de.ukbonn.mwtek.dashboardlogic.enums.KidsRadarConstants.MEAN_LENGTH_OF_STAY;
+import static de.ukbonn.mwtek.dashboardlogic.enums.KidsRadarConstants.RSV_PREFIX;
 import static de.ukbonn.mwtek.dashboardlogic.tools.ObservationFilter.getObservationsByContext;
 import static de.ukbonn.mwtek.dashboardlogic.tools.ObservationFilter.getVariantObservationsByContext;
 
 import de.ukbonn.mwtek.dashboardlogic.enums.DataItemContext;
 import de.ukbonn.mwtek.dashboardlogic.settings.InputCodeSettings;
 import de.ukbonn.mwtek.dashboardlogic.settings.QualitativeLabCodesSettings;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbCondition;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbLocation;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbObservation;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbPatient;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbProcedure;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiCondition;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiEncounter;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiLocation;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiObservation;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiPatient;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiProcedure;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -49,24 +49,25 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class DashboardData {
 
-  @Getter private List<UkbEncounter> encounters;
-  @Getter private List<UkbPatient> patients;
-  @Getter private List<UkbObservation> observations;
-  @Getter private List<UkbProcedure> icuProcedures;
-  @Getter private List<UkbCondition> conditions;
-  @Getter private List<UkbObservation> variantObservations;
+  @Getter private List<MiiEncounter> encounters;
+  @Getter private List<MiiPatient> patients;
+  @Getter private List<MiiObservation> observations;
+  @Getter private List<MiiProcedure> icuProcedures;
+  @Getter private List<MiiCondition> conditions;
+  @Getter private List<MiiObservation> variantObservations;
   @Getter private InputCodeSettings inputCodeSettings;
   @Getter private QualitativeLabCodesSettings qualitativeLabCodesSettings;
-  @Getter private List<UkbLocation> locations;
-  @Getter private List<UkbEncounter> supplyContactEncounters;
-  @Getter private List<UkbEncounter> facilityContactEncounters;
+  @Getter private List<MiiLocation> locations;
+  @Getter private List<MiiEncounter> supplyContactEncounters;
+  @Getter private List<MiiEncounter> facilityContactEncounters;
 
   private static Map<String, Integer> encounterAgeMap = null;
   private static boolean encounterAgeMapInitialized = false; // Flag to check if map is initialized
   private static AtomicReference<Map<String, Integer>> encounterAgeMapRef =
       new AtomicReference<>(null);
 
-  public static final List<String> LENGTH_OF_STAY_STACKS = Arrays.asList(MEAN_LENGTH_OF_STAY);
+  public static final List<String> RSV_LENGTH_OF_STAY_STACKS =
+      List.of(RSV_PREFIX + "_" + MEAN_LENGTH_OF_STAY);
   public static final List<String> DISORDERS_CHARTS = List.of(ALL_DISORDERS);
   public static final List<String> ALL_ICD_CODES_CHARTS = List.of(ALL_ICD_CODES);
 
@@ -74,12 +75,12 @@ public class DashboardData {
   public DashboardData initializeData(
       InputCodeSettings inputCodeSettings,
       QualitativeLabCodesSettings qualitativeLabCodesSettings,
-      List<UkbEncounter> encounters,
-      List<UkbPatient> patients,
-      List<UkbObservation> observations,
-      List<UkbCondition> conditions,
-      List<UkbLocation> locations,
-      List<UkbProcedure> icuProcedures,
+      List<MiiEncounter> encounters,
+      List<MiiPatient> patients,
+      List<MiiObservation> observations,
+      List<MiiCondition> conditions,
+      List<MiiLocation> locations,
+      List<MiiProcedure> icuProcedures,
       DataItemContext dataItemContext) {
     this.inputCodeSettings = inputCodeSettings;
     this.qualitativeLabCodesSettings = qualitativeLabCodesSettings;
@@ -91,7 +92,7 @@ public class DashboardData {
       this.observations =
           new ArrayList<>(
               getObservationsByContext(observations, getInputCodeSettings(), dataItemContext));
-      Set<UkbObservation> variantObservationsByContext =
+      Set<MiiObservation> variantObservationsByContext =
           getVariantObservationsByContext(observations, getInputCodeSettings(), dataItemContext);
       if (variantObservationsByContext != null) {
         this.variantObservations = new ArrayList<>(variantObservationsByContext);
@@ -100,9 +101,9 @@ public class DashboardData {
     this.locations = locations;
     if (encounters != null) {
       this.facilityContactEncounters =
-          encounters.parallelStream().filter(UkbEncounter::isFacilityContact).toList();
+          encounters.parallelStream().filter(MiiEncounter::isFacilityContact).toList();
       this.supplyContactEncounters =
-          encounters.parallelStream().filter(UkbEncounter::isSupplyContact).toList();
+          encounters.parallelStream().filter(MiiEncounter::isSupplyContact).toList();
     }
     return this;
   }

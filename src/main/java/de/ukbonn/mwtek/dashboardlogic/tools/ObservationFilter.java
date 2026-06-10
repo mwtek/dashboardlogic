@@ -30,7 +30,7 @@ import de.ukbonn.mwtek.dashboardlogic.enums.DataItemContext;
 import de.ukbonn.mwtek.dashboardlogic.enums.ObservationInterpretationDetectionCodes;
 import de.ukbonn.mwtek.dashboardlogic.settings.InputCodeSettings;
 import de.ukbonn.mwtek.dashboardlogic.settings.QualitativeLabCodesSettings;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbObservation;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiObservation;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -41,54 +41,72 @@ import lombok.extern.slf4j.Slf4j;
 import org.hl7.fhir.r4.model.CodeableConcept;
 import org.hl7.fhir.r4.model.Observation;
 
-/** Various auxiliary methods that affect the {@link UkbObservation} resources. */
+/** Various auxiliary methods that affect the {@link MiiObservation} resources. */
 @Slf4j
 public class ObservationFilter {
 
   /**
-   * Filter a list of {@link UkbObservation} resources to those describing a disease-positive PCR
+   * Filter a list of {@link MiiObservation} resources to those describing a disease-positive PCR
    * finding.
    *
-   * @param labObservations A list with {@link UkbObservation observation resources}.
+   * @param labObservations A list with {@link MiiObservation observation resources}.
    * @param inputCodeSettings An {@link InputCodeSettings} instance that contains the valid
    *     disease-context-related pcr codes.
    * @return A filtered collection containing only observations with disease-context-related pcr
    *     findings. If the input list is <code>null</code> it will return an empty set.
    */
-  public static Set<UkbObservation> getObservationsByContext(
-      Collection<UkbObservation> labObservations,
+  public static Set<MiiObservation> getObservationsByContext(
+      Collection<MiiObservation> labObservations,
       InputCodeSettings inputCodeSettings,
       DataItemContext dataItemContext) {
     switch (dataItemContext) {
-      case COVID -> {
+      case COVID, KIDS_RADAR_PED_COV -> {
         return getObservationsByCode(
             labObservations, inputCodeSettings.getCovidObservationPcrLoincCodes());
       }
-      case INFLUENZA -> {
+      case INFLUENZA, KIDS_RADAR_PED_INFL -> {
         return getObservationsByCode(
             labObservations, inputCodeSettings.getInfluenzaObservationPcrLoincCodes());
+      }
+      case KIDS_RADAR_PED -> {
+        var result =
+            getObservationsByCode(
+                labObservations, inputCodeSettings.getCovidObservationPcrLoincCodes());
+        var resultInfl =
+            getObservationsByCode(
+                labObservations, inputCodeSettings.getInfluenzaObservationPcrLoincCodes());
+        var resultPertussis =
+            getObservationsByCode(
+                labObservations, inputCodeSettings.getKidsRadarPedPertussisLoincCodes());
+        var resultRsv =
+            getObservationsByCode(
+                labObservations, inputCodeSettings.getKidsRadarPedRsvLoincCodes());
+        result.addAll(resultInfl);
+        result.addAll(resultPertussis);
+        result.addAll(resultRsv);
+        return result;
       }
       default -> {
         log.error(
             "Method getObservationsByContext is invoked with an unknown context [{}].",
             dataItemContext);
-        return null;
+        return new HashSet<>();
       }
     }
   }
 
   /**
-   * Filter a list of {@link UkbObservation} resources to those describing a disease-positive PCR
+   * Filter a list of {@link MiiObservation} resources to those describing a disease-positive PCR
    * finding.
    *
-   * @param labObservations A list with {@link UkbObservation observation resources}.
+   * @param labObservations A list with {@link MiiObservation observation resources}.
    * @param inputCodeSettings An {@link InputCodeSettings} instance that contains the valid
    *     disease-context-related pcr loinc codes.
    * @return A filtered collection containing only observations with disease-context-related pcr
    *     findings. If the input list is <code>null</code> it will return an empty set.
    */
-  public static Set<UkbObservation> getVariantObservationsByContext(
-      Collection<UkbObservation> labObservations,
+  public static Set<MiiObservation> getVariantObservationsByContext(
+      Collection<MiiObservation> labObservations,
       InputCodeSettings inputCodeSettings,
       DataItemContext dataItemContext) {
     switch (dataItemContext) {
@@ -106,8 +124,8 @@ public class ObservationFilter {
     }
   }
 
-  public static Set<UkbObservation> getObservationsByLoincCode(
-      Collection<UkbObservation> labObservations, Collection<String> loincCodes) {
+  public static Set<MiiObservation> getObservationsByLoincCode(
+      Collection<MiiObservation> labObservations, Collection<String> loincCodes) {
     if (labObservations != null) {
       return labObservations.parallelStream()
           .filter(x -> x.hasCode() && x.getCode().hasCoding())
@@ -118,8 +136,8 @@ public class ObservationFilter {
     }
   }
 
-  public static Set<UkbObservation> getObservationsByCode(
-      Collection<UkbObservation> labObservations, Collection<String> loincCodes) {
+  public static Set<MiiObservation> getObservationsByCode(
+      Collection<MiiObservation> labObservations, Collection<String> loincCodes) {
     if (labObservations != null) {
       return labObservations.parallelStream()
           .filter(x -> x.hasCode() && x.getCode().hasCoding())
@@ -142,18 +160,18 @@ public class ObservationFilter {
   }
 
   /**
-   * Filtering a list of covid {@link UkbObservation} resources on a result in the {@link
-   * UkbObservation#getValue()} field.
+   * Filtering a list of covid {@link MiiObservation} resources on a result in the {@link
+   * MiiObservation#getValue()} field.
    *
-   * @param covidObservations A filtered list with {@link UkbObservation observation resources},
+   * @param covidObservations A filtered list with {@link MiiObservation observation resources},
    *     that describe disease-positive findings. Creatable via {@link
    *     ObservationFilter#getObservationsByContext }.
    * @param obsResultType The value to filter on (e.g. {@link DashboardLogicFixedValues#POSITIVE}).
    * @return A filtered collection containing the resources that have the specified result type in
-   *     the {@link UkbObservation#getValue()} attribute.
+   *     the {@link MiiObservation#getValue()} attribute.
    */
-  public static Set<UkbObservation> getObservationsByValue(
-      Collection<UkbObservation> covidObservations,
+  public static Set<MiiObservation> getObservationsByValue(
+      Collection<MiiObservation> covidObservations,
       DashboardLogicFixedValues obsResultType,
       QualitativeLabCodesSettings qualitativeLabCodesSettings) {
 
@@ -168,6 +186,14 @@ public class ObservationFilter {
         .collect(Collectors.toSet());
   }
 
+  public static boolean isObservationValueGivenType(
+      MiiObservation observation,
+      DashboardLogicFixedValues obsResultType,
+      QualitativeLabCodesSettings qualitativeLabCodesSettings) {
+    return !getObservationsByValue(List.of(observation), obsResultType, qualitativeLabCodesSettings)
+        .isEmpty();
+  }
+
   private static Collection<String> getObsValueCodeSystems(
       QualitativeLabCodesSettings qualitativeLabCodesSettings) {
     if (qualitativeLabCodesSettings == null) return List.of(SNOMED);
@@ -175,18 +201,18 @@ public class ObservationFilter {
   }
 
   /**
-   * Filtering a list of covid {@link UkbObservation} resources on a result in the {@link
-   * UkbObservation#getInterpretation()} field.
+   * Filtering a list of covid {@link MiiObservation} resources on a result in the {@link
+   * MiiObservation#getInterpretation()} field.
    *
-   * @param covidObservations A filtered list with {@link UkbObservation observation resources},
+   * @param covidObservations A filtered list with {@link MiiObservation observation resources},
    *     that describe disease-positive findings. Creatable via {@link
    *     ObservationFilter#getObservationsByContext}.
    * @param obsResultType The value to filter on (e.g. {@link DashboardLogicFixedValues#POSITIVE}).
    * @return A filtered collection containing the resources that have the specified result type in
-   *     the {@link UkbObservation#getInterpretation()} attribute.
+   *     the {@link MiiObservation#getInterpretation()} attribute.
    */
-  public static Set<UkbObservation> getObservationsByInterpretation(
-      Collection<UkbObservation> covidObservations, DashboardLogicFixedValues obsResultType) {
+  public static Set<MiiObservation> getObservationsByInterpretation(
+      Collection<MiiObservation> covidObservations, DashboardLogicFixedValues obsResultType) {
 
     return covidObservations.parallelStream()
         .filter(x -> !x.hasValue())
@@ -204,18 +230,18 @@ public class ObservationFilter {
    * #getObservationsByValue(Collection,DashboardLogicFixedValues, QualitativeLabCodesSettings)} and
    * returns only the case numbers of the retrieved observations.
    *
-   * @param covidObservations A filtered list with {@link UkbObservation observation resources},
+   * @param covidObservations A filtered list with {@link MiiObservation observation resources},
    *     that describe disease-positive findings. Creatable via {@link
    *     ObservationFilter#getObservationsByContext}.
    * @param obsResultType The value to filter on (e.g. {@link DashboardLogicFixedValues#POSITIVE}).
    */
   public static Set<String> getCaseIdsByObsValue(
-      Collection<UkbObservation> covidObservations,
+      Collection<MiiObservation> covidObservations,
       DashboardLogicFixedValues obsResultType,
       QualitativeLabCodesSettings qualitativeLabCodesSettings) {
     return getObservationsByValue(covidObservations, obsResultType, qualitativeLabCodesSettings)
         .stream()
-        .map(UkbObservation::getCaseId)
+        .map(MiiObservation::getCaseId)
         .collect(Collectors.toSet());
   }
 
@@ -223,15 +249,15 @@ public class ObservationFilter {
    * Auxiliary function that calls {@link #getObservationsByInterpretation(Collection,
    * DashboardLogicFixedValues)} and returns only the case numbers of the retrieved observations.
    *
-   * @param covidObservations A filtered list with {@link UkbObservation observation resources},
+   * @param covidObservations A filtered list with {@link MiiObservation observation resources},
    *     that describe disease-positive findings. Creatable via {@link
    *     ObservationFilter#getObservationsByContext }.
    * @param obsResultType The value to filter on (e.g. {@link DashboardLogicFixedValues#POSITIVE}).
    */
   public static Set<String> getCaseIdsByObsInterpretation(
-      Collection<UkbObservation> covidObservations, DashboardLogicFixedValues obsResultType) {
+      Collection<MiiObservation> covidObservations, DashboardLogicFixedValues obsResultType) {
     return getObservationsByInterpretation(covidObservations, obsResultType).stream()
-        .map(UkbObservation::getCaseId)
+        .map(MiiObservation::getCaseId)
         .collect(Collectors.toSet());
   }
 
@@ -240,18 +266,18 @@ public class ObservationFilter {
    * DashboardLogicFixedValues, QualitativeLabCodesSettings)} and returns only the patient ids of
    * the retrieved observations.
    *
-   * @param positiveObservations A filtered list with {@link UkbObservation observation resources},
+   * @param positiveObservations A filtered list with {@link MiiObservation observation resources},
    *     that describe disease-positive findings. Creatable via {@link
    *     ObservationFilter#getObservationsByContext} (Collection, InputCodeSettings)}.
    * @param obsResultType The value to filter on (e.g. {@link DashboardLogicFixedValues#POSITIVE}).
    */
   public static Set<String> getPatientIdsByObsValue(
-      Collection<UkbObservation> positiveObservations,
+      Collection<MiiObservation> positiveObservations,
       DashboardLogicFixedValues obsResultType,
       QualitativeLabCodesSettings qualitativeLabCodesSettings) {
     return getObservationsByValue(positiveObservations, obsResultType, qualitativeLabCodesSettings)
         .stream()
-        .map(UkbObservation::getPatientId)
+        .map(MiiObservation::getPatientId)
         .collect(Collectors.toSet());
   }
 
@@ -259,21 +285,21 @@ public class ObservationFilter {
    * Auxiliary function that calls {@link #getObservationsByInterpretation(Collection,
    * DashboardLogicFixedValues)} and returns only the patient ids of the retrieved observations.
    *
-   * @param positiveObservations A filtered list with {@link UkbObservation observation resources},
+   * @param positiveObservations A filtered list with {@link MiiObservation observation resources},
    *     that describe disease-positive findings. Creatable via {@link
    *     ObservationFilter#getObservationsByContext }.
    * @param obsResultType The value to filter on (e.g. {@link DashboardLogicFixedValues#POSITIVE}).
    */
   public static Set<String> getPatientIdsByObsInterpretation(
-      Collection<UkbObservation> positiveObservations, DashboardLogicFixedValues obsResultType) {
+      Collection<MiiObservation> positiveObservations, DashboardLogicFixedValues obsResultType) {
     return getObservationsByInterpretation(positiveObservations, obsResultType).stream()
-        .map(UkbObservation::getPatientId)
+        .map(MiiObservation::getPatientId)
         .collect(Collectors.toSet());
   }
 
   /**
    * Retrieve the value sets for the passed result type for attribute {@link
-   * UkbObservation#getValue()}.
+   * MiiObservation#getValue()}.
    */
   private static List<String> getObsValueCodesByResultType(
       DashboardLogicFixedValues obsResult,
@@ -300,7 +326,7 @@ public class ObservationFilter {
 
   /**
    * Retrieve the value sets for the passed result type for attribute {@link
-   * UkbObservation#getInterpretation()}.
+   * MiiObservation#getInterpretation()}.
    */
   private static List<String> getObsInterpretationCodeSystem(DashboardLogicFixedValues obsResult) {
     switch (obsResult) {

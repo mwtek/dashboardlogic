@@ -25,8 +25,8 @@ import de.ukbonn.mwtek.dashboardlogic.DashboardDataItemLogic;
 import de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels;
 import de.ukbonn.mwtek.dashboardlogic.logic.CoronaResultFunctionality;
 import de.ukbonn.mwtek.dashboardlogic.models.DiseaseDataItem;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbPatient;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiEncounter;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiPatient;
 import de.ukbonn.mwtek.utilities.generic.time.TimerTools;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -59,8 +59,8 @@ public class CumulativeAge extends DashboardDataItemLogic {
    * @return returns list of age of all positive patients, who fulfill the caseStatus criteria
    */
   public static List<Integer> getAgeDistributionsByCaseClass(
-      List<UkbEncounter> facilityEncounters,
-      List<UkbPatient> patients,
+      List<MiiEncounter> facilityEncounters,
+      List<MiiPatient> patients,
       TreatmentLevels encounterClass) {
     log.debug(
         "Started getAgeDistributionsByCaseClass for encounterClass: {} with {} encounters",
@@ -73,16 +73,16 @@ public class CumulativeAge extends DashboardDataItemLogic {
     Set<String> ambulantPidSet = new HashSet<>();
 
     // get the age of each patient at the admission date from the first disease-positive case
-    List<UkbEncounter> encountersPositive =
+    List<MiiEncounter> encountersPositive =
         facilityEncounters.parallelStream()
             .filter(x -> x.hasExtension(POSITIVE_RESULT.getValue()))
             .toList();
 
-    Map<TreatmentLevels, List<UkbEncounter>> mapEncounterPos =
+    Map<TreatmentLevels, List<MiiEncounter>> mapEncounterPos =
         Map.of(TreatmentLevels.ALL, encountersPositive);
     Map<String, Date> pidAgeMap = createPidAgeMap(mapEncounterPos);
 
-    for (UkbEncounter encounter : encountersPositive) {
+    for (MiiEncounter encounter : encountersPositive) {
       if (encounter.isCaseClassInpatientOrShortStay()) {
         stationaryPidSet.add(encounter.getPatientId());
       } else if (encounter.isCaseClassOutpatient()
@@ -100,7 +100,7 @@ public class CumulativeAge extends DashboardDataItemLogic {
     }
 
     // calculates age
-    for (UkbPatient patient : patients) {
+    for (MiiPatient patient : patients) {
       if (pidSet.contains(patient.getId())) {
         Date admissionDate = pidAgeMap.get(patient.getId());
         if (patient.hasBirthDate() && admissionDate != null) {
@@ -124,11 +124,11 @@ public class CumulativeAge extends DashboardDataItemLogic {
    * @return Map that assigns the admission date of the patient's first c19 positive case to a pid
    */
   private static Map<String, Date> createPidAgeMap(
-      Map<TreatmentLevels, List<UkbEncounter>> mapPositiveEncounterByClass) {
+      Map<TreatmentLevels, List<MiiEncounter>> mapPositiveEncounterByClass) {
 
     Map<String, Date> pidMap = new HashMap<>();
     for (var entry : mapPositiveEncounterByClass.entrySet()) {
-      for (UkbEncounter encounter : entry.getValue()) {
+      for (MiiEncounter encounter : entry.getValue()) {
         pidMap.compute(
             encounter.getPatientId(),
             (pid, existingDate) -> getEarlierAdmissionDate(existingDate, encounter));
@@ -144,7 +144,7 @@ public class CumulativeAge extends DashboardDataItemLogic {
    * @param encounter The new encounter to compare.
    * @return The earlier of the two dates.
    */
-  private static Date getEarlierAdmissionDate(Date existingDate, UkbEncounter encounter) {
+  private static Date getEarlierAdmissionDate(Date existingDate, MiiEncounter encounter) {
     if (!encounter.isPeriodStartExistent()) {
       return existingDate; // Keep the existing date if no period start exists
     }

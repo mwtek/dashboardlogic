@@ -15,76 +15,92 @@
  * OF THE POSSIBILITY OF SUCH DAMAGES. You should have received a copy of the GPL 3 license with *
  * this file. If not, visit http://www.gnu.de/documents/gpl-3.0.en.html
  */
+
 package de.ukbonn.mwtek.dashboardlogic.logic.timeline;
 
+import static de.ukbonn.mwtek.dashboardlogic.enums.KidsRadarConstants.IN_GROUP;
+import static de.ukbonn.mwtek.dashboardlogic.enums.KidsRadarConstants.OUT_GROUP;
+import static de.ukbonn.mwtek.dashboardlogic.enums.KidsRadarConstants.RSV_DIAGNOSES_ALL;
 import static de.ukbonn.mwtek.dashboardlogic.enums.NumDashboardConstants.YEAR_MONTH_FORMAT;
 import static de.ukbonn.mwtek.dashboardlogic.logic.KiraData.createLabelList;
+import static de.ukbonn.mwtek.dashboardlogic.tools.KidsRadarTools.getRsvOnlyCoreCaseDataByGroups;
 import static de.ukbonn.mwtek.dashboardlogic.tools.TimelineTools.generateDateList;
 
 import de.ukbonn.mwtek.dashboardlogic.DashboardDataItemLogic;
 import de.ukbonn.mwtek.dashboardlogic.enums.KidsRadarDataItemContext;
 import de.ukbonn.mwtek.dashboardlogic.enums.NumDashboardConstants.KidsRadar;
 import de.ukbonn.mwtek.dashboardlogic.models.CoreCaseData;
+import de.ukbonn.mwtek.dashboardlogic.models.KiraInteger;
 import de.ukbonn.mwtek.dashboardlogic.models.StackedBarChartsItem;
+import de.ukbonn.mwtek.dashboardlogic.models.StackedBarChartsUniformItem;
 import de.ukbonn.mwtek.utilities.generic.time.TimerTools;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Creation of the "timeline.diags.occurrence" items for kjp and rsv.
- *
- * @author <a href="mailto:david.meyers@ukbonn.de">David Meyers</a>
+ * Generates the grouped bar chart data item for the KidsRadar timeline, used to visualize
+ * diagnostic group occurrences across monthly periods.
  */
 @Slf4j
 public class KiraTimelineDisorders extends DashboardDataItemLogic
     implements TimelineFunctionalities {
-  // Debug output
+
+  // Debug map: holds patients and case IDs per period and group
   static Map<String, Map<String, Set<String>>> patientIdsByPeriod = new LinkedHashMap<>();
 
   /**
-   * Creates a StackedBarChartsItem object containing stacked bar chart data for the KidsRadar
-   * timeline.
+   * Generates a GroupedBarChartsItem with patient counts per diagnostic group and monthly period.
    *
-   * <p>This method processes case data grouped by categories and months, and returns a stacked bar
-   * chart item containing the counts of unique patients per month. The resulting chart is used in
-   * the KidsRadar timeline to visualize patient encounters across different case groups.
+   * <p>For each group (e.g., diagnostic category), this method creates one chart. Each chart
+   * contains a bar per month (x-axis) and two stacked bars: one for patients who had this diagnosis
+   * in that month ("in_group") and one for patients who had encounters in that month but did not
+   * have this diagnosis ("out_group").
    *
-   * @param kidsRadarDataItemContext the context containing metadata and settings for the radar
-   *     chart like {@link KidsRadarDataItemContext#KJP} or {@link KidsRadarDataItemContext#RSV}.
-   * @param coreCaseDataByGroups a map where the key represents a group/category (e.g., disorders),
-   *     and the value is another map, mapping case IDs to CoreCaseData objects.
-   * @return StackedBarChartsItem containing chart data, bars (months), stacks (groups), and values
-   *     (counts).
+   * @param kidsRadarDataItemContext The context (e.g., KJP or RSV) determining date reference
+   * @param coreCaseDataByGroups Map: group → Map: case ID → CoreCaseData
+   * @return a GroupedBarChartsItem formatted for rendering in the KidsRadar dashboard
    */
-  public StackedBarChartsItem createStackedBarCharts(
+  public StackedBarChartsUniformItem<KiraInteger> createStackedBarChartsUniform(
       KidsRadarDataItemContext kidsRadarDataItemContext,
       Map<String, Map<String, CoreCaseData>> coreCaseDataByGroups) {
 
-    log.debug("started KiraTimelineDisorders.createStackedBarCharts");
+    log.debug("Started KiraTimelineDisorders.createGroupedBarCharts");
     Instant startTimer = TimerTools.startTimer();
 
-    StackedBarChartsItem result = new StackedBarChartsItem();
-    result.setCharts(
-        new ArrayList<>(List.of(determineKiRaChartsAllLabelByContext(kidsRadarDataItemContext))));
+    StackedBarChartsUniformItem<KiraInteger> result = new StackedBarChartsUniformItem<>();
+    result.setCharts(createLabelList(coreCaseDataByGroups.keySet()));
 
-    // Generate valid date list using the determined format.
-    var validPeriods = generateDateList(KidsRadar.QUALIFYING_DATE, YEAR_MONTH_FORMAT);
-    result.setBars(List.of(validPeriods));
+    List<String> validPeriods =
+        generateDateList(KidsRadar.QUALIFYING_DATE, YEAR_MONTH_FORMAT, true);
+    result.setBars(validPeriods);
+    result.setStacks(List.of(IN_GROUP, OUT_GROUP));
 
-    result.setStacks(List.of(createLabelList(coreCaseDataByGroups.keySet())));
-    List<List<? extends Number>> resultList = new ArrayList<>();
-
+    // Precompute: all patients per period (across all diagnostic groups)
+    Map<String, Set<String>> allPatientsByPeriod = new HashMap<>();
     for (String period : validPeriods) {
-      List<Integer> resultByPeriod = new ArrayList<>();
+      Set<String> allPatients =
+          coreCaseDataByGroups.values().stream()
+              .flatMap(groupCases -> groupCases.values().stream())
+              .filter(x -> isDateInPeriod(kidsRadarDataItemContext, x.getAdmissionDate(), period))
+              .map(CoreCaseData::getPatientId)
+              .collect(Collectors.toSet());
+      allPatientsByPeriod.put(period, allPatients);
+    }
 
-      coreCaseDataByGroups.forEach(
-          (group, caseDataItem) -> {
+    // Final result structure: charts x months x [in_group, out_group]
+    List<List<List<KiraInteger>>> values = new ArrayList<>();
+
+    coreCaseDataByGroups.forEach(
+        (group, caseDataItem) -> {
+          if (caseDataItem == null) return;
+
+          List<List<KiraInteger>> valuesPerPeriod = new ArrayList<>();
+
+          for (String period : validPeriods) {
+            // Get all cases with this diagnosis group in the current period
             List<CoreCaseData> caseDataItemsByPeriod =
                 caseDataItem.values().stream()
                     .filter(
@@ -100,47 +116,123 @@ public class KiraTimelineDisorders extends DashboardDataItemLogic
                                 CoreCaseData::getFacilityEncounterId, Collectors.toSet())));
 
             patientIdsByPeriod.put(period + "_" + group, patientIdCaseIdsMap);
-
-            // Creation of a map with patients that got more than 1 case by month as debug info.
             logPatientsWithMultipleCases(patientIdCaseIdsMap, period, group);
 
-            // Adding patient once.
-            resultByPeriod.add(patientIdCaseIdsMap.size());
-          });
+            int inGroup = patientIdCaseIdsMap.size();
+            Set<String> allPatientIdsInPeriod = allPatientsByPeriod.getOrDefault(period, Set.of());
+            int outGroup =
+                (int)
+                    allPatientIdsInPeriod.stream()
+                        .filter(id -> !patientIdCaseIdsMap.containsKey(id))
+                        .count();
 
-      resultList.add(resultByPeriod);
-    }
+            valuesPerPeriod.add(List.of(new KiraInteger(inGroup), new KiraInteger(outGroup)));
+          }
 
-    result.setValues(List.of(resultList));
-    TimerTools.stopTimerAndLog(startTimer, "finished KiraTimelineDisorders.createStackedBarCharts");
+          values.add(valuesPerPeriod);
+        });
 
-    // Order ascending regarding the specification.
+    result.setValues(values);
+
+    TimerTools.stopTimerAndLog(startTimer, "Finished KiraTimelineDisorders.createGroupedBarCharts");
     return result;
   }
 
+  /**
+   * Generates a StackedBarChartsItem with patient counts per diagnostic group and monthly period.
+   * Currently used for RSV only.
+   *
+   * @param kidsRadarDataItemContext The context (e.g., RSV) determining date reference
+   * @param coreCaseDataByGroups Map: group → Map: case ID → CoreCaseData
+   * @return a StackedBarChartsItem formatted for rendering in the KidsRadar dashboard
+   */
+  public StackedBarChartsItem createStackBarCharts(
+      KidsRadarDataItemContext kidsRadarDataItemContext,
+      Map<String, Map<String, CoreCaseData>> coreCaseDataByGroups) {
+
+    Map<String, Map<String, CoreCaseData>> rsvOnly =
+        getRsvOnlyCoreCaseDataByGroups(coreCaseDataByGroups);
+    log.debug("Started KiraTimelineDisorders.createStackBarCharts");
+    Instant startTimer = TimerTools.startTimer();
+
+    StackedBarChartsItem result = new StackedBarChartsItem();
+    result.setCharts(List.of(RSV_DIAGNOSES_ALL));
+    result.setStacks(List.of(createLabelList(rsvOnly.keySet())));
+
+    List<String> validPeriods = generateDateList(KidsRadar.QUALIFYING_DATE, YEAR_MONTH_FORMAT);
+    result.setBars(List.of(validPeriods));
+
+    // Precompute: all patients per period (across all diagnostic groups)
+    List<String> stackKeysOrdered = new ArrayList<>(rsvOnly.keySet());
+
+    // 3) Build values: values[chartIndex][barIndex][stackIndex]
+    List<List<List<? extends Number>>> values = new ArrayList<>(1);
+    List<List<? extends Number>> valuesForSingleChart = new ArrayList<>(validPeriods.size());
+
+    for (String period : validPeriods) {
+      // one row per month (bar): counts per stack in the same order as stackKeysOrdered
+      List<Integer> countsPerStackThisMonth = new ArrayList<>(stackKeysOrdered.size());
+
+      for (String groupKey : stackKeysOrdered) {
+        Map<String, CoreCaseData> groupCases = rsvOnly.get(groupKey);
+
+        // 1) Filter cases by period
+        List<CoreCaseData> caseDataItemsByPeriod =
+            (groupCases == null ? Stream.<CoreCaseData>empty() : groupCases.values().stream())
+                .filter(c -> isDateInPeriod(kidsRadarDataItemContext, c.getAdmissionDate(), period))
+                .toList();
+
+        // 2) Group by patientId and collect set of encounterIds
+        Map<String, Set<String>> patientIdCaseIdsMap =
+            caseDataItemsByPeriod.stream()
+                .collect(
+                    Collectors.groupingBy(
+                        CoreCaseData::getPatientId,
+                        Collectors.mapping(
+                            CoreCaseData::getFacilityEncounterId, Collectors.toSet())));
+
+        // 3) Put into debug map under key "<period>_<group>"
+        patientIdsByPeriod.put(period + "_" + groupKey, patientIdCaseIdsMap);
+
+        // 4) Use the size of the map as the unique patient count for this stack this month
+        int uniquePatientsThisMonth = patientIdCaseIdsMap.size();
+
+        countsPerStackThisMonth.add(uniquePatientsThisMonth);
+      }
+
+      valuesForSingleChart.add(countsPerStackThisMonth);
+    }
+
+    values.add(valuesForSingleChart);
+    result.setValues(values);
+    TimerTools.stopTimerAndLog(startTimer, "Finished KiraTimelineDisorders.createStackBarCharts");
+    return result;
+  }
+
+  /** Returns internal debug data mapping periods + group to patient-case information. */
   public Map<String, Map<String, Set<String>>> getDebugData() {
     return patientIdsByPeriod;
   }
 
-  // Method to log patients with multiple cases for readability
+  /**
+   * Logs information about patients who had multiple encounters in a given month and group.
+   *
+   * @param patientIdCaseIdsMap map of patient ID → set of encounter IDs
+   * @param period the period (yyyy-MM)
+   * @param group the diagnosis group name
+   */
   private void logPatientsWithMultipleCases(
-      Map<String, Set<String>> patientIdCaseIdsMap, String yearAndMonth, String group) {
+      Map<String, Set<String>> patientIdCaseIdsMap, String period, String group) {
 
-    Map<String, Set<String>> patientIdsWithMultipleCases =
-        patientIdCaseIdsMap.entrySet().stream()
-            .filter(entry -> entry.getValue().size() > 1)
-            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+    long count =
+        patientIdCaseIdsMap.values().stream().filter(encounters -> encounters.size() > 1).count();
 
-    if (!patientIdsWithMultipleCases.isEmpty()) {
-      patientIdsWithMultipleCases.forEach(
-          (patientId, caseIds) -> {
-            log.info(
-                "Patient {} had multiple encounters in the month: {} [group: {}; encounters: {}]",
-                patientId,
-                yearAndMonth,
-                group,
-                caseIds);
-          });
+    if (count > 0) {
+      log.debug(
+          "In period {} for group '{}': {} patients had multiple encounters.",
+          period,
+          group,
+          count);
     }
   }
 }

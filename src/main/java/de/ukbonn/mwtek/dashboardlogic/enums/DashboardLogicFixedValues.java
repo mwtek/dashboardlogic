@@ -126,6 +126,11 @@ public enum DashboardLogicFixedValues {
   public static final ImmutableList<DashboardLogicFixedValues> DIAGNOSIS_SECURITY_NEGATIVE_ENUM =
       ImmutableList.of(DIAG_RELIABILITY_A);
 
+  public static final String GENDER_OTHER_CODE = "other";
+  public static final String GENDER_EXTENSION_URL =
+      "http://fhir.de/StructureDefinition/gender-amtlich-de";
+  public static final String GENDER_EXTENSION_DIVERSE_CODE = "D";
+
   private final String value;
 
   DashboardLogicFixedValues(String value) {

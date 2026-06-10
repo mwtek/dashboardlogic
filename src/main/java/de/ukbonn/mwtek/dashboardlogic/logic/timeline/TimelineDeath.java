@@ -26,7 +26,7 @@ import de.ukbonn.mwtek.dashboardlogic.DashboardDataItemLogic;
 import de.ukbonn.mwtek.dashboardlogic.enums.DataItemContext;
 import de.ukbonn.mwtek.dashboardlogic.models.DiseaseDataItem;
 import de.ukbonn.mwtek.dashboardlogic.models.TimestampedListPair;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiEncounter;
 import de.ukbonn.mwtek.utilities.generic.time.DateTools;
 import de.ukbonn.mwtek.utilities.generic.time.TimerTools;
 import java.time.Instant;
@@ -55,7 +55,7 @@ public class TimelineDeath extends DashboardDataItemLogic implements TimelineFun
    * @return ListNumberPair Containing dates and number of deceased people
    */
   public TimestampedListPair createTimelineDeathMap(
-      List<UkbEncounter> facilityContacts, DataItemContext dataItemContext) {
+      List<MiiEncounter> facilityContacts, DataItemContext dataItemContext) {
     log.debug("started createTimelineDeathMap");
     Instant startTimer = TimerTools.startTimer();
     LinkedHashMap<Long, Long> dateResultMap = new LinkedHashMap<>();
@@ -70,12 +70,12 @@ public class TimelineDeath extends DashboardDataItemLogic implements TimelineFun
     try {
       // subset with positive and completed encounters needed with discharge disposition: dead
       // (07 on pos 1 and 2 in the Encounter.dischargeDisposition)
-      List<UkbEncounter> listPositiveDeceasedCases =
+      List<MiiEncounter> listPositiveDeceasedCases =
           facilityContacts.parallelStream()
               .filter(x -> x.hasExtension(POSITIVE_RESULT.getValue()))
               // just finished non-outpatient cases can hold a discharge disposition
               .filter(x -> x.getPeriod().hasEnd() && !x.isCaseClassOutpatient())
-              .filter(UkbEncounter::isPatientDeceased)
+              .filter(MiiEncounter::isPatientDeceased)
               .toList();
       // Loop through each day
       while (tempDateUnix <= currentUnixTime) {
@@ -84,7 +84,7 @@ public class TimelineDeath extends DashboardDataItemLogic implements TimelineFun
         // needs to be filled beforehand for daysDifferenceCheck to work
         dateResultMap.put(tempDateUnix, countDeceased);
 
-        for (UkbEncounter encounter : listPositiveDeceasedCases) {
+        for (MiiEncounter encounter : listPositiveDeceasedCases) {
           checkDaysDifference(tempDateUnix, dateResultMap, encounter);
         }
         tempDateUnix += DAY_IN_SECONDS; // add one day
@@ -106,10 +106,10 @@ public class TimelineDeath extends DashboardDataItemLogic implements TimelineFun
    * @param tempDateUnix Current date [unixtime] which is checked and incremented if the reporting
    *     date fits into the corresponding time window [date + 24 hours]
    * @param dateResultMap Map with the result per date [unixtime]
-   * @param encounter Current {@link UkbEncounter} that is going to be checked
+   * @param encounter Current {@link MiiEncounter} that is going to be checked
    */
   private static void checkDaysDifference(
-      long tempDateUnix, Map<Long, Long> dateResultMap, UkbEncounter encounter) {
+      long tempDateUnix, Map<Long, Long> dateResultMap, MiiEncounter encounter) {
     Date checkDate = DateTools.unixTimeSecondsToDate(tempDateUnix);
     Date caseDate = encounter.getPeriod().getEnd();
     LocalDate localCheckDate = checkDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();

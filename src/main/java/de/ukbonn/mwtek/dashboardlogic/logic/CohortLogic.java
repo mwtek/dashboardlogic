@@ -25,7 +25,7 @@ import static de.ukbonn.mwtek.dashboardlogic.enums.AcribisCohortIcdCodes.INCLUSI
 import de.ukbonn.mwtek.dashboardlogic.enums.AcribisCohortIcdCodes;
 import de.ukbonn.mwtek.dashboardlogic.enums.AcribisCohortOpsCodes;
 import de.ukbonn.mwtek.dashboardlogic.models.PidTimestampCohortMap;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbConsent;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiConsent;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
@@ -36,7 +36,7 @@ import java.util.stream.Collectors;
 public class CohortLogic {
 
   public static PidTimestampCohortMap getCohort1(
-      Map<String, Set<String>> pidDiagnoses, List<UkbConsent> consents) {
+      Map<String, Set<String>> pidDiagnoses, List<MiiConsent> consents) {
 
     return buildCohort(
         pidDiagnoses,
@@ -48,7 +48,7 @@ public class CohortLogic {
   }
 
   public static PidTimestampCohortMap getCohort2(
-      Map<String, Set<String>> pidDiagnoses, List<UkbConsent> consents) {
+      Map<String, Set<String>> pidDiagnoses, List<MiiConsent> consents) {
 
     return buildCohort(
         pidDiagnoses,
@@ -62,7 +62,7 @@ public class CohortLogic {
   public static PidTimestampCohortMap getCohort3(
       Map<String, Set<String>> pidDiagnoses,
       Map<String, Set<String>> pidProcedures,
-      List<UkbConsent> consents) {
+      List<MiiConsent> consents) {
 
     return buildCohort(
         pidDiagnoses,
@@ -76,19 +76,19 @@ public class CohortLogic {
   public static PidTimestampCohortMap buildCohort(
       Map<String, Set<String>> pidDiagnoses,
       Map<String, Set<String>> pidProcedures,
-      List<UkbConsent> consents,
+      List<MiiConsent> consents,
       List<String> inclusionDiagnoses,
       List<String> inclusionProcedures,
       List<String> exclusionDiagnoses) {
 
     PidTimestampCohortMap pidTimestampCohortMap = new PidTimestampCohortMap();
 
-    Map<String, UkbConsent> firstConsentByPid =
+    Map<String, MiiConsent> firstConsentByPid =
         consents.stream()
             .filter(c -> c.getPatientId() != null && c.getAcribisPermitStartDate() != null)
             .collect(
                 Collectors.toMap(
-                    UkbConsent::getPatientId,
+                    MiiConsent::getPatientId,
                     c -> c,
                     (existing, replacement) -> existing)); // Keep first
 

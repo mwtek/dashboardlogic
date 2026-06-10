@@ -26,7 +26,8 @@ import de.ukbonn.mwtek.dashboardlogic.DashboardDataItemLogic;
 import de.ukbonn.mwtek.dashboardlogic.enums.DataItemContext;
 import de.ukbonn.mwtek.dashboardlogic.models.DiseaseDataItem;
 import de.ukbonn.mwtek.dashboardlogic.models.TimestampedListTriple;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbConsent;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiConsent;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiQuestionnaireResponse;
 import de.ukbonn.mwtek.utilities.generic.time.DateTools;
 import de.ukbonn.mwtek.utilities.generic.time.TimerTools;
 import java.time.Instant;
@@ -34,6 +35,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 
@@ -55,12 +57,13 @@ public class TimelineRecruitment extends DashboardDataItemLogic implements Timel
    * @return ListNumberPair Containing dates and number of deceased people
    */
   public TimestampedListTriple createTimelineRecruitment(
-      List<UkbConsent> consents, DataItemContext dataItemContext) {
+      List<MiiConsent> consents,
+      List<MiiQuestionnaireResponse> questionnaireResponses,
+      DataItemContext dataItemContext) {
     log.debug("started createTimelineRecruitment");
     Instant startTimer = TimerTools.startTimer();
     LinkedHashMap<Long, Long> dateRecruitmentConsentMap = new LinkedHashMap<>();
     LinkedHashMap<Long, Long> dateRecruitmentFollowUpMap = new LinkedHashMap<>();
-
     List<Long> recruitmentConsentList;
     List<Long> recruitmentFollowUpList;
     TimestampedListTriple resultTriple = new TimestampedListTriple();
@@ -73,32 +76,42 @@ public class TimelineRecruitment extends DashboardDataItemLogic implements Timel
     try {
       List<Long> consentPermitStartDatesUnix =
           consents.stream()
-              // Grouping consents by PatientId
-              .collect(Collectors.groupingBy(UkbConsent::getPatientId))
+              // Grouping consents by pid
+              .collect(Collectors.groupingBy(MiiConsent::getPatientId))
               .values()
               .stream()
               // For each patient's consent list, take the first valid consent date
               .map(
                   patientConsents ->
                       patientConsents.stream()
-                          .map(UkbConsent::getAcribisPermitStartDate) // Filter valid dates
-                          .findFirst() // Take only the first valid date
+                          // Filter valid dates
+                          .map(MiiConsent::getAcribisPermitStartDate)
+                          .filter(Objects::nonNull)
+                          // Take only the first valid date
                           .map(DateTools::dateToUnixTime)
+                          .min(Long::compareTo)
                           .orElse(null))
               .filter(Objects::nonNull)
               .toList();
+
+      // Follow-up entries
+      List<Long> followUpAuthoredDatesUnix = getFollowUpDatesOnlyLastOne(questionnaireResponses);
 
       // Loop through each day
       while (tempDateUnix <= currentUnixTime) {
         final long dayStart = tempDateUnix;
         final long dayEnd = tempDateUnix + DAY_IN_SECONDS;
-        long count =
+        long consentCount =
             consentPermitStartDatesUnix.stream()
                 .filter(timestamp -> timestamp >= dayStart && timestamp < dayEnd)
                 .count();
+        long followUpCount =
+            followUpAuthoredDatesUnix.stream()
+                .filter(timestamp -> timestamp >= dayStart && timestamp < dayEnd)
+                .count();
 
-        dateRecruitmentConsentMap.put(dayStart, count);
-        dateRecruitmentFollowUpMap.put(dayStart, 0L); // UNSUPPORTED ATM
+        dateRecruitmentConsentMap.put(dayStart, consentCount);
+        dateRecruitmentFollowUpMap.put(dayStart, followUpCount); // UNSUPPORTED ATM
 
         tempDateUnix = dayEnd;
       }
@@ -113,12 +126,33 @@ public class TimelineRecruitment extends DashboardDataItemLogic implements Timel
     } catch (Exception e) {
       log.debug("Error is calculating the timeline death: {}", e.getMessage());
     }
+
+    logFollowUpsWithoutConsent(consents, questionnaireResponses);
+
     TimerTools.stopTimerAndLog(startTimer, "finished createTimelineRecruitment");
     return resultTriple;
   }
 
+  private static List<Long> getFollowUpDatesOnlyLastOne(
+      List<MiiQuestionnaireResponse> questionnaireResponses) {
+    return questionnaireResponses.stream()
+        .collect(Collectors.groupingBy(MiiQuestionnaireResponse::getPatientId))
+        .values()
+        .stream()
+        .map(
+            patientResponses ->
+                patientResponses.stream()
+                    .map(MiiQuestionnaireResponse::getAuthored)
+                    .filter(Objects::nonNull)
+                    .map(DateTools::dateToUnixTime)
+                    .max(Long::compareTo)
+                    .orElse(null))
+        .filter(Objects::nonNull)
+        .toList();
+  }
+
   private static void logUnassignedConsentEntries(
-      List<UkbConsent> consents, LinkedHashMap<Long, Long> dateRecruitmentConsentMap) {
+      List<MiiConsent> consents, LinkedHashMap<Long, Long> dateRecruitmentConsentMap) {
     // Identify consents with valid permit start dates that were not counted in any day window
     List<Map.Entry<String, Long>> unmatchedPatientsWithTimestamps =
         consents.stream()
@@ -148,6 +182,32 @@ public class TimelineRecruitment extends DashboardDataItemLogic implements Timel
     }
   }
 
+  private static void logFollowUpsWithoutConsent(
+      List<MiiConsent> consents, List<MiiQuestionnaireResponse> questionnaireResponses) {
+    // Collect consent pids
+    Set<String> consentPatientIds =
+        consents.stream()
+            .map(MiiConsent::getPatientId)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+
+    // Find follow-up pids without consent
+    Set<String> followUpWithoutConsent =
+        questionnaireResponses.stream()
+            .map(MiiQuestionnaireResponse::getPatientId)
+            .filter(Objects::nonNull)
+            .filter(pid -> !consentPatientIds.contains(pid))
+            .collect(Collectors.toSet());
+
+    // Log them
+    if (!followUpWithoutConsent.isEmpty()) {
+      followUpWithoutConsent.forEach(
+          pid ->
+              log.warn(
+                  "Follow-up for patient {} exists without corresponding consent entry.", pid));
+    }
+  }
+
   public Map<String, List<? extends Number>> createTimelineRecruitmentMap(
       TimestampedListTriple timestampedListTriple) {
     Map<String, List<? extends Number>> dataMap = new LinkedHashMap<>();
@@ -155,5 +215,10 @@ public class TimelineRecruitment extends DashboardDataItemLogic implements Timel
     dataMap.put(ACR_RECRUITMENT_CONSENT, timestampedListTriple.getValue1());
     dataMap.put(ACR_RECRUITMENT_FOLLOWUP, timestampedListTriple.getValue2());
     return dataMap;
+  }
+
+  @Override
+  public List<Long> divideMapValuesToLists(Map<Long, Long> tempMap) {
+    return TimelineFunctionalities.super.divideMapValuesToLists(tempMap);
   }
 }

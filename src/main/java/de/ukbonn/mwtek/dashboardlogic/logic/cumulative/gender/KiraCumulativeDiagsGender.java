@@ -18,10 +18,12 @@
 package de.ukbonn.mwtek.dashboardlogic.logic.cumulative.gender;
 
 import static de.ukbonn.mwtek.dashboardlogic.logic.KiraData.createLabelList;
+import static de.ukbonn.mwtek.dashboardlogic.tools.KidsRadarTools.getRsvOnlyCoreCaseDataByGroups;
 
 import de.ukbonn.mwtek.dashboardlogic.DashboardDataItemLogic;
 import de.ukbonn.mwtek.dashboardlogic.enums.KidsRadarDataItemContext;
 import de.ukbonn.mwtek.dashboardlogic.models.CoreCaseData;
+import de.ukbonn.mwtek.dashboardlogic.models.KiraInteger;
 import de.ukbonn.mwtek.dashboardlogic.models.StackedBarChartsItem;
 import de.ukbonn.mwtek.utilities.generic.time.TimerTools;
 import java.time.Instant;
@@ -33,43 +35,65 @@ import lombok.extern.slf4j.Slf4j;
 import org.hl7.fhir.r4.model.Enumerations.AdministrativeGender;
 
 @Slf4j
-public class KiraCumulativeDisordersGender extends DashboardDataItemLogic {
+public class KiraCumulativeDiagsGender extends DashboardDataItemLogic {
 
   final List<String> STACKS_GENDER = Arrays.asList("male", "female", "diverse");
 
   /**
-   * Creates a stacked bar chart representation of the given core case data grouped by diagnosis
-   * groups. The chart will display gender distribution (male, female, other) for each diagnosis
-   * group.
+   * Builds a gender-distribution stacked bar chart for KJP where numeric values are wrapped as
+   * {@link KiraInteger}. One chart is produced with bars per diagnostic group and stacks for
+   * genders (e.g., male/female/other). Unknown/missing genders are logged but excluded.
    *
-   * <p>Processes a map of core case data, grouped by KJP / RSV diagnosis groups. For each group,
-   * the number of male, female, and other gender cases is calculated and included in the chart.
-   * Additionally, cases with unknown or missing gender entries are logged as warnings.
-   *
-   * @param coreCaseDataByGroups a map where the key represents a diagnosis group, and the value is
-   *     another map of core case data for that group.
-   * @return a {@link StackedBarChartsItem} object that contains the charts, stacks, bars, and
-   *     values representing the gender distribution for each KJP diagnosis group.
+   * @param coreCaseDataByGroups map of diagnostic group -> (caseId → {@code CoreCaseData})
    */
-  public StackedBarChartsItem createStackBarCharts(
-      KidsRadarDataItemContext kidsRadarDataItemContext,
+  public StackedBarChartsItem<KiraInteger> createStackBarChartsKjp(
       Map<String, Map<String, CoreCaseData>> coreCaseDataByGroups) {
 
-    log.debug("started createStackBarCharts");
+    // Build with KiraValue wrapping
+    return createStackBarChartsCore(
+        KidsRadarDataItemContext.KJP, coreCaseDataByGroups, KiraInteger::new);
+  }
+
+  /**
+   * Builds a gender-distribution stacked bar chart for PED with plain numeric values ({@link
+   * java.lang.Integer}). The input is RSV-filtered internally (group map reduced to RSV scope).
+   * Unknown/missing genders are logged but excluded.
+   *
+   * @param coreCaseDataByGroups map of diagnostic group → (caseId → {@code CoreCaseData})
+   */
+  public StackedBarChartsItem<Integer> createStackBarChartsPed(
+      Map<String, Map<String, CoreCaseData>> coreCaseDataByGroups) {
+
+    // Filter RSV-only for PED and build with plain Integer
+    Map<String, Map<String, CoreCaseData>> filtered =
+        getRsvOnlyCoreCaseDataByGroups(coreCaseDataByGroups);
+    return createStackBarChartsCore(
+        KidsRadarDataItemContext.PED, filtered, java.lang.Integer::valueOf);
+  }
+
+  private <T> StackedBarChartsItem<T> createStackBarChartsCore(
+      KidsRadarDataItemContext ctx,
+      Map<String, Map<String, CoreCaseData>> coreCaseDataByGroups,
+      java.util.function.IntFunction<T> wrap) {
+
+    log.debug("started createStackBarChartsCore ({})", ctx);
     Instant startTime = TimerTools.startTimer();
 
-    StackedBarChartsItem result = new StackedBarChartsItem();
-    String chartsLabel = determineKiRaChartsAllLabelByContext(kidsRadarDataItemContext);
+    StackedBarChartsItem<T> result = new StackedBarChartsItem<>();
 
-    // Setting chart, stack, and bar labels
+    // Determine chart label by context
+    String chartsLabel = determineKiRaChartsAllLabelByContext(ctx);
+
+    // Labels
     result.setCharts(new ArrayList<>(List.of(chartsLabel)));
-    result.setStacks(List.of(STACKS_GENDER));
+    result.setStacks(List.of(STACKS_GENDER)); // e.g., ["male", "female", "other"]
     result.setBars(List.of(createLabelList(coreCaseDataByGroups.keySet())));
 
-    List<List<? extends Number>> resultValues = new ArrayList<>();
+    // Build values per bar (group key)
+    List<List<T>> resultValues = new ArrayList<>();
 
     coreCaseDataByGroups.forEach(
-        (kjpGroupKey, coreCaseDataItem) -> {
+        (groupKey, coreCaseDataItem) -> {
           // Retrieve cases by gender
           List<CoreCaseData> males =
               getCoreCaseDataByGender(coreCaseDataItem, AdministrativeGender.MALE);
@@ -77,12 +101,16 @@ public class KiraCumulativeDisordersGender extends DashboardDataItemLogic {
               getCoreCaseDataByGender(coreCaseDataItem, AdministrativeGender.FEMALE);
           List<CoreCaseData> others =
               getCoreCaseDataByGender(coreCaseDataItem, AdministrativeGender.OTHER);
-          // Add the gender distribution values to the result
-          resultValues.add(List.of(males.size(), females.size(), others.size()));
-          // Debug logging for unknown and missing gender entries
+
+          // Add the gender distribution values to the result (wrapped)
+          resultValues.add(
+              List.of(
+                  wrap.apply(males.size()), wrap.apply(females.size()), wrap.apply(others.size())));
+
+          // Debug for unknown/missing genders (not included in chart)
           List<CoreCaseData> unknowns =
               getCoreCaseDataByGender(coreCaseDataItem, AdministrativeGender.UNKNOWN);
-          List<CoreCaseData> missingGenderEntries =
+          List<CoreCaseData> missing =
               getCoreCaseDataByGender(coreCaseDataItem, AdministrativeGender.NULL);
 
           if (!unknowns.isEmpty()) {
@@ -90,24 +118,23 @@ public class KiraCumulativeDisordersGender extends DashboardDataItemLogic {
                 "Skipping {} patient resources with gender 'unknown' in group {}. [Example:"
                     + " Patient/{}]",
                 unknowns.size(),
-                kjpGroupKey, // Log the KJP group key
+                groupKey,
                 unknowns.get(0).getPatientId());
           }
-          if (!missingGenderEntries.isEmpty()) {
+          if (!missing.isEmpty()) {
             log.warn(
                 "Skipping {} patient resources with missing gender in group {}. [Example:"
                     + " Patient/{}]",
-                missingGenderEntries.size(),
-                kjpGroupKey, // Log the KJP group key
-                missingGenderEntries.get(0).getPatientId());
+                missing.size(),
+                groupKey,
+                missing.get(0).getPatientId());
           }
         });
 
-    // Set the values for the chart
+    // Set values as a single-chart payload
     result.setValues(List.of(resultValues));
 
-    // Log the time taken for the method to complete
-    TimerTools.stopTimerAndLog(startTime, "finished createStackBarCharts");
+    TimerTools.stopTimerAndLog(startTime, "finished createStackBarChartsCore (" + ctx + ")");
     return result;
   }
 

@@ -22,7 +22,9 @@ public interface KiraAgeCluster {
 
   Integer getUpperBorder();
 
-  KiraAgeCluster.Period getPeriod();
+  Period getPeriod();
+
+  String getLabel();
 
   enum Period {
     YEARS,

@@ -17,7 +17,10 @@
  */
 package de.ukbonn.mwtek.dashboardlogic.models;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import de.ukbonn.mwtek.dashboardlogic.enums.StackedBarCharts;
 import java.util.List;
+import java.util.Map;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -27,7 +30,7 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class StackedBarChartsItem {
+public class StackedBarChartsItem<T> implements StackedBarCharts<T> {
 
   /** List of chart names. */
   private List<String> charts;
@@ -39,25 +42,44 @@ public class StackedBarChartsItem {
   private List<List<String>> stacks;
 
   /** Values for each stack in each bar in each chart. */
-  private List<List<List<? extends Number>>> values;
+  private List<List<List<T>>> values;
 
-  /**
-   * Returns the list of values associated with the given chart name.
-   *
-   * @param barChartName The name of the bar for which the values are requested.
-   * @return The list of values corresponding to the given chart name, or null if the chart name is
-   *     not found.
-   */
-  public List<? extends Number> getValueByBarChart(String barChartName) {
-    // Find the index of the chartName in the bars list
-    int barIndex = bars.get(0).indexOf(barChartName);
+  @JsonIgnore private Map<String, List<String>> debugData;
 
-    // If the chartName is not found, return null or an empty list (optional)
-    if (barIndex == -1) {
-      return null; // or return new ArrayList<>(), depending on the requirement
+  /** Returns the list of values associated with the given bar name (from the first chart). */
+  public List<T> getValueByBarChart(String barChartName) {
+    // Guard against null/empty structures
+    if (bars == null || bars.isEmpty() || values == null || values.isEmpty()) {
+      return null;
     }
 
-    // Return the values corresponding to the found index
-    return values.get(0).get(barIndex);
+    // Find the index of the bar in the first chart
+    int barIndex = bars.getFirst().indexOf(barChartName);
+    if (barIndex == -1) {
+      return null;
+    }
+
+    // Return the values corresponding to the found index in the first chart
+    return values.getFirst().get(barIndex);
+  }
+
+  /** Same as above but lets you specify which chart to read from. */
+  public List<T> getValueByBarChart(int chartIndex, String barChartName) {
+    // Guard against invalid chart index
+    if (bars == null
+        || values == null
+        || chartIndex < 0
+        || chartIndex >= bars.size()
+        || chartIndex >= values.size()) {
+      return null;
+    }
+
+    List<String> barsOfChart = bars.get(chartIndex);
+    int barIndex = (barsOfChart != null) ? barsOfChart.indexOf(barChartName) : -1;
+    if (barIndex == -1) {
+      return null;
+    }
+
+    return values.get(chartIndex).get(barIndex);
   }
 }

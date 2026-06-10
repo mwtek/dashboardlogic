@@ -31,22 +31,25 @@ import static de.ukbonn.mwtek.dashboardlogic.logic.CohortLogic.getCohort2;
 import static de.ukbonn.mwtek.dashboardlogic.logic.CohortLogic.getCohort3;
 import static de.ukbonn.mwtek.utilities.enums.TerminologySystems.OPS;
 import static de.ukbonn.mwtek.utilities.generic.time.DateTools.calcYearsBetweenDates;
+import static de.ukbonn.mwtek.utilities.generic.time.DateTools.getCurrentDateTime;
 
 import de.ukbonn.mwtek.dashboardlogic.enums.DataItemContext;
 import de.ukbonn.mwtek.dashboardlogic.logic.current.AcribisCurrentDischargeDiags;
 import de.ukbonn.mwtek.dashboardlogic.logic.timeline.AcribisTimelineDischargeDiags;
 import de.ukbonn.mwtek.dashboardlogic.models.DiseaseDataItem;
 import de.ukbonn.mwtek.dashboardlogic.models.PidTimestampCohortMap;
+import de.ukbonn.mwtek.dashboardlogic.models.StackedBarChartsItem;
 import de.ukbonn.mwtek.dashboardlogic.settings.GlobalConfiguration;
 import de.ukbonn.mwtek.dashboardlogic.settings.InputCodeSettings;
 import de.ukbonn.mwtek.dashboardlogic.settings.QualitativeLabCodesSettings;
 import de.ukbonn.mwtek.dashboardlogic.settings.VariantSettings;
 import de.ukbonn.mwtek.dashboardlogic.tools.DataBuilder;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbCondition;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbConsent;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbPatient;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbProcedure;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiCondition;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiConsent;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiEncounter;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiPatient;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiProcedure;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiQuestionnaireResponse;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
@@ -60,6 +63,8 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.hl7.fhir.r4.model.Coding;
+import org.hl7.fhir.r4.model.Enumerations.AdministrativeGender;
+import org.hl7.fhir.r4.model.Patient;
 
 /**
  * Class in which the individual {@link DiseaseDataItem DataItems} of the json specification with
@@ -70,17 +75,20 @@ import org.hl7.fhir.r4.model.Coding;
 @Slf4j
 public class AcribisDataItemGenerator extends DataItemGenerator {
 
-  List<UkbConsent> consents;
+  List<MiiConsent> consents;
+  List<MiiQuestionnaireResponse> questionnaireResponses;
 
   /** Initialization of the Acribis related fhir resource lists. */
   public AcribisDataItemGenerator(
-      List<UkbConsent> consents,
-      List<UkbCondition> ukbConditions,
-      List<UkbPatient> ukbPatients,
-      List<UkbEncounter> ukbEncounters,
-      List<UkbProcedure> ukbProcedures) {
-    super(ukbConditions, null, ukbPatients, ukbEncounters, ukbProcedures, null);
+      List<MiiConsent> consents,
+      List<MiiCondition> ukbConditions,
+      List<MiiPatient> miiPatients,
+      List<MiiEncounter> miiEncounters,
+      List<MiiProcedure> ukbProcedures,
+      List<MiiQuestionnaireResponse> questionnaireResponses) {
+    super(ukbConditions, null, miiPatients, miiEncounters, ukbProcedures, null);
     this.consents = consents;
+    this.questionnaireResponses = questionnaireResponses;
   }
 
   /**
@@ -113,16 +121,25 @@ public class AcribisDataItemGenerator extends DataItemGenerator {
 
     // The valid cases in our use case must have agreed to three specific fields
     consents = getValidConsents(consents);
+    // Logic should be run on valid follow-ups only
+    questionnaireResponses = getQrsValidConsents(questionnaireResponses, consents);
 
     DiseaseDataItem cd;
     // acr.current.recruitment
     String currentRecruitmentLabel = determineLabel(ACRIBIS, CURRENT_RECRUITMENT);
     if (isItemNotExcluded(mapExcludeDataItems, currentRecruitmentLabel, false)) {
+      StackedBarChartsItem<Integer> item =
+          new DataBuilder()
+              .questionnaireResponses(questionnaireResponses)
+              .consents(consents)
+              .buildCurrentRecruitment();
       currentDataList.add(
-          new DiseaseDataItem(
-              currentRecruitmentLabel,
-              ITEMTYPE_STACKED_BAR_CHARTS,
-              new DataBuilder().consents(consents).buildCurrentRecruitment()));
+          new DiseaseDataItem(currentRecruitmentLabel, ITEMTYPE_STACKED_BAR_CHARTS, item));
+      if (debug) {
+        currentDataList.add(
+            new DiseaseDataItem(
+                addDebugLabel(currentRecruitmentLabel), ITEMTYPE_DEBUG, item.getDebugData()));
+      }
     }
     // acr.timeline.recruitment
     String timelineRecruitmentLabel = determineLabel(ACRIBIS, TIMELINE_RECRUITMENT);
@@ -132,6 +149,7 @@ public class AcribisDataItemGenerator extends DataItemGenerator {
               timelineRecruitmentLabel,
               ITEMTYPE_LIST,
               new DataBuilder()
+                  .questionnaireResponses(questionnaireResponses)
                   .consents(consents)
                   .dataItemContext(ACRIBIS)
                   .buildTimelineRecruitmentMap()));
@@ -195,6 +213,34 @@ public class AcribisDataItemGenerator extends DataItemGenerator {
     return currentDataList;
   }
 
+  private List<MiiQuestionnaireResponse> getQrsValidConsents(
+      List<MiiQuestionnaireResponse> questionnaireResponses, List<MiiConsent> consents) {
+
+    // Build set of valid pids (allowed consent)
+    Set<String> validConsentPatientIds =
+        consents.stream()
+            .filter(c -> c.getPatientId() != null)
+            .filter(MiiConsent::isAcribisConsentAllowed)
+            .map(MiiConsent::getPatientId)
+            .collect(Collectors.toSet());
+
+    // Filter questionnaire responses
+    return questionnaireResponses.stream()
+        .filter(
+            qr -> {
+              String pid = qr.getPatientId();
+              boolean isValid = pid != null && validConsentPatientIds.contains(pid);
+              if (!isValid) {
+                log.warn(
+                    "QuestionnaireResponse {} got filtered without valid consent: patient={},",
+                    qr.getId(),
+                    pid);
+              }
+              return isValid;
+            })
+        .toList();
+  }
+
   private void logPatientsWithoutCohort(
       List<String> pidsAdults,
       PidTimestampCohortMap cohort1ByTimestamp,
@@ -208,7 +254,7 @@ public class AcribisDataItemGenerator extends DataItemGenerator {
 
     pidsAdults.stream()
         .filter(pid -> !allCohortPids.contains(pid))
-        .forEach(pid -> log.debug("Patient without cohort: {}", pid));
+        .forEach(pid -> log.trace("Patient without cohort: {}", pid));
   }
 
   /**
@@ -230,7 +276,7 @@ public class AcribisDataItemGenerator extends DataItemGenerator {
    * @return a map from patient ID to a list of all their ICD diagnosis codes
    */
   private Map<String, Set<String>> getDischargeDiagnosisList(
-      List<String> pidsAdults, List<UkbCondition> conditions, List<UkbEncounter> encounters) {
+      List<String> pidsAdults, List<MiiCondition> conditions, List<MiiEncounter> encounters) {
 
     Set<String> adultPidSet = new HashSet<>(pidsAdults);
 
@@ -242,7 +288,7 @@ public class AcribisDataItemGenerator extends DataItemGenerator {
             .collect(Collectors.toSet());
 
     // Step 2: Filter conditions that match discharge diagnosis IDs
-    List<UkbCondition> relevantConditions =
+    List<MiiCondition> relevantConditions =
         conditions.stream().filter(c -> dischargeDiagnosisIds.contains(c.getId())).toList();
 
     // Step 3: Build patientId → list of ICD codes
@@ -260,7 +306,7 @@ public class AcribisDataItemGenerator extends DataItemGenerator {
   }
 
   private Map<String, Set<String>> getOpsList(
-      Collection<String> pidsAdults, Collection<UkbProcedure> procedures) {
+      Collection<String> pidsAdults, Collection<MiiProcedure> procedures) {
 
     Set<String> adultPidSet = new HashSet<>(pidsAdults);
 
@@ -288,13 +334,13 @@ public class AcribisDataItemGenerator extends DataItemGenerator {
    * @param patients List of patients
    * @return List of patient IDs that meet the criteria
    */
-  public List<String> filterPatientsByAge(List<UkbConsent> consents, List<UkbPatient> patients) {
+  public List<String> filterPatientsByAge(List<MiiConsent> consents, List<MiiPatient> patients) {
     // Group consents by patient ID (only valid ones)
-    Map<String, List<UkbConsent>> consentMap =
+    Map<String, List<MiiConsent>> consentMap =
         consents.stream()
-            .filter(UkbConsent::isAcribisConsentAllowed)
+            .filter(MiiConsent::isAcribisConsentAllowed)
             .filter(c -> c.getPatientId() != null && c.getAcribisPermitStartDate() != null)
-            .collect(Collectors.groupingBy(UkbConsent::getPatientId));
+            .collect(Collectors.groupingBy(MiiConsent::getPatientId));
 
     return patients.parallelStream()
         .filter(
@@ -302,7 +348,7 @@ public class AcribisDataItemGenerator extends DataItemGenerator {
               String patientId = p.getId();
               Date birthDate = p.getBirthDate();
 
-              List<UkbConsent> patientConsents = consentMap.get(patientId);
+              List<MiiConsent> patientConsents = consentMap.get(patientId);
               // Exclude patients without a valid main consent
               if (patientConsents == null || patientConsents.isEmpty()) {
                 return false;
@@ -310,7 +356,7 @@ public class AcribisDataItemGenerator extends DataItemGenerator {
 
               boolean allConsentsValid = true;
 
-              for (UkbConsent consent : patientConsents) {
+              for (MiiConsent consent : patientConsents) {
                 Date consentDate = consent.getAcribisPermitStartDate();
                 if (consentDate == null) {
                   log.warn("WARN: Consent date is null for consentId: {}", consent.getId());
@@ -330,20 +376,20 @@ public class AcribisDataItemGenerator extends DataItemGenerator {
               }
               return allConsentsValid;
             })
-        .map(UkbPatient::getId)
+        .map(MiiPatient::getId)
         .collect(Collectors.toList());
   }
 
-  private List<UkbConsent> filterConsentByValidity(
-      List<UkbConsent> ukbConsents, Predicate<UkbConsent> consentFilter) {
+  private List<MiiConsent> filterConsentByValidity(
+      List<MiiConsent> ukbConsents, Predicate<MiiConsent> consentFilter) {
     return ukbConsents.parallelStream()
-        .filter(UkbConsent::isPrivacyPolicyDocumentAndMiiConsentCategory)
+        .filter(MiiConsent::isPrivacyPolicyDocumentAndMiiConsentCategory)
         .filter(consentFilter)
         .toList();
   }
 
-  private List<UkbConsent> filterConsentByValidity(List<UkbConsent> ukbConsents) {
-    return ukbConsents.stream().filter(UkbConsent::isAcribisConsentAllowed).toList();
+  private List<MiiConsent> filterConsentByValidity(List<MiiConsent> ukbConsents) {
+    return ukbConsents.stream().filter(MiiConsent::isAcribisConsentAllowed).toList();
   }
 
   /**
@@ -356,8 +402,8 @@ public class AcribisDataItemGenerator extends DataItemGenerator {
    * @return A filtered list of Acribis consents that have valid PatientIds in both PatDataUsage and
    *     Recontacting consents.
    */
-  public List<UkbConsent> filterAcribisConsentWithValidMainConsent(
-      List<UkbConsent> validAcribisConsents, List<UkbConsent> validPatDataUsage) {
+  public List<MiiConsent> filterAcribisConsentWithValidMainConsent(
+      List<MiiConsent> validAcribisConsents, List<MiiConsent> validPatDataUsage) {
 
     // Extract patient IDs from validPatDataUsage
     Set<String> patDataUsageIds = extractPatientIds(validPatDataUsage);
@@ -369,12 +415,12 @@ public class AcribisDataItemGenerator extends DataItemGenerator {
     Optional<String> exampleRemovedPatientId =
         validAcribisConsents.stream()
             // Keep only if PatientId exists in patDataUsageIds
-            .map(UkbConsent::getPatientId)
+            .map(MiiConsent::getPatientId)
             .filter(patientId -> !patDataUsageIds.contains(patientId))
             .findFirst();
 
     // Filter validAcribisConsents: keep only if PatientId exists in patDataUsageIds
-    List<UkbConsent> filteredConsents =
+    List<MiiConsent> filteredConsents =
         validAcribisConsents.stream()
             .filter(c -> patDataUsageIds.contains(c.getPatientId()))
             .collect(Collectors.toList());
@@ -395,18 +441,23 @@ public class AcribisDataItemGenerator extends DataItemGenerator {
     } else {
       log.info("No consents had to be removed.");
     }
+    Patient patient = new Patient();
+    patient.setGender(AdministrativeGender.UNKNOWN);
     return filteredConsents;
   }
 
-  private static Set<String> extractPatientIds(List<UkbConsent> validPatDataUsage) {
-    return validPatDataUsage.stream().map(UkbConsent::getPatientId).collect(Collectors.toSet());
+  private static Set<String> extractPatientIds(List<MiiConsent> validPatDataUsage) {
+    return validPatDataUsage.stream().map(MiiConsent::getPatientId).collect(Collectors.toSet());
   }
 
-  private List<UkbConsent> getValidConsents(List<UkbConsent> consents) {
-    List<UkbConsent> acribis =
-        filterConsentByValidity(consents, UkbConsent::isAcribisConsentAllowed);
-    List<UkbConsent> patData = filterConsentByValidity(consents, UkbConsent::isPatDataUsageAllowed);
-    // Determine all consent forms that have agreed to the two fields.
+  private List<MiiConsent> getValidConsents(List<MiiConsent> consents) {
+    List<MiiConsent> acribis =
+        filterConsentByValidity(consents, MiiConsent::isAcribisConsentAllowed);
+    List<MiiConsent> patData =
+        filterConsentByValidity(consents, x -> x.isPatDataUsageAllowed(getCurrentDateTime()));
+    //    List<UkbConsent> recontact =
+    //        filterConsentByValidity(consents, UkbConsent::isRecontactingAllowed);
+    // Determine all consent forms that have agreed to all 3 fields.
     return filterAcribisConsentWithValidMainConsent(acribis, patData);
   }
 }

@@ -17,8 +17,8 @@
  */
 package de.ukbonn.mwtek.dashboardlogic.models;
 
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiEncounter;
 import java.util.HashMap;
 import java.util.List;
 
-public class FacilityEncounterToIcuSupplyContactsMap extends HashMap<String, List<UkbEncounter>> {}
+public class FacilityEncounterToIcuSupplyContactsMap extends HashMap<String, List<MiiEncounter>> {}

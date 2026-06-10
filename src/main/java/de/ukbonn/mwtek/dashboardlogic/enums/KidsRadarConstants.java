@@ -25,11 +25,7 @@ public class KidsRadarConstants {
   public static final String ALL_DISORDERS = "all_disorders";
   public static final String ALL_ICD_CODES = "all_icd_codes";
 
-  public static final String RSV_ACUTE_BRONCHIOLITIS = "rsv_acute_bronchiolitis";
-  public static final String RSV_ACUTE_BRONCHITIS = "rsv_acute_bronchitis";
-  public static final String RSV_PNEUMONIA = "rsv_pneumonia";
-  public static final String RSV_CAUSED_DISEASE = "rsv_caused_disease";
-
+  public static final String RSV_PREFIX = "rsv";
   public static final String MEAN_LENGTH_OF_STAY = "mean_length_of_stay";
 
   public static final String KJP_DIAGNOSES_ALL = "kjp_diagnoses_all";
@@ -39,6 +35,7 @@ public class KidsRadarConstants {
   public static final String OUT_GROUP = "out_group";
 
   public static final Integer KIRA_NUMBER_OF_CHARS_ZIP_CODES = 3;
+  public static final Integer KIRA_PED_NUMBER_OF_CHARS_ZIP_CODES = 5;
   public static final int UPPER_AGE_BORDER = 18;
   public static final int UPPER_AGE_BORDER_PREFILTER = 20;
   public static final int THRESHOLD_DAYS_CASE_MERGE = 21;

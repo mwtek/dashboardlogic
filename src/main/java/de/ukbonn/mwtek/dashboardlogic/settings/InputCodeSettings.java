@@ -17,6 +17,7 @@
  */
 package de.ukbonn.mwtek.dashboardlogic.settings;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import lombok.Data;
@@ -40,6 +41,10 @@ public class InputCodeSettings {
 
   private List<String> covidConditionIcdCodes;
 
+  private List<String> procedureHighFlowCodes;
+
+  private List<String> procedureCpapCodes;
+
   private List<String> procedureVentilationCodes;
 
   private List<String> procedureEcmoCodes;
@@ -50,26 +55,64 @@ public class InputCodeSettings {
 
   private Map<String, List<String>> kidsRadarConditionKjpIcdCodes;
 
-  private Map<String, List<String>> kidsRadarConditionRsvIcdCodes;
+  private Map<String, List<String>> kidsRadarConditionPedIcdCodes;
+
+  private Map<String, List<String>> kidsRadarPedLoincCodes;
+
+  private String kidsRadarKjpOpsCodePrefix;
 
   public InputCodeSettings(
       List<String> covidObservationPcrLoincCodes,
       List<String> covidObservationVariantLoincCodes,
       List<String> covidConditionIcdCodes,
+      List<String> procedureHighFlowCodes,
+      List<String> procedureCpapCodes,
       List<String> procedureVentilationCodes,
       List<String> procedureEcmoCodes,
       List<String> influenzaObservationPcrLoincCodes,
       List<String> influenzaConditionIcdCodes,
       Map<String, List<String>> kidsRadarConditionKjpIcdCodes,
-      Map<String, List<String>> kidsRadarConditionRsvIcdCodes) {
+      Map<String, List<String>> kidsRadarConditionPedIcdCodes,
+      Map<String, List<String>> kidsRadarPedLoincCodes,
+      String kidsRadarKjpOpsCodePrefix) {
     this.covidObservationPcrLoincCodes = covidObservationPcrLoincCodes;
     this.covidObservationVariantLoincCodes = covidObservationVariantLoincCodes;
     this.covidConditionIcdCodes = covidConditionIcdCodes;
+    this.procedureHighFlowCodes = procedureHighFlowCodes;
+    this.procedureCpapCodes = procedureCpapCodes;
     this.procedureVentilationCodes = procedureVentilationCodes;
     this.procedureEcmoCodes = procedureEcmoCodes;
     this.influenzaObservationPcrLoincCodes = influenzaObservationPcrLoincCodes;
     this.influenzaConditionIcdCodes = influenzaConditionIcdCodes;
     this.kidsRadarConditionKjpIcdCodes = kidsRadarConditionKjpIcdCodes;
-    this.kidsRadarConditionRsvIcdCodes = kidsRadarConditionRsvIcdCodes;
+    this.kidsRadarConditionPedIcdCodes = kidsRadarConditionPedIcdCodes;
+    this.kidsRadarPedLoincCodes = kidsRadarPedLoincCodes;
+    this.kidsRadarKjpOpsCodePrefix = kidsRadarKjpOpsCodePrefix;
+  }
+
+  public List<String> getKidsRadarPedPertussisLoincCodes() {
+    return kidsRadarPedLoincCodes.get("pertussis");
+  }
+
+  public List<String> getKidsRadarPedRsvLoincCodes() {
+    return kidsRadarPedLoincCodes.get("rsv");
+  }
+
+  public List<String> getKidsRadarPedAllLoincCodes() {
+    List<String> allKidsRadarPedLoincCodes = new ArrayList<>();
+    allKidsRadarPedLoincCodes.addAll(getKidsRadarPedRsvLoincCodes());
+    allKidsRadarPedLoincCodes.addAll(getKidsRadarPedPertussisLoincCodes());
+    allKidsRadarPedLoincCodes.addAll(covidObservationPcrLoincCodes);
+    allKidsRadarPedLoincCodes.addAll(influenzaObservationPcrLoincCodes);
+    return allKidsRadarPedLoincCodes;
+  }
+
+  public List<String> getKidsRadarPedAllProcSnomedCodes() {
+    List<String> allKidsRadarPedProcSnomedCodes = new ArrayList<>();
+    allKidsRadarPedProcSnomedCodes.addAll(procedureHighFlowCodes);
+    allKidsRadarPedProcSnomedCodes.addAll(procedureVentilationCodes);
+    allKidsRadarPedProcSnomedCodes.addAll(procedureCpapCodes);
+    allKidsRadarPedProcSnomedCodes.addAll(procedureEcmoCodes);
+    return allKidsRadarPedProcSnomedCodes;
   }
 }

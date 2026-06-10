@@ -14,37 +14,29 @@
  * PROGRAM TO OPERATE WITH ANY OTHER PROGRAMS), EVEN IF SUCH HOLDER OR OTHER PARTY HAS BEEN ADVISED
  * OF THE POSSIBILITY OF SUCH DAMAGES. You should have received a copy of the GPL 3 license with *
  * this file. If not, visit http://www.gnu.de/documents/gpl-3.0.en.html
- */ package de.ukbonn.mwtek.dashboardlogic.enums;
+ */
 
-import static de.ukbonn.mwtek.dashboardlogic.enums.KiraAgeCluster.Period.MONTHS;
-import static de.ukbonn.mwtek.dashboardlogic.enums.KiraAgeCluster.Period.YEARS;
+package de.ukbonn.mwtek.dashboardlogic.models;
 
-import de.ukbonn.mwtek.dashboardlogic.enums.KiraAgeCluster.Period;
-import java.util.Arrays;
-import java.util.List;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
+import com.fasterxml.jackson.annotation.JsonValue;
 
-@Getter
-@AllArgsConstructor
-public enum KiraAgeRsvCluster implements KiraAgeCluster {
-  AGE_0_3_M(label("0-3", MONTHS), 0, 3, MONTHS),
-  AGE_4_5_M(label("4-5", MONTHS), 4, 5, MONTHS),
-  AGE_6_11_M(label("6-11", MONTHS), 6, 11, MONTHS),
-  AGE_12_23_M(label("12-23", MONTHS), 12, 23, MONTHS),
-  AGE_24_35_M(label("24-35", MONTHS), 24, 35, MONTHS),
-  AGE_3_5_Y(label("3-5", YEARS), 3, 5, YEARS),
-  AGE_6_17_Y(label("6-17", YEARS), 6, 17, YEARS);
+/**
+ * The Value of a kiradar entry that should get replaced by an inequality string if it's lower than
+ * a given threshold.
+ */
+public record KiraInteger(Number number) {
 
-  final String label;
-  final Integer lowerBorder;
-  final Integer upperBorder;
-  final Period period;
+  public static final int THRESHOLD = 3;
+  public static final String THRESHOLD_UNEQUALITY = "<=" + THRESHOLD;
 
-  private static String label(String range, Period period) {
-    return String.format("age_rsv_%s%s", range, period == Period.YEARS ? "y" : "m");
+  // This is the value that Jackson will write in the json output (not toString!)
+  @JsonValue
+  public Object json() {
+    if (number == null) {
+      return null;
+    }
+    double n = number.doubleValue();
+    // Return a String for values <= 3, otherwise return the numeric value
+    return n <= THRESHOLD ? THRESHOLD_UNEQUALITY : number;
   }
-
-  public static final List<String> BARS =
-      Arrays.stream(KiraAgeRsvCluster.values()).map(KiraAgeRsvCluster::getLabel).toList();
 }

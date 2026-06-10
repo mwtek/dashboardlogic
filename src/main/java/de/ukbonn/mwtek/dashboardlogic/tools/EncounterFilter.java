@@ -22,17 +22,16 @@ import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.POS
 import static de.ukbonn.mwtek.dashboardlogic.enums.FlaggingExtension.POSITIVE_EXTENSION;
 
 import de.ukbonn.mwtek.dashboardlogic.models.CoreCaseData;
-import de.ukbonn.mwtek.utilities.fhir.misc.FhirConditionTools;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbCondition;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbLocation;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbPatient;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiEncounter;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiLocation;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiPatient;
 import de.ukbonn.mwtek.utilities.generic.time.DateTools;
 import java.util.Collection;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 
@@ -41,31 +40,17 @@ import lombok.extern.slf4j.Slf4j;
 public class EncounterFilter {
 
   /** Determines whether the passed encounter instance has a disease-positive flag. */
-  public static boolean isDiseasePositive(UkbEncounter encounter) {
+  public static boolean isDiseasePositive(MiiEncounter encounter) {
     return encounter.hasExtension(POSITIVE_RESULT.getValue());
   }
 
-  public static List<UkbEncounter> getPositiveCurrentlyOnIcuWardEncounters(
-      Collection<UkbEncounter> supplyContactEncounters, List<UkbLocation> locations) {
+  public static List<MiiEncounter> getPositiveCurrentlyOnIcuWardEncounters(
+      Collection<MiiEncounter> supplyContactEncounters, List<MiiLocation> locations) {
     return supplyContactEncounters.stream()
         .filter(EncounterFilter::isDiseasePositive)
-        .filter(UkbEncounter::isActive)
+        .filter(MiiEncounter::isActive)
         .filter(x -> x.isCurrentlyOnIcuWard(LocationFilter.getIcuLocationIds(locations)))
         .toList();
-  }
-
-  /**
-   * Retrieves a set of encounter IDs that match the specified ICD codes.
-   *
-   * @param conditions The list of conditions.
-   * @param icdCodes The list of ICD codes to match.
-   * @return A set of matching encounter IDs.
-   */
-  public static Set<String> getEncounterIdsByIcdCodes(
-      List<UkbCondition> conditions, List<String> icdCodes) {
-    return FhirConditionTools.getConditionsByIcdCodes(conditions, icdCodes).stream()
-        .map(UkbCondition::getCaseId)
-        .collect(Collectors.toSet());
   }
 
   /**
@@ -75,29 +60,31 @@ public class EncounterFilter {
    * @param ids The set of encounter IDs to retain.
    * @return A set of filtered encounters.
    */
-  public static Set<UkbEncounter> filterEncountersByIds(
-      List<UkbEncounter> encounters, Set<String> ids) {
+  public static Set<MiiEncounter> filterEncountersByIds(
+      List<MiiEncounter> encounters, Set<String> ids) {
     return encounters.parallelStream()
         .filter(encounter -> ids.contains(encounter.getId()))
         .collect(Collectors.toSet());
   }
 
-  public static List<UkbEncounter> filterEncounterByAge(
-      List<UkbEncounter> encounters, List<UkbPatient> patients, int upperAgeBorder) {
+  public static List<MiiEncounter> filterEncounterByAge(
+      List<MiiEncounter> encounters, List<MiiPatient> patients, int upperAgeBorder) {
 
     // Create a map for quick patient lookup, only including patients with a birthdate
-    Map<String, UkbPatient> patientMap =
+    Map<String, MiiPatient> patientMap =
         patients.stream()
-            .filter(UkbPatient::hasBirthDate)
-            .collect(Collectors.toMap(UkbPatient::getId, patient -> patient));
+            .filter(MiiPatient::hasBirthDate)
+            .collect(
+                Collectors.toMap(
+                    MiiPatient::getId, Function.identity(), (existing, _) -> existing));
 
     // Filter encounters based on patient age
     return encounters.parallelStream()
         .filter(
             encounter -> {
-              UkbPatient patient = patientMap.get(encounter.getPatientId());
+              MiiPatient patient = patientMap.get(encounter.getPatientId());
               if (patient == null) {
-                log.warn("No patient found for encounter ID {}", encounter.getId());
+                log.trace("No patient found for encounter ID {}", encounter.getId());
                 return false;
               }
               Date birthDate = patient.getBirthDate();
@@ -135,7 +122,7 @@ public class EncounterFilter {
    */
   public static boolean isEncounterValidByAge(
       Map<String, CoreCaseData> coreCaseDataByEncounterIdMap,
-      UkbEncounter encounter,
+      MiiEncounter encounter,
       int upperAgeBorder) {
     // If the current case is not part of the map, the case got already filtered by age
     if (!coreCaseDataByEncounterIdMap.containsKey(encounter.getId())) {
@@ -158,13 +145,13 @@ public class EncounterFilter {
    *
    * Additionally, the method adds a positive extension to each selected encounter.
    *
-   * @param ukbEncounters the list of encounters to filter
+   * @param miiEncounters the list of encounters to filter
    * @return a list of inpatient facility encounters with the positive extension applied
    */
-  public static List<UkbEncounter> getInpatientFacilityEncounters(
-      List<UkbEncounter> ukbEncounters) {
-    return ukbEncounters.parallelStream()
-        .filter(UkbEncounter::isFacilityContact)
+  public static List<MiiEncounter> getInpatientFacilityEncounters(
+      List<MiiEncounter> miiEncounters) {
+    return miiEncounters.parallelStream()
+        .filter(MiiEncounter::isFacilityContact)
         .filter(EncounterFilter::isNotOutpatient)
         .filter(EncounterFilter::isNotSemiStationary)
         .map(EncounterFilter::addPositiveExtension)
@@ -177,7 +164,7 @@ public class EncounterFilter {
    * @param encounter the encounter to check
    * @return {@code true} if the encounter is not an outpatient case, otherwise {@code false}
    */
-  private static boolean isNotOutpatient(UkbEncounter encounter) {
+  private static boolean isNotOutpatient(MiiEncounter encounter) {
     return !encounter.isCaseClassOutpatient();
   }
 
@@ -187,7 +174,7 @@ public class EncounterFilter {
    * @param encounter the encounter to check
    * @return {@code true} if the encounter is not semi-stationary, otherwise {@code false}
    */
-  private static boolean isNotSemiStationary(UkbEncounter encounter) {
+  private static boolean isNotSemiStationary(MiiEncounter encounter) {
     return !encounter.isSemiStationary();
   }
 
@@ -197,7 +184,7 @@ public class EncounterFilter {
    * @param encounter the encounter to modify
    * @return the modified encounter with the positive extension added
    */
-  private static UkbEncounter addPositiveExtension(UkbEncounter encounter) {
+  private static MiiEncounter addPositiveExtension(MiiEncounter encounter) {
     encounter.addExtension(POSITIVE_EXTENSION);
     return encounter;
   }

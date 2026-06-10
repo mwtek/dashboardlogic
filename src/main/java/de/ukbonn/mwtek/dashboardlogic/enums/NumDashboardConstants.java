@@ -135,6 +135,31 @@ public class NumDashboardConstants {
         DateTools.dateToUnixTime(QUALIFYING_DATE) * 1000;
   }
 
+  public static class Bct {
+
+    /**
+     * Calendar year from which medical cases are subject to the bct logic workflow. Used in
+     * parallelization of the data requests.
+     */
+    public static final int QUALIFYING_YEAR = 2020; // 27.01.
+
+    /** Calendar month from which medical cases are subject to the bct logic workflow. */
+    public static final int QUALIFYING_MONTH = 4; // January
+
+    /** Calendar day from which medical cases are subject to the bct logic workflow. */
+    public static final int QUALIFYING_DAY = 15;
+
+    /** Effective date from which medical cases are subject to the bct logic workflow */
+    public static final Date QUALIFYING_DATE =
+        DateTools.toDate(QUALIFYING_YEAR, QUALIFYING_MONTH, QUALIFYING_DAY);
+
+    /** Unix time equivalent of the effective date */
+    public static final long QUALIFYING_DATE_SECONDS = DateTools.dateToUnixTime(QUALIFYING_DATE);
+
+    public static final long QUALIFYING_DATE_MILLISECONDS =
+        DateTools.dateToUnixTime(QUALIFYING_DATE) * 1000;
+  }
+
   /** The duration of a day in seconds */
   public static final long DAY_IN_SECONDS = 86400;
 

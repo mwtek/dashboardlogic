@@ -37,9 +37,9 @@ import de.ukbonn.mwtek.dashboardlogic.settings.InputCodeSettings;
 import de.ukbonn.mwtek.dashboardlogic.settings.QualitativeLabCodesSettings;
 import de.ukbonn.mwtek.utilities.fhir.misc.FhirConditionTools;
 import de.ukbonn.mwtek.utilities.fhir.misc.FhirTools;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbCondition;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbObservation;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiCondition;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiEncounter;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiObservation;
 import de.ukbonn.mwtek.utilities.generic.time.TimerTools;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -70,16 +70,16 @@ public class DiseaseDetectionManagement {
    * (Exclusion via negative diagnostic code), as far as this information can be determined from the
    * corresponding observation and condition resources.
    *
-   * @param ukbEncounters List of all {@linkplain UkbEncounter} resources that could be flagged.
-   * @param ukbConditions List of all {@linkplain UkbCondition} resources with U07.* ICD codes.
+   * @param miiEncounters List of all {@linkplain MiiEncounter} resources that could be flagged.
+   * @param ukbConditions List of all {@linkplain MiiCondition} resources with U07.* ICD codes.
    * @param ukbObservations List of all observation resources with a disease-related PCR code.
    * @param inputCodeSettings The configuration of the parameterizable codes such as the observation
    *     codes or procedure codes.
    */
   public static void flagEncounters(
-      List<UkbEncounter> ukbEncounters,
-      List<UkbCondition> ukbConditions,
-      List<UkbObservation> ukbObservations,
+      List<MiiEncounter> miiEncounters,
+      List<MiiCondition> ukbConditions,
+      List<MiiObservation> ukbObservations,
       InputCodeSettings inputCodeSettings,
       QualitativeLabCodesSettings qualitativeLabCodesSettings,
       DataItemContext dataItemContext) {
@@ -87,7 +87,7 @@ public class DiseaseDetectionManagement {
     Instant startTimer = TimerTools.startTimer();
     // The encounter ids of the disease-positive encounters
     Set<String> positiveEncounterIds = new HashSet<>();
-    Set<UkbEncounter> flaggedEncounters;
+    Set<MiiEncounter> flaggedEncounters;
     // create maps <DiagnoseCodes, Set<CaseId>>
     switch (dataItemContext) {
       case COVID -> {
@@ -113,12 +113,12 @@ public class DiseaseDetectionManagement {
     // Identify the facility contact <-> supply contact connection via 'encounter.identifier
     // .aufnahmenummer' and flag them as disease-positive if needed
     Set<String> positiveVisitNumbers =
-        FhirTools.getVisitNumberIdentifiers(positiveEncounterIds, ukbEncounters);
+        FhirTools.getVisitNumberIdentifiers(positiveEncounterIds, miiEncounters);
     flaggedEncounters =
-        flagEncountersByIdentifierValue(positiveVisitNumbers, ukbEncounters, POSITIVE_EXTENSION);
+        flagEncountersByIdentifierValue(positiveVisitNumbers, miiEncounters, POSITIVE_EXTENSION);
 
     // 12-days-logic and flagging the encounter if the prerequisites are fulfilled
-    detectPositiveInpatientEncountersByPreviousEncounters(flaggedEncounters, ukbEncounters);
+    detectPositiveInpatientEncountersByPreviousEncounters(flaggedEncounters, miiEncounters);
     TimerTools.stopTimerAndLog(startTimer, "finished flagCases");
   }
 
@@ -131,32 +131,32 @@ public class DiseaseDetectionManagement {
    *     flagged due to the 12-day logic.
    */
   public static void detectPositiveInpatientEncountersByPreviousEncounters(
-      Set<UkbEncounter> flaggedEncounter, List<UkbEncounter> encountersAll) {
+      Set<MiiEncounter> flaggedEncounter, List<MiiEncounter> encountersAll) {
 
     // Start logging
     log.debug("started detectPositiveInpatientEncountersByPreviousEncounters");
     Instant startTimer = TimerTools.startTimer();
 
-    Set<UkbEncounter> positiveOutpatientEncounter =
+    Set<MiiEncounter> positiveOutpatientEncounter =
         flaggedEncounter.parallelStream()
-            .filter(UkbEncounter::isCaseClassOutpatient)
+            .filter(MiiEncounter::isCaseClassOutpatient)
             .collect(Collectors.toSet());
 
     // Extract patient IDs from flagged encounters marked as outpatient
     Set<String> positiveOutpatientPatientIds =
         positiveOutpatientEncounter.stream()
-            .map(UkbEncounter::getPatientId)
+            .map(MiiEncounter::getPatientId)
             .collect(Collectors.toSet());
 
     // Filter encounters for inpatients using positive outpatient patient IDs
-    Map<String, List<UkbEncounter>> inpatientEncountersByPatientId =
+    Map<String, List<MiiEncounter>> inpatientEncountersByPatientId =
         encountersAll.stream()
             .filter(encounter -> positiveOutpatientPatientIds.contains(encounter.getPatientId()))
-            .filter(UkbEncounter::isCaseClassInpatientOrShortStay)
-            .collect(Collectors.groupingBy(UkbEncounter::getPatientId));
+            .filter(MiiEncounter::isCaseClassInpatientOrShortStay)
+            .collect(Collectors.groupingBy(MiiEncounter::getPatientId));
 
     // Loop through flagged encounters
-    for (UkbEncounter outpatientEncounter : positiveOutpatientEncounter) {
+    for (MiiEncounter outpatientEncounter : positiveOutpatientEncounter) {
       // Skip encounters without start dates
       if (!outpatientEncounter.isPeriodStartExistent()) {
         continue;
@@ -165,14 +165,14 @@ public class DiseaseDetectionManagement {
       Date outpatientStart = outpatientEncounter.getPeriod().getStart();
 
       // Get inpatient encounters for the same patient ID
-      List<UkbEncounter> inpatientEncounters =
+      List<MiiEncounter> inpatientEncounters =
           inpatientEncountersByPatientId.get(outpatientEncounter.getPatientId());
       if (inpatientEncounters == null) {
         continue; // No inpatient encounters for this patient
       }
 
       // Iterate through inpatient encounters for the same patient ID
-      for (UkbEncounter inpatientEncounter : inpatientEncounters) {
+      for (MiiEncounter inpatientEncounter : inpatientEncounters) {
         // Skip encounters without start dates
         if (!inpatientEncounter.isPeriodStartExistent()) {
           continue;
@@ -196,10 +196,9 @@ public class DiseaseDetectionManagement {
             // Log if inpatient encounter is marked as positive
             if (!inpatientEncounter.hasExtension(POSITIVE_RESULT.getValue())) {
               log.debug(
-                  "The encounter with id "
-                      + inpatientEncounter.getId()
-                      + " was marked as positive because a previous outpatient case not older"
-                      + " than 12 days was positive.");
+                  "The encounter with id {} was marked as positive because a previous outpatient"
+                      + " case not older than 12 days was positive.",
+                  inpatientEncounter.getId());
             }
           }
         }
@@ -220,12 +219,12 @@ public class DiseaseDetectionManagement {
    */
   @Deprecated
   public static Map<String, Set<String>> getCaseIdsByDiagReliability(
-      List<UkbCondition> listConditions, String icdCode) {
+      List<MiiCondition> listConditions, String icdCode) {
 
     // Create a map that assigns a list of case numbers to an ICD code.
     Map<String, Set<String>> mapResultDiagnoseCaseIds = new HashMap<>();
 
-    for (UkbCondition condition : listConditions) {
+    for (MiiCondition condition : listConditions) {
       // Check if the condition contains an ICD-10-GM code system and if it contains the given
       // icd code
       if (condition.hasCode() && condition.getCode().hasCoding(ICD_SYSTEM.getValue(), icdCode)) {
@@ -287,33 +286,41 @@ public class DiseaseDetectionManagement {
                 });
       }
     }
-
     return mapResultDiagnoseCaseIds;
   }
 
   /**
    * Creation of a set of caseIds that have a disease positive lab result.
    *
-   * @param labObservations A list with {@link UkbObservation observation resources}.
+   * @param labObservations A list with {@link MiiObservation observation resources}.
    * @param inputCodeSettings The configuration of the parameterizable codes such as the observation
    *     codes or procedure codes.
    * @return set of case ids that have a disease positive lab result
    */
   public static Set<String> getEncounterIdsWithPositiveLabObs(
-      List<UkbObservation> labObservations,
+      List<MiiObservation> labObservations,
       InputCodeSettings inputCodeSettings,
       DataItemContext dataItemContext,
       QualitativeLabCodesSettings qualitativeLabCodesSettings) {
     Set<String> positiveEncounterIds;
-    Set<UkbObservation> positiveObservations =
+    Set<MiiObservation> positiveObservations =
         getObservationsByContext(labObservations, inputCodeSettings, dataItemContext);
     // For logging purposes, we look for observations that contain a loinc coding,
     // but don't have any values
     List<String> loincCodes =
         switch (dataItemContext) {
-          case COVID -> inputCodeSettings.getCovidObservationPcrLoincCodes();
-          case INFLUENZA -> inputCodeSettings.getInfluenzaObservationPcrLoincCodes();
-          case KIDS_RADAR, KIDS_RADAR_KJP, KIDS_RADAR_RSV, UKB_MODEL, ACRIBIS -> null;
+          case COVID, KIDS_RADAR_PED_COV -> inputCodeSettings.getCovidObservationPcrLoincCodes();
+          case INFLUENZA, KIDS_RADAR_PED_INFL ->
+              inputCodeSettings.getInfluenzaObservationPcrLoincCodes();
+          case KIDS_RADAR,
+              KIDS_RADAR_PED,
+              KIDS_RADAR_KJP,
+              KIDS_RADAR_PED_RSV,
+              UKB_MODEL,
+              ACRIBIS,
+              BCT,
+              SNID ->
+              null;
         };
 
     Set<String> observationsWithoutResult =

@@ -18,6 +18,9 @@
 
 package de.ukbonn.mwtek.dashboardlogic.logic.cumulative.gender;
 
+import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.GENDER_EXTENSION_DIVERSE_CODE;
+import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.GENDER_EXTENSION_URL;
+import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.GENDER_OTHER_CODE;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.POSITIVE_RESULT;
 import static de.ukbonn.mwtek.dashboardlogic.enums.Gender.DIVERSE;
 import static de.ukbonn.mwtek.dashboardlogic.enums.Gender.FEMALE;
@@ -27,14 +30,16 @@ import de.ukbonn.mwtek.dashboardlogic.DashboardDataItemLogic;
 import de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues;
 import de.ukbonn.mwtek.dashboardlogic.enums.Gender;
 import de.ukbonn.mwtek.dashboardlogic.models.DiseaseDataItem;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbPatient;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiEncounter;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiPatient;
 import de.ukbonn.mwtek.utilities.generic.time.TimerTools;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
+import org.hl7.fhir.r4.model.Coding;
+import org.hl7.fhir.r4.model.Extension;
 
 /**
  * This class is used for generating the data item {@link DiseaseDataItem cumulative.gender}.
@@ -50,12 +55,12 @@ public class CumulativeGender extends DashboardDataItemLogic {
    *
    * <p>called by "cumulative.gender"
    *
-   * @param filteredEncounters A list with {@link UkbEncounter} resources
+   * @param filteredEncounters A list with {@link MiiEncounter} resources
    * @param gender The gender type (e.g. male) to be counted
    * @return Frequency of gender searched across all patients who are covid positive.
    */
   public static Set<String> getGenderCount(
-      List<UkbEncounter> filteredEncounters, List<UkbPatient> patients, Gender gender) {
+      List<MiiEncounter> filteredEncounters, List<MiiPatient> patients, Gender gender) {
     return getGenderPatientIdList(filteredEncounters, patients, gender);
   }
 
@@ -64,12 +69,12 @@ public class CumulativeGender extends DashboardDataItemLogic {
    *
    * <p>called by "cumulative.gender"
    *
-   * @param filteredEncounters A list with {@link UkbEncounter} resources
+   * @param filteredEncounters A list with {@link MiiEncounter} resources
    * @param gender The gender type (e.g. male) to be counted
    * @return Frequency of gender searched across all patients who are covid positive.
    */
   public static Set<String> getGenderPatientIdList(
-      List<UkbEncounter> filteredEncounters, List<UkbPatient> patients, Gender gender) {
+      List<MiiEncounter> filteredEncounters, List<MiiPatient> patients, Gender gender) {
     log.debug("Started genderCounting for gender: " + gender);
     Instant startTimer = TimerTools.startTimer();
 
@@ -77,20 +82,42 @@ public class CumulativeGender extends DashboardDataItemLogic {
     Set<String> positivePids =
         filteredEncounters.parallelStream()
             .filter(x -> x.hasExtension(POSITIVE_RESULT.getValue()))
-            .map(UkbEncounter::getPatientId)
+            .map(MiiEncounter::getPatientId)
             .collect(Collectors.toSet());
 
     // collect all the positive patient ids
     Set<String> resultSet =
         patients.parallelStream()
-            .filter(
-                x -> x.hasGender() && x.getGender().toCode().equalsIgnoreCase(gender.getValue()))
-            .map(UkbPatient::getId)
-            .filter(positivePids::contains)
+            .filter(patient -> positivePids.contains(patient.getId()))
+            .filter(patient -> matchesGender(patient, gender))
+            .map(MiiPatient::getId)
             .collect(Collectors.toSet());
 
     TimerTools.stopTimerAndLog(startTimer, "Finished genderCounting");
     return resultSet;
+  }
+
+  private static boolean matchesGender(MiiPatient patient, Gender gender) {
+    if (!patient.hasGender()) {
+      return false;
+    }
+
+    String genderCode = patient.getGender().toCode();
+    // "Diverse" information is held in a extension so we need different behavior
+    if (gender == DIVERSE) {
+      if (!GENDER_OTHER_CODE.equalsIgnoreCase(genderCode)) {
+        return false;
+      }
+
+      return patient.getGenderElement().getExtension().stream()
+          .filter(ext -> GENDER_EXTENSION_URL.equals(ext.getUrl()))
+          .map(Extension::getValue)
+          .filter(Coding.class::isInstance)
+          .map(Coding.class::cast)
+          .anyMatch(coding -> GENDER_EXTENSION_DIVERSE_CODE.equalsIgnoreCase(coding.getCode()));
+    }
+
+    return genderCode.equalsIgnoreCase(gender.getValue());
   }
 
   public static Gender translateGenderSpecIntoEnum(DashboardLogicFixedValues dashboardSpecGender) {

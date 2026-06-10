@@ -23,8 +23,8 @@ import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.OUTPATIENT;
 import de.ukbonn.mwtek.dashboardlogic.enums.Gender;
 import de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels;
 import de.ukbonn.mwtek.dashboardlogic.models.DiseaseDataItem;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbPatient;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiEncounter;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiPatient;
 import de.ukbonn.mwtek.utilities.generic.time.TimerTools;
 import java.time.Instant;
 import java.util.List;
@@ -46,8 +46,8 @@ public class CumulativeGenderByClass extends CumulativeGender {
   /**
    * Generic method to process patients by gender and encounter case class.
    *
-   * @param ukbEncounters List of encounters.
-   * @param ukbPatients List of patients.
+   * @param miiEncounters List of encounters.
+   * @param miiPatients List of patients.
    * @param gender The gender to filter by.
    * @param encounterClass The case class to filter by.
    * @param resultFunction Function that processes the filtered encounters and patients.
@@ -55,18 +55,18 @@ public class CumulativeGenderByClass extends CumulativeGender {
    * @return Result of processing.
    */
   public static <T> T processGenderByCaseClass(
-      List<UkbEncounter> ukbEncounters,
-      List<UkbPatient> ukbPatients,
+      List<MiiEncounter> miiEncounters,
+      List<MiiPatient> miiPatients,
       Gender gender,
       TreatmentLevels encounterClass,
-      BiFunction<List<UkbEncounter>, List<UkbPatient>, T> resultFunction) {
+      BiFunction<List<MiiEncounter>, List<MiiPatient>, T> resultFunction) {
 
     log.debug(
         "Started processGenderByCaseClass for class: {} and gender: {}", encounterClass, gender);
     Instant startTimer = TimerTools.startTimer();
 
-    List<UkbEncounter> filteredEncounterList =
-        ukbEncounters.parallelStream()
+    List<MiiEncounter> filteredEncounterList =
+        miiEncounters.parallelStream()
             .filter(
                 encounter -> {
                   if (encounterClass == OUTPATIENT) {
@@ -80,41 +80,41 @@ public class CumulativeGenderByClass extends CumulativeGender {
                 })
             .collect(Collectors.toList());
 
-    T result = resultFunction.apply(filteredEncounterList, ukbPatients);
+    T result = resultFunction.apply(filteredEncounterList, miiPatients);
 
     TimerTools.stopTimerAndLog(startTimer, "Finished processGenderByCaseClass");
     return result;
   }
 
-  private static boolean isInpatientBasedOnDsd(UkbEncounter encounter) {
+  private static boolean isInpatientBasedOnDsd(MiiEncounter encounter) {
     return encounter.isCaseClassInpatient()
         || encounter.isCaseTypePostStationary()
         || encounter.isSemiStationary();
   }
 
   public static Set<String> getGenderCountByCaseClass(
-      List<UkbEncounter> ukbEncounters,
-      List<UkbPatient> ukbPatients,
+      List<MiiEncounter> miiEncounters,
+      List<MiiPatient> miiPatients,
       Gender gender,
       TreatmentLevels encounterClass) {
 
     return processGenderByCaseClass(
-        ukbEncounters,
-        ukbPatients,
+        miiEncounters,
+        miiPatients,
         gender,
         encounterClass,
         (filteredEncounters, patients) -> getGenderCount(filteredEncounters, patients, gender));
   }
 
   public static Set<String> getGenderPidsByCaseClass(
-      List<UkbEncounter> ukbEncounters,
-      List<UkbPatient> ukbPatients,
+      List<MiiEncounter> miiEncounters,
+      List<MiiPatient> miiPatients,
       Gender gender,
       TreatmentLevels encounterClass) {
 
     return processGenderByCaseClass(
-        ukbEncounters,
-        ukbPatients,
+        miiEncounters,
+        miiPatients,
         gender,
         encounterClass,
         (filteredEncounters, patients) ->

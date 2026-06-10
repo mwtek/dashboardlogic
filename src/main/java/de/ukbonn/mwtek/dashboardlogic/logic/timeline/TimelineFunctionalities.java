@@ -17,11 +17,16 @@
  */
 package de.ukbonn.mwtek.dashboardlogic.logic.timeline;
 
+import static de.ukbonn.mwtek.dashboardlogic.enums.NumDashboardConstants.DAY_IN_SECONDS;
+
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiProcedure;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.hl7.fhir.r4.model.Coding;
 
 /**
  * This class contains some auxiliary functions that are used in the logic of the timelines.
@@ -37,10 +42,20 @@ public interface TimelineFunctionalities {
    *
    * @param tempMap Map that maps a frequency value to a date (unixtime)
    */
-  public default List<Long> divideMapValuesToLists(Map<Long, Long> tempMap) {
+  default List<Long> divideMapValuesToLists(Map<Long, Long> tempMap) {
 
     List<Long> listKeys = new ArrayList<>(tempMap.keySet());
     Collections.sort(listKeys);
     return listKeys.stream().map(tempMap::get).collect(Collectors.toList());
+  }
+
+  default boolean matchesCode(MiiProcedure procedure, Collection<String> codeSet) {
+    return procedure.getCode().getCoding().stream()
+        .map(Coding::getCode)
+        .anyMatch(codeSet::contains);
+  }
+
+  default long normalizeToMidnight(long timestamp) {
+    return timestamp - (timestamp % DAY_IN_SECONDS);
   }
 }

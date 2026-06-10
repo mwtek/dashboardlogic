@@ -26,7 +26,7 @@ import de.ukbonn.mwtek.dashboardlogic.DashboardDataItemLogic;
 import de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels;
 import de.ukbonn.mwtek.dashboardlogic.models.DiseaseDataItem;
 import de.ukbonn.mwtek.dashboardlogic.tools.EncounterFilter;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiEncounter;
 import de.ukbonn.mwtek.utilities.generic.time.TimerTools;
 import java.time.Instant;
 import java.util.Collections;
@@ -45,7 +45,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class CurrentMaxTreatmentLevel extends DashboardDataItemLogic {
 
-  private List<UkbEncounter> facilityContactsInpatientPositive;
+  private List<MiiEncounter> facilityContactsInpatientPositive;
 
   /**
    * Searches for the maximum treatment level of the current ongoing encounter for the given
@@ -59,9 +59,9 @@ public class CurrentMaxTreatmentLevel extends DashboardDataItemLogic {
    * @return All current ongoing inpatient disease-positive encounters for the given treatment
    *     level.
    */
-  public List<UkbEncounter> getNumberOfCurrentMaxTreatmentLevel(
-      Map<TreatmentLevels, List<UkbEncounter>> mapIcu,
-      List<UkbEncounter> facilityContacts,
+  public List<MiiEncounter> getNumberOfCurrentMaxTreatmentLevel(
+      Map<TreatmentLevels, List<MiiEncounter>> mapIcu,
+      List<MiiEncounter> facilityContacts,
       TreatmentLevels treatmentLevel,
       boolean useIcuUndiff) {
 
@@ -71,20 +71,20 @@ public class CurrentMaxTreatmentLevel extends DashboardDataItemLogic {
     if (facilityContactsInpatientPositive == null) {
       facilityContactsInpatientPositive =
           facilityContacts.stream()
-              .filter(UkbEncounter::isCaseClassInpatientOrShortStay)
-              .filter(UkbEncounter::isActive)
+              .filter(MiiEncounter::isCaseClassInpatientOrShortStay)
+              .filter(MiiEncounter::isActive)
               .filter(EncounterFilter::isDiseasePositive)
               .collect(Collectors.toList());
     }
-    List<UkbEncounter> results;
+    List<MiiEncounter> results;
 
     // ICU lists based on whether ICU_UNDIFFERENTIATED should be used
-    List<UkbEncounter> icuUndiffEncounters =
+    List<MiiEncounter> icuUndiffEncounters =
         useIcuUndiff ? mapIcu.get(ICU_UNDIFF) : Collections.emptyList();
-    List<UkbEncounter> icuEncounters = useIcuUndiff ? Collections.emptyList() : mapIcu.get(ICU);
-    List<UkbEncounter> icuVentEncounters =
+    List<MiiEncounter> icuEncounters = useIcuUndiff ? Collections.emptyList() : mapIcu.get(ICU);
+    List<MiiEncounter> icuVentEncounters =
         useIcuUndiff ? Collections.emptyList() : mapIcu.get(ICU_VENTILATION);
-    List<UkbEncounter> ecmoEncounters =
+    List<MiiEncounter> ecmoEncounters =
         useIcuUndiff ? Collections.emptyList() : mapIcu.get(ICU_ECMO);
 
     results =

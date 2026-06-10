@@ -25,7 +25,7 @@ import static de.ukbonn.mwtek.dashboardlogic.examples.EncounterExampleData.getEx
 import de.ukbonn.mwtek.dashboardlogic.enums.DataItemContext;
 import de.ukbonn.mwtek.dashboardlogic.examples.InputCodeSettingsExampleData;
 import de.ukbonn.mwtek.dashboardlogic.logic.DashboardData;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbPatient;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiPatient;
 import java.util.ArrayList;
 import java.util.List;
 import org.hl7.fhir.r4.model.Address;
@@ -45,7 +45,7 @@ public class CumulativeZipCodeTests {
           + "the patient resource even with missing fields.")
   void testCumulativeResults() {
     // Initialization of the input list
-    List<UkbPatient> patients = new ArrayList<>();
+    List<MiiPatient> patients = new ArrayList<>();
     List<Identifier> identifiers = new ArrayList<>();
     List<HumanName> humanNames = new ArrayList<>();
     List<Address> addresses = new ArrayList<>();
@@ -55,8 +55,8 @@ public class CumulativeZipCodeTests {
         new Identifier().setValue(ENCOUNTER_ID_INPATIENT).setUse(IdentifierUse.OFFICIAL));
     humanNames.add(new HumanName().setFamily("Testpatient"));
     addresses.add(new Address().setPostalCode("12345").setCountry("DE"));
-    UkbPatient patientWithMissingCountryCode =
-        new UkbPatient(identifiers, humanNames, AdministrativeGender.MALE, addresses);
+    MiiPatient patientWithMissingCountryCode =
+        new MiiPatient(identifiers, humanNames, AdministrativeGender.MALE, addresses);
     patientWithMissingCountryCode.setId(ENCOUNTER_ID_INPATIENT);
 
     patients.add(patientWithMissingCountryCode);
@@ -70,8 +70,8 @@ public class CumulativeZipCodeTests {
         new Identifier().setValue(ENCOUNTER_ID_MISSING_IDENTIFIER).setUse(IdentifierUse.OFFICIAL));
     humanNamesPatientTwo.add(new HumanName().setFamily("Testpatient"));
     addressesPatientTwo.add(new Address().setCountry("DE"));
-    UkbPatient patientWithMissingZipCode =
-        new UkbPatient(
+    MiiPatient patientWithMissingZipCode =
+        new MiiPatient(
             identifiersPatientTwo,
             humanNamesPatientTwo,
             AdministrativeGender.MALE,
@@ -95,7 +95,7 @@ public class CumulativeZipCodeTests {
 
     List<String> result =
         new CumulativeZipCode()
-            .createZipCodeList(dbData.getEncounters(), null, dbData.getPatients(), null);
+            .createZipCodeList(dbData.getEncounters(), null, dbData.getPatients(), null, true);
     // Even the ones with missing value should return a "null" string.
     Assert.isTrue(result.size() == patients.size(), "");
   }

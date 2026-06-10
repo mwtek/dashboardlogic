@@ -17,7 +17,6 @@
  */
 package de.ukbonn.mwtek.dashboardlogic.logic.cumulative.results;
 
-import static de.ukbonn.mwtek.dashboardlogic.DashboardDataItemLogic.getObservationsYoungerKickoffDate;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.BORDERLINE;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.NEGATIVE;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.POSITIVE;
@@ -31,7 +30,7 @@ import de.ukbonn.mwtek.dashboardlogic.enums.DataItemContext;
 import de.ukbonn.mwtek.dashboardlogic.models.DiseaseDataItem;
 import de.ukbonn.mwtek.dashboardlogic.settings.InputCodeSettings;
 import de.ukbonn.mwtek.dashboardlogic.settings.QualitativeLabCodesSettings;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbObservation;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiObservation;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
@@ -47,7 +46,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class CumulativeResult extends DashboardDataItemLogic {
 
-  private Set<UkbObservation> observationsByContext;
+  private Set<MiiObservation> observationsByContext;
 
   /**
    * Determination of the laboratory tests of all patients for whom there is an outpatient,
@@ -59,15 +58,15 @@ public class CumulativeResult extends DashboardDataItemLogic {
    * @return Get tests of all patients for whom an outpatient, pre-hospital, posthospital, partial
    *     hospitalization or full hospitalization case related to the test exists.
    */
-  public Set<UkbObservation> getObservationsByResult(
+  public Set<MiiObservation> getObservationsByResult(
       DashboardLogicFixedValues labResult,
       DataItemContext dataItemContext,
-      Collection<UkbObservation> observations,
+      Collection<MiiObservation> observations,
       InputCodeSettings inputCodeSettings,
       QualitativeLabCodesSettings qualitativeLabCodesSettings) {
-    Set<UkbObservation> listObs = new HashSet<>();
+    Set<MiiObservation> listObs = new HashSet<>();
     // Just observations that are younger than the kick-off date are relevant
-    List<UkbObservation> validObservations =
+    List<MiiObservation> validObservations =
         getObservationsYoungerKickoffDate(dataItemContext, observations);
 
     // Initial filtering of the needed observations

@@ -34,7 +34,7 @@ import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Creation of the "timeline.diags.occurrence" items for kjp and rsv.
+ * Creation of the "dischargediags.cohorts" items for acribis.
  *
  * @author <a href="mailto:david.meyers@ukbonn.de">David Meyers</a>
  */

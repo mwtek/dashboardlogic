@@ -19,15 +19,18 @@ package de.ukbonn.mwtek.dashboardlogic.logic.cumulative.age;
 
 import static de.ukbonn.mwtek.dashboardlogic.enums.KidsRadarConstants.IN_GROUP;
 import static de.ukbonn.mwtek.dashboardlogic.enums.KidsRadarConstants.OUT_GROUP;
-import static de.ukbonn.mwtek.dashboardlogic.enums.KidsRadarConstants.RSV_DIAGNOSES_ALL;
+import static de.ukbonn.mwtek.dashboardlogic.tools.KidsRadarTools.getRsvOnlyCoreCaseDataByGroups;
 
 import de.ukbonn.mwtek.dashboardlogic.DashboardDataItemLogic;
 import de.ukbonn.mwtek.dashboardlogic.enums.KidsRadarDataItemContext;
 import de.ukbonn.mwtek.dashboardlogic.enums.KiraAgeCluster;
 import de.ukbonn.mwtek.dashboardlogic.enums.KiraAgeKjpCluster;
-import de.ukbonn.mwtek.dashboardlogic.enums.KiraAgeRsvCluster;
+import de.ukbonn.mwtek.dashboardlogic.enums.KiraAgePedCluster;
+import de.ukbonn.mwtek.dashboardlogic.enums.StackedBarCharts;
 import de.ukbonn.mwtek.dashboardlogic.models.CoreCaseData;
+import de.ukbonn.mwtek.dashboardlogic.models.KiraInteger;
 import de.ukbonn.mwtek.dashboardlogic.models.StackedBarChartsItem;
+import de.ukbonn.mwtek.dashboardlogic.models.StackedBarChartsUniformItem;
 import de.ukbonn.mwtek.utilities.generic.time.TimerTools;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -60,7 +63,7 @@ public class KiraCumulativeAgeDisorders extends DashboardDataItemLogic {
    *     another map of individual case data entries.
    * @return A populated {@link StackedBarChartsItem} with chart names, bar data, and stack data.
    */
-  public static StackedBarChartsItem createStackedBarCharts(
+  public static StackedBarCharts createStackedBarCharts(
       KidsRadarDataItemContext kidsRadarDataItemContext,
       Map<String, Map<String, CoreCaseData>> coreCaseDataByGroups) {
 
@@ -68,7 +71,7 @@ public class KiraCumulativeAgeDisorders extends DashboardDataItemLogic {
       case KJP -> {
         return createKjpData(coreCaseDataByGroups);
       }
-      case RSV -> {
+      case PED -> {
         return createRsvData(coreCaseDataByGroups);
       }
     }
@@ -76,29 +79,22 @@ public class KiraCumulativeAgeDisorders extends DashboardDataItemLogic {
     return null;
   }
 
-  private static StackedBarChartsItem createKjpData(
+  private static StackedBarChartsUniformItem<KiraInteger> createKjpData(
       Map<String, Map<String, CoreCaseData>> coreCaseDataByGroups) {
     log.debug("Started KiraCumulativeAgeDisorders.createKjpData");
-    Instant startTimer = TimerTools.startTimer(); // Start the execution timer
+    Instant startTimer = TimerTools.startTimer();
 
-    StackedBarChartsItem result = new StackedBarChartsItem();
+    StackedBarChartsUniformItem<KiraInteger> result = new StackedBarChartsUniformItem<>();
 
     // Set chart names from the disease group keys
     result.setCharts(new ArrayList<>(coreCaseDataByGroups.keySet()));
 
     // Initialize lists to store the bars and stacks
-    List<List<String>> barsOutput = new ArrayList<>();
-    List<List<String>> stacksOutput = new ArrayList<>();
-    coreCaseDataByGroups.forEach(
-        (group, values) -> {
-          barsOutput.add(KiraAgeKjpCluster.BARS);
-          stacksOutput.add(stacksKjp);
-        });
-    result.setBars(barsOutput);
-    result.setStacks(stacksOutput);
+    result.setBars(KiraAgeKjpCluster.BARS);
+    result.setStacks(stacksKjp);
 
     // Initialize the dataList that will store chart values
-    List<List<List<? extends Number>>> dataList = new ArrayList<>();
+    List<List<List<KiraInteger>>> dataList = new ArrayList<>();
 
     // Map to hold total facility encounters per age group (used for stacks)
     Map<KiraAgeKjpCluster, Set<String>> facilityEncountersByAgeGroup =
@@ -108,7 +104,7 @@ public class KiraCumulativeAgeDisorders extends DashboardDataItemLogic {
     coreCaseDataByGroups.forEach(
         (group, cases) -> {
           // A list to hold results for each disease group by age
-          List<List<? extends Number>> resultByDisease =
+          List<List<KiraInteger>> resultByDisease =
               facilityEncountersByAgeGroup.entrySet().stream()
                   .map(
                       entry -> {
@@ -134,8 +130,8 @@ public class KiraCumulativeAgeDisorders extends DashboardDataItemLogic {
                         // 2. The remaining cases in the age group not belonging to this disease
                         // group
                         return Arrays.asList(
-                            casesInAgeGroup.size(),
-                            (Number) (allCasesInAgeGroup.size() - casesInAgeGroup.size()));
+                            new KiraInteger(casesInAgeGroup.size()),
+                            new KiraInteger(allCasesInAgeGroup.size() - casesInAgeGroup.size()));
                       })
                   .collect(Collectors.toList());
 
@@ -150,43 +146,45 @@ public class KiraCumulativeAgeDisorders extends DashboardDataItemLogic {
     return result;
   }
 
-  private static StackedBarChartsItem createRsvData(
+  private static StackedBarChartsItem<Integer> createRsvData(
       Map<String, Map<String, CoreCaseData>> coreCaseDataByGroups) {
     log.debug("Started KiraCumulativeAgeDisorders.createRsvData");
-    Instant startTimer = TimerTools.startTimer(); // Start the execution timer
+    Instant startTimer = TimerTools.startTimer();
 
-    StackedBarChartsItem result = new StackedBarChartsItem();
+    Map<String, Map<String, CoreCaseData>> coreCaseDataByGroupsFiltered =
+        getRsvOnlyCoreCaseDataByGroups(coreCaseDataByGroups);
+    StackedBarChartsItem<Integer> result = new StackedBarChartsItem<>();
 
     // Set chart names from the disease group keys
-    result.setCharts(List.of(RSV_DIAGNOSES_ALL));
+    result.setCharts(List.of(KJP_PATIENT));
 
     // Initialize lists to store the bars and stacks
-    List<List<String>> barsOutput = List.of(KiraAgeRsvCluster.BARS);
+    List<List<String>> barsOutput = List.of(KiraAgePedCluster.BARS);
     result.setBars(barsOutput);
-    result.setStacks(List.of(new ArrayList<>(coreCaseDataByGroups.keySet())));
+    result.setStacks(List.of(new ArrayList<>(coreCaseDataByGroupsFiltered.keySet())));
 
     // Initialize the dataList that will store chart values
-    List<List<List<? extends Number>>> dataList = new ArrayList<>();
+    List<List<List<Integer>>> dataList = new ArrayList<>();
 
     // Map to hold total facility encounters per age group (used for stacks)
-    Map<KiraAgeRsvCluster, Set<String>> facilityEncountersByAgeGroup =
-        getCasesWithAgeCluster(coreCaseDataByGroups.values(), KiraAgeRsvCluster.values());
+    Map<KiraAgePedCluster, Set<String>> facilityEncountersByAgeGroup =
+        getCasesWithAgeCluster(coreCaseDataByGroupsFiltered.values(), KiraAgePedCluster.values());
 
     // A list to hold results for each disease group by age
-    List<List<? extends Number>> resultByDisease =
+    List<List<Integer>> resultByDisease =
         facilityEncountersByAgeGroup.entrySet().stream()
             .map(
                 entry -> {
-                  KiraAgeRsvCluster ageGroup = entry.getKey();
+                  KiraAgePedCluster ageGroup = entry.getKey();
                   Set<String> allCasesInAgeGroup = entry.getValue();
                   List<Integer> resultSumByAgeAndDisease = new ArrayList<>();
 
-                  coreCaseDataByGroups
+                  coreCaseDataByGroupsFiltered
                       .keySet()
                       .forEach(
                           group -> {
                             Map<String, CoreCaseData> casesWithCurrentDisease =
-                                coreCaseDataByGroups.get(group);
+                                coreCaseDataByGroupsFiltered.get(group);
                             // Figure out how many of the disease group that we iterate
                             // through are also in the age group
                             int sum =
@@ -223,7 +221,7 @@ public class KiraCumulativeAgeDisorders extends DashboardDataItemLogic {
    * @param caseDataByGroup A collection of maps where each map contains case data with a facility
    *     encounter ID as the key.
    * @param ageClusters An array of age clusters (e.g., {@link KiraAgeKjpCluster} or {@link
-   *     KiraAgeRsvCluster}) used to group the cases.
+   *     KiraAgePedCluster}) used to group the cases.
    * @return A map where the key is an age cluster, and the value is a set of facility encounter IDs
    *     that fall within the cluster's age range.
    */

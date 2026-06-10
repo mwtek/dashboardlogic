@@ -25,12 +25,9 @@ import lombok.Getter;
 @Getter
 @AllArgsConstructor
 public enum KiraAgeKjpCluster implements KiraAgeCluster {
-  AGE_0_2(label("0-2"), 0, 2, KiraAgeCluster.Period.YEARS),
-  AGE_3_5(label("3-5"), 3, 5, KiraAgeCluster.Period.YEARS),
-  AGE_6_8(label("6-8"), 6, 8, KiraAgeCluster.Period.YEARS),
-  AGE_9_11(label("9-11"), 9, 11, KiraAgeCluster.Period.YEARS),
-  AGE_12_14(label("12-14"), 12, 14, KiraAgeCluster.Period.YEARS),
-  AGE_15_17(label("15-17"), 15, 17, KiraAgeCluster.Period.YEARS);
+  AGE_0_5(label("0-5"), 0, 5, KiraAgeCluster.Period.YEARS),
+  AGE_6_13(label("6-13"), 6, 13, KiraAgeCluster.Period.YEARS),
+  AGE_14_17(label("14-17"), 14, 17, KiraAgeCluster.Period.YEARS);
 
   final String label;
   final Integer lowerBorder;

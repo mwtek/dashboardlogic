@@ -70,6 +70,12 @@ public class GlobalConfiguration {
   /** Should the kids radar data item generation take place? */
   private Boolean generateKidsRadarData = false;
 
+  /** Should the kids radar pediatric data item generation take place? */
+  private Boolean generateKidsRadarPedData = false;
+
+  /** Should the kids radar kjp data item generation take place? */
+  private Boolean generateKidsRadarKjpData = false;
+
   /**
    * Should the generation ukb-renal-replacement prediction model data item generation take place?
    * Currently not supported via FHIR server usage.
@@ -78,6 +84,12 @@ public class GlobalConfiguration {
 
   /** Should the acribis data item generation take place? */
   private Boolean generateAcribisData = false;
+
+  /** Should the BCT data item generation take place? */
+  private Boolean generateBctData = false;
+
+  /** Should the SNID data item generation take place? */
+  private Boolean generateSnidData = false;
 
   /**
    * Instead of `Encounter.location` references, Encounters can be marked as icu-encounter via

@@ -20,12 +20,12 @@ package de.ukbonn.mwtek.dashboardlogic.logic;
 import de.ukbonn.mwtek.dashboardlogic.enums.DataItemContext;
 import de.ukbonn.mwtek.dashboardlogic.settings.InputCodeSettings;
 import de.ukbonn.mwtek.dashboardlogic.settings.QualitativeLabCodesSettings;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbCondition;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbLocation;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbObservation;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbPatient;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbProcedure;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiCondition;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiEncounter;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiLocation;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiObservation;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiPatient;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiProcedure;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -42,18 +42,22 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class KiraData extends DashboardData {
 
-  public List<UkbEncounter> facilityEncountersRsv = new ArrayList<>();
+  public List<MiiEncounter> facilityEncountersRsv = new ArrayList<>();
+  public List<MiiEncounter> facilityEncountersPed = new ArrayList<>();
+  public List<MiiEncounter> facilityEncountersCovid = new ArrayList<>();
+  public List<MiiEncounter> facilityEncountersInfluenza = new ArrayList<>();
 
   public KiraData initializeData(
       InputCodeSettings inputCodeSettings,
       QualitativeLabCodesSettings qualitativeLabCodesSettings,
-      List<UkbEncounter> facilityEncountersKjp,
-      List<UkbEncounter> facilityEncountersRsv,
-      List<UkbPatient> patients,
-      List<UkbObservation> observations,
-      List<UkbCondition> conditions,
-      List<UkbLocation> locations,
-      List<UkbProcedure> icuProcedures,
+      List<MiiEncounter> facilityEncountersKjp,
+      List<MiiEncounter> facilityEncountersPed,
+      List<MiiEncounter> facilityEncountersRsv,
+      List<MiiPatient> patients,
+      List<MiiObservation> observations,
+      List<MiiCondition> conditions,
+      List<MiiLocation> locations,
+      List<MiiProcedure> icuProcedures,
       DataItemContext dataItemContext) {
 
     // Initialization with kjp facility encounters as default
@@ -68,6 +72,7 @@ public class KiraData extends DashboardData {
         icuProcedures,
         dataItemContext);
     this.facilityEncountersRsv = facilityEncountersRsv;
+    this.facilityEncountersPed = facilityEncountersPed;
     return this;
   }
 

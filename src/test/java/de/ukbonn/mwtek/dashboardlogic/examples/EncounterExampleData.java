@@ -24,7 +24,7 @@ import static de.ukbonn.mwtek.utilities.enums.EncounterContactLevel.FACILITY_CON
 import static de.ukbonn.mwtek.utilities.enums.EncounterContactLevel.SUPPLY_CONTACT;
 
 import de.ukbonn.mwtek.utilities.enums.EncounterContactLevel;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiEncounter;
 import java.util.ArrayList;
 import java.util.List;
 import org.hl7.fhir.r4.model.CodeableConcept;
@@ -42,13 +42,13 @@ public class EncounterExampleData {
   public static String ENCOUNTER_ID_MISSING_ATTRIBUTES = "ENCOUNTER-ID-MISSING-ATTRIBUTES";
   public static String ENCOUNTER_ID_MISSING_IDENTIFIER = "MISSING-IDENTIFIER";
 
-  public static List<UkbEncounter> getExampleList() {
+  public static List<MiiEncounter> getExampleList() {
 
-    List<UkbEncounter> encounterExamples = new ArrayList<>();
+    List<MiiEncounter> encounterExamples = new ArrayList<>();
 
     // Adding an encounter resource in-progress and got a valid icu transfer.
-    UkbEncounter encounterInpatientInProgressFacilityContact =
-        new UkbEncounter(
+    MiiEncounter encounterInpatientInProgressFacilityContact =
+        new MiiEncounter(
             ENCOUNTER_ID_INPATIENT,
             new Encounter.EncounterStatusEnumFactory()
                 .fromType(new StringType(EncounterStatus.INPROGRESS.toCode())),
@@ -61,8 +61,8 @@ public class EncounterExampleData {
     encounterExamples.add(encounterInpatientInProgressFacilityContact);
 
     // A corresponding supply contact
-    UkbEncounter encounterInpatientInProgressSupplyContact =
-        new UkbEncounter(
+    MiiEncounter encounterInpatientInProgressSupplyContact =
+        new MiiEncounter(
             ENCOUNTER_ID_INPATIENT,
             new Encounter.EncounterStatusEnumFactory()
                 .fromType(new StringType(EncounterStatus.INPROGRESS.toCode())),
@@ -77,8 +77,8 @@ public class EncounterExampleData {
     encounterExamples.add(encounterInpatientInProgressSupplyContact);
 
     // Missing code system in codings should all be handled and not throw any exception.
-    UkbEncounter encounterWithMissingCodeSystems =
-        new UkbEncounter(
+    MiiEncounter encounterWithMissingCodeSystems =
+        new MiiEncounter(
             ENCOUNTER_ID_MISSING_ATTRIBUTES,
             new Encounter.EncounterStatusEnumFactory()
                 .fromType(new StringType(EncounterStatus.INPROGRESS.toCode())),
@@ -94,8 +94,8 @@ public class EncounterExampleData {
     encounterExamples.add(encounterWithMissingCodeSystems);
 
     // Missing code system in codings should all be handled and not throw any exception.
-    UkbEncounter encounterWithMissingIdentifier =
-        new UkbEncounter(
+    MiiEncounter encounterWithMissingIdentifier =
+        new MiiEncounter(
             ENCOUNTER_ID_MISSING_IDENTIFIER,
             new Encounter.EncounterStatusEnumFactory()
                 .fromType(new StringType(EncounterStatus.INPROGRESS.toCode())),

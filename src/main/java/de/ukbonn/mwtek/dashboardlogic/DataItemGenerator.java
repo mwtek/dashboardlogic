@@ -29,6 +29,7 @@ import static de.ukbonn.mwtek.dashboardlogic.enums.DataItemTypes.ITEMTYPE_AGGREG
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItemTypes.ITEMTYPE_DEBUG;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItemTypes.ITEMTYPE_LIST;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItemTypes.SUBITEMTYPE_DATE;
+import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.BCT_PREFIX;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.CUMULATIVE_AGE;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.CUMULATIVE_AGE_MAXTREATMENTLEVEL_ICU;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.CUMULATIVE_AGE_MAXTREATMENTLEVEL_ICU_UNDIFF;
@@ -64,7 +65,12 @@ import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.INFLUENZA_PREFIX;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.KIDS_RADAR_PREFIX;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.KIDS_RADAR_PREFIX_ACRIBIS;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.KIDS_RADAR_PREFIX_KJP;
-import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.KIDS_RADAR_PREFIX_RSV;
+import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.KIDS_RADAR_PREFIX_PED;
+import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.KIDS_RADAR_PREFIX_PED_COV;
+import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.KIDS_RADAR_PREFIX_PED_INFL;
+import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.KIDS_RADAR_PREFIX_PED_PERTUSSIS;
+import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.KIDS_RADAR_PREFIX_PED_RSV;
+import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.SNID_PREFIX;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.TIMELINE_DEATHS;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.TIMELINE_MAXTREATMENTLEVEL;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.TIMELINE_TESTS;
@@ -120,12 +126,12 @@ import de.ukbonn.mwtek.dashboardlogic.settings.QualitativeLabCodesSettings;
 import de.ukbonn.mwtek.dashboardlogic.settings.VariantSettings;
 import de.ukbonn.mwtek.dashboardlogic.tools.DataBuilder;
 import de.ukbonn.mwtek.dashboardlogic.tools.LocationFilter;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbCondition;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbLocation;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbObservation;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbPatient;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbProcedure;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiCondition;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiEncounter;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiLocation;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiObservation;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiPatient;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiProcedure;
 import de.ukbonn.mwtek.utilities.generic.time.DateTools;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -159,18 +165,18 @@ import org.hl7.fhir.r4.model.Enumerations.FHIRAllTypes;
 public class DataItemGenerator {
 
   // Initialization of the fhir resource lists
-  List<UkbCondition> conditions;
-  List<UkbObservation> observations;
-  List<UkbPatient> patients;
-  List<UkbEncounter> encounters;
-  List<UkbEncounter> facilityContactEncounters;
-  List<UkbProcedure> procedures;
-  List<UkbLocation> locations;
+  List<MiiCondition> conditions;
+  List<MiiObservation> observations;
+  List<MiiPatient> patients;
+  List<MiiEncounter> encounters;
+  List<MiiEncounter> facilityContactEncountersInpatient;
+  List<MiiProcedure> procedures;
+  List<MiiLocation> locations;
 
-  List<UkbEncounter> cumulativeIcuEncounters;
-  List<UkbEncounter> cumulativeIcuVentEncounters;
-  List<UkbEncounter> cumulativeIcuEcmoEncounters;
-  List<UkbEncounter> cumulativeIcuUndiffEncounters;
+  List<MiiEncounter> cumulativeIcuEncounters;
+  List<MiiEncounter> cumulativeIcuVentEncounters;
+  List<MiiEncounter> cumulativeIcuEcmoEncounters;
+  List<MiiEncounter> cumulativeIcuUndiffEncounters;
 
   // map with all inpatient-disease-positive cases, which is needed for internal reports in the UKB
   Map<String, List<String>> mapCurrentTreatmentlevelCaseNrs = new HashMap<>();
@@ -187,12 +193,12 @@ public class DataItemGenerator {
    * @param locations List of all FHIR location resources based on the encounter inputs
    */
   public DataItemGenerator(
-      List<UkbCondition> conditions,
-      List<UkbObservation> observations,
-      List<UkbPatient> patients,
-      List<UkbEncounter> encounters,
-      List<UkbProcedure> procedures,
-      List<UkbLocation> locations) {
+      List<MiiCondition> conditions,
+      List<MiiObservation> observations,
+      List<MiiPatient> patients,
+      List<MiiEncounter> encounters,
+      List<MiiProcedure> procedures,
+      List<MiiLocation> locations) {
     super();
     this.conditions = conditions;
     this.observations = observations;
@@ -245,29 +251,29 @@ public class DataItemGenerator {
     updateInProgressEncounterStatusByDemand(globalConfiguration);
 
     // Group the encounter resources by facility type
-    facilityContactEncounters =
-        encounters.parallelStream().filter(UkbEncounter::isFacilityContact).toList();
+    facilityContactEncountersInpatient =
+        encounters.parallelStream().filter(MiiEncounter::isFacilityContact).toList();
 
     // Logging of unexpected attribute assignments within the resources.
-    reportAttributeArtifacts(facilityContactEncounters);
+    reportAttributeArtifacts(facilityContactEncountersInpatient);
 
     // To obtain the case transfer history of an encounter, we need to check the supply level
-    List<UkbEncounter> supplyContactEncounters =
+    List<MiiEncounter> supplyContactEncounters =
         encounters.parallelStream()
-            .filter(UkbEncounter::isSupplyContact)
-            .filter(UkbEncounter::isCaseClassInpatientOrShortStay)
+            .filter(MiiEncounter::isSupplyContact)
+            .filter(MiiEncounter::isCaseClassInpatientOrShortStay)
             .toList();
 
     // Department contacts are just needed if we need to determine encounter hierarchy via .partOf
-    List<UkbEncounter> departmentContactEncounters =
+    List<MiiEncounter> departmentContactEncounters =
         encounters.parallelStream()
-            .filter(UkbEncounter::isDepartmentContact)
-            .filter(UkbEncounter::isCaseClassInpatientOrShortStay)
+            .filter(MiiEncounter::isDepartmentContact)
+            .filter(MiiEncounter::isCaseClassInpatientOrShortStay)
             .toList();
 
     // If no Encounter of type 'Versorgungsstellenkontakt' could be found, many data items cannot
     // be meaningfully filled and these are excluded from the export.
-    // Same logic if their is no location data found. If Encounter.service provider is used instead,
+    // Same logic if there is no location data found. If Encounter.service provider is used instead,
     // there should be at least one dummy icu location.
     boolean supplyContactsFound = isSupplyContactFound(supplyContactEncounters);
     boolean locationsFound = locations != null && !locations.isEmpty();
@@ -276,7 +282,7 @@ public class DataItemGenerator {
           generateSupplyContactToFacilityContactMap(
               supplyContactEncounters,
               departmentContactEncounters,
-              facilityContactEncounters,
+              facilityContactEncountersInpatient,
               globalConfiguration.getUsePartOfInsteadOfIdentifier());
     } else {
       log.warn(
@@ -296,7 +302,7 @@ public class DataItemGenerator {
         dataItemContext);
 
     // the icu information is part of the supply contact
-    List<UkbEncounter> icuSupplyContactEncounters =
+    List<MiiEncounter> icuSupplyContactEncounters =
         supplyContactEncounters.stream()
             .filter(x -> x.isIcuCase(LocationFilter.getIcuLocationIds(locations), false))
             .toList();
@@ -304,17 +310,17 @@ public class DataItemGenerator {
     if (globalConfiguration.getCheckProceduresIcuStays())
       procedures = filterProceduresByIcuWardCheck(procedures, icuSupplyContactEncounters);
 
-    Map<TreatmentLevels, List<UkbEncounter>> mapPositiveEncounterByClass =
-        createEncounterMapByClass(facilityContactEncounters);
+    Map<TreatmentLevels, List<MiiEncounter>> mapPositiveEncounterByClass =
+        createEncounterMapByClass(facilityContactEncountersInpatient);
 
     // List of stationary Cases
-    List<UkbEncounter> inpatientEncounters =
-        encounters.parallelStream().filter(UkbEncounter::isCaseClassInpatientOrShortStay).toList();
+    List<MiiEncounter> inpatientEncounters =
+        encounters.parallelStream().filter(MiiEncounter::isCaseClassInpatientOrShortStay).toList();
 
     FacilityEncounterToIcuSupplyContactsMap facilityEncounterIdToIcuSupplyContactsMap =
         assignSupplyEncountersToFacilityEncounter(icuSupplyContactEncounters, inpatientEncounters);
 
-    Map<TreatmentLevels, List<UkbEncounter>> mapIcuDiseasePositiveOverall =
+    Map<TreatmentLevels, List<MiiEncounter>> mapIcuDiseasePositiveOverall =
         createIcuMap(
             encounters,
             icuSupplyContactEncounters,
@@ -324,7 +330,7 @@ public class DataItemGenerator {
             useIcuUndiff);
 
     /* used for current logic */
-    Map<TreatmentLevels, List<UkbEncounter>> mapCurrentIcuDiseasePositive =
+    Map<TreatmentLevels, List<MiiEncounter>> mapCurrentIcuDiseasePositive =
         createCurrentIcuMap(mapIcuDiseasePositiveOverall, useIcuUndiff);
 
     // Initialize an instance with the clinical data sets.
@@ -342,18 +348,18 @@ public class DataItemGenerator {
                 dataItemContext);
 
     // Partial lists of current cases broken down by case status
-    List<UkbEncounter> currentStandardWardEncounters = new ArrayList<>();
-    List<UkbEncounter> currentIcuEncounters = new ArrayList<>();
-    List<UkbEncounter> currentVentEncounters = new ArrayList<>();
-    List<UkbEncounter> currentEcmoEncounters = new ArrayList<>();
-    List<UkbEncounter> currentIcuUndiffEncounters = new ArrayList<>();
+    List<MiiEncounter> currentStandardWardEncounters = new ArrayList<>();
+    List<MiiEncounter> currentIcuEncounters = new ArrayList<>();
+    List<MiiEncounter> currentVentEncounters = new ArrayList<>();
+    List<MiiEncounter> currentEcmoEncounters = new ArrayList<>();
+    List<MiiEncounter> currentIcuUndiffEncounters = new ArrayList<>();
 
     // Lists of current maxtreatmentlevels
-    List<UkbEncounter> currentMaxStationary = new ArrayList<>();
-    List<UkbEncounter> currentMaxIcu = new ArrayList<>();
-    List<UkbEncounter> currentMaxIcuVent = new ArrayList<>();
-    List<UkbEncounter> currentMaxIcuEcmo = new ArrayList<>();
-    List<UkbEncounter> currentMaxIcuUndiff = new ArrayList<>();
+    List<MiiEncounter> currentMaxStationary = new ArrayList<>();
+    List<MiiEncounter> currentMaxIcu = new ArrayList<>();
+    List<MiiEncounter> currentMaxIcuVent = new ArrayList<>();
+    List<MiiEncounter> currentMaxIcuEcmo = new ArrayList<>();
+    List<MiiEncounter> currentMaxIcuUndiff = new ArrayList<>();
 
     // Lists of current maxtreatmentlevels with ages
     List<Long> currentMaxStationaryAgeList;
@@ -367,14 +373,14 @@ public class DataItemGenerator {
     // cumulative.inpatient/outpatient.gender
 
     // same for cumulative results
-    List<UkbEncounter> cumulativeOutpatientEncounters =
+    List<MiiEncounter> cumulativeOutpatientEncounters =
         new DataBuilder()
             .treatmentLevel(OUTPATIENT)
             .mapPositiveEncounterByClass(mapPositiveEncounterByClass)
             .icuDiseaseMap(mapCurrentIcuDiseasePositive)
             .buildCumulativeByClass();
 
-    List<UkbEncounter> cumulativeStandardWardEncounters =
+    List<MiiEncounter> cumulativeStandardWardEncounters =
         new DataBuilder()
             .treatmentLevel(INPATIENT)
             .mapPositiveEncounterByClass(mapPositiveEncounterByClass)
@@ -653,7 +659,7 @@ public class DataItemGenerator {
     if (isItemNotExcluded(mapExcludeDataItems, cumulativeResultsLabel, false)) {
       Map<String, Number> cumulativeResultMap = new LinkedHashMap<>();
       for (DashboardLogicFixedValues result : List.of(POSITIVE, BORDERLINE, NEGATIVE)) {
-        Set<UkbObservation> observations =
+        Set<MiiObservation> observations =
             buildObservationsByResult(result, dataItemContext, dbData);
         cumulativeResultMap.put(result.getValue(), observations.size());
       }
@@ -707,19 +713,9 @@ public class DataItemGenerator {
     String cumulativeMaxTreatmentLevelLabel =
         determineLabel(dataItemContext, CUMULATIVE_MAXTREATMENTLEVEL);
     if (isItemNotExcluded(mapExcludeDataItems, cumulativeMaxTreatmentLevelLabel, false)) {
-      Map<String, Number> mapCumulativeMaxtreatmentlevel = new LinkedHashMap<>();
-      mapCumulativeMaxtreatmentlevel.put(
-          OUTPATIENT.getValue(), cumulativeOutpatientEncounters.size());
-      mapCumulativeMaxtreatmentlevel.put(
-          NORMAL_WARD.getValue(), cumulativeStandardWardEncounters.size());
-      if (!useIcuUndiff) {
-        mapCumulativeMaxtreatmentlevel.put(ICU.getValue(), cumulativeIcuEncounters.size());
-        mapCumulativeMaxtreatmentlevel.put(
-            ICU_VENTILATION.getValue(), cumulativeIcuVentEncounters.size());
-        mapCumulativeMaxtreatmentlevel.put(ICU_ECMO.getValue(), cumulativeIcuEcmoEncounters.size());
-      } else
-        mapCumulativeMaxtreatmentlevel.put(
-            ICU_UNDIFF.getValue(), cumulativeIcuUndiffEncounters.size());
+      Map<String, Number> mapCumulativeMaxtreatmentlevel =
+          getStringNumberMap(
+              cumulativeOutpatientEncounters, cumulativeStandardWardEncounters, useIcuUndiff);
       currentDataList.add(
           new DiseaseDataItem(
               cumulativeMaxTreatmentLevelLabel,
@@ -881,7 +877,7 @@ public class DataItemGenerator {
           new DiseaseDataItem(
               cumulativeZipCodeLabel,
               ITEMTYPE_LIST,
-              new DataBuilder().dbData(dbData).buildZipCodeList()));
+              new DataBuilder().dbData(dbData).buildCumulativeZipCodeList()));
     }
 
     // timeline tests
@@ -1086,15 +1082,15 @@ public class DataItemGenerator {
         aggData.put(
             "state", Arrays.asList("0000", "0100", "0110", "0111", "1000", "1100", "1110", "1111"));
         aggData.put("value", new ArrayList<>());
-        Map<TreatmentLevels, List<UkbEncounter>> crosstabMaxtreatmentlevels = new LinkedHashMap<>();
+        Map<TreatmentLevels, List<MiiEncounter>> crosstabMaxtreatmentlevels = new LinkedHashMap<>();
         crosstabMaxtreatmentlevels.put(INPATIENT, currentStandardWardEncounters);
         crosstabMaxtreatmentlevels.put(ICU, currentIcuEncounters);
-        List<UkbEncounter> ventEncounters = new ArrayList<>(currentVentEncounters);
+        List<MiiEncounter> ventEncounters = new ArrayList<>(currentVentEncounters);
         crosstabMaxtreatmentlevels.put(ICU_VENTILATION, ventEncounters);
-        List<UkbEncounter> ecmoEncounters = new ArrayList<>(currentEcmoEncounters);
+        List<MiiEncounter> ecmoEncounters = new ArrayList<>(currentEcmoEncounters);
         crosstabMaxtreatmentlevels.put(ICU_ECMO, ecmoEncounters);
 
-        Set<UkbEncounter> allCurrentEncounters = new HashSet<>();
+        Set<MiiEncounter> allCurrentEncounters = new HashSet<>();
 
         allCurrentEncounters.addAll(currentStandardWardEncounters);
         allCurrentEncounters.addAll(currentIcuEncounters);
@@ -1103,10 +1099,10 @@ public class DataItemGenerator {
 
         Set<String> encounterPids =
             allCurrentEncounters.stream()
-                .map(UkbEncounter::getPatientId)
+                .map(MiiEncounter::getPatientId)
                 .collect(Collectors.toSet());
 
-        List<UkbPatient> currentPatients =
+        List<MiiPatient> currentPatients =
             patients.stream()
                 .filter(patient -> encounterPids.contains(patient.getId()))
                 .collect(Collectors.toList());
@@ -1235,6 +1231,26 @@ public class DataItemGenerator {
     return currentDataList;
   }
 
+  private Map<String, Number> getStringNumberMap(
+      List<MiiEncounter> cumulativeOutpatientEncounters,
+      List<MiiEncounter> cumulativeStandardWardEncounters,
+      boolean useIcuUndiff) {
+    Map<String, Number> mapCumulativeMaxtreatmentlevel = new LinkedHashMap<>();
+    mapCumulativeMaxtreatmentlevel.put(
+        OUTPATIENT.getValue(), cumulativeOutpatientEncounters.size());
+    mapCumulativeMaxtreatmentlevel.put(
+        NORMAL_WARD.getValue(), cumulativeStandardWardEncounters.size());
+    if (!useIcuUndiff) {
+      mapCumulativeMaxtreatmentlevel.put(ICU.getValue(), cumulativeIcuEncounters.size());
+      mapCumulativeMaxtreatmentlevel.put(
+          ICU_VENTILATION.getValue(), cumulativeIcuVentEncounters.size());
+      mapCumulativeMaxtreatmentlevel.put(ICU_ECMO.getValue(), cumulativeIcuEcmoEncounters.size());
+    } else
+      mapCumulativeMaxtreatmentlevel.put(
+          ICU_UNDIFF.getValue(), cumulativeIcuUndiffEncounters.size());
+    return mapCumulativeMaxtreatmentlevel;
+  }
+
   private void updateInProgressEncounterStatusByDemand(GlobalConfiguration globalConfiguration) {
     updateInProgressEncounterStatusByPeriodEnd(globalConfiguration);
     updateInProgressEncounterStatusByDate(globalConfiguration);
@@ -1248,7 +1264,7 @@ public class DataItemGenerator {
   private void updateInProgressEncounterStatusByPeriodEnd(GlobalConfiguration globalConfiguration) {
     if (globalConfiguration.getCheckInProgressPeriodEnd())
       encounters.stream()
-          .filter(UkbEncounter::isActive)
+          .filter(MiiEncounter::isActive)
           .filter(x -> x.hasPeriod() && x.getPeriod().hasEnd())
           .forEach(x -> x.setStatus(EncounterStatus.FINISHED));
   }
@@ -1313,9 +1329,9 @@ public class DataItemGenerator {
    * @param dataItemContext The context which determines the qualifying cutoff date.
    */
   private void filterResourcesByDate(
-      List<UkbEncounter> encounters,
-      List<UkbCondition> conditions,
-      List<UkbObservation> observations,
+      List<MiiEncounter> encounters,
+      List<MiiCondition> conditions,
+      List<MiiObservation> observations,
       DataItemContext dataItemContext) {
     Long cutOffDateMillis =
         (dataItemContext == INFLUENZA)
@@ -1326,33 +1342,31 @@ public class DataItemGenerator {
     String firstRemovedConditionId = "";
     String firstRemovedObservationId = "";
 
-    List<UkbEncounter> encountersFilteredByDate =
+    List<MiiEncounter> encountersFilteredByDate =
         filterEncountersAfterDate(encounters, cutOffDateMillis);
     int encounterDiff = encounters.size() - encountersFilteredByDate.size();
     if (encounterDiff > 0) {
-      UkbEncounter firstRemovedEncounter =
+      MiiEncounter firstRemovedEncounter =
           findFirstRemovedElement(encounters, encountersFilteredByDate);
       firstRemovedEncounterId = firstRemovedEncounter != null ? firstRemovedEncounter.getId() : "";
       encounters.clear();
       encounters.addAll(encountersFilteredByDate);
     }
 
-    List<UkbCondition> conditionsFilteredByDate =
+    List<MiiCondition> conditionsFilteredByDate =
         filterConditionsAfterDate(conditions, cutOffDateMillis);
     int condDiff = conditions.size() - conditionsFilteredByDate.size();
     if (condDiff > 0) {
-      UkbCondition firstRemovedCondition =
+      MiiCondition firstRemovedCondition =
           findFirstRemovedElement(conditions, conditionsFilteredByDate);
       firstRemovedConditionId = firstRemovedCondition != null ? firstRemovedCondition.getId() : "";
-      conditions.clear();
-      conditions.addAll(conditionsFilteredByDate);
     }
 
-    List<UkbObservation> observationsFilteredByDate =
+    List<MiiObservation> observationsFilteredByDate =
         filterObservationsAfterDate(observations, cutOffDateMillis);
     int obsDiff = observations.size() - observationsFilteredByDate.size();
     if (obsDiff > 0) {
-      UkbObservation firstRemovedObservation =
+      MiiObservation firstRemovedObservation =
           findFirstRemovedElement(observations, observationsFilteredByDate);
       firstRemovedObservationId =
           firstRemovedObservation != null ? firstRemovedObservation.getId() : "";
@@ -1393,8 +1407,8 @@ public class DataItemGenerator {
    * @param cutOffDateMillis The cutoff date for filtering.
    * @return A list of encounters that occur after the cutoff date.
    */
-  private List<UkbEncounter> filterEncountersAfterDate(
-      List<UkbEncounter> encounters, Long cutOffDateMillis) {
+  private List<MiiEncounter> filterEncountersAfterDate(
+      List<MiiEncounter> encounters, Long cutOffDateMillis) {
 
     return encounters.parallelStream()
         .filter(
@@ -1412,8 +1426,8 @@ public class DataItemGenerator {
    * @param cutOffDateMillis The cutoff date for filtering.
    * @return A list of conditions recorded after the cutoff date.
    */
-  private List<UkbCondition> filterConditionsAfterDate(
-      List<UkbCondition> conditions, Long cutOffDateMillis) {
+  private List<MiiCondition> filterConditionsAfterDate(
+      List<MiiCondition> conditions, Long cutOffDateMillis) {
     return conditions.parallelStream()
         .filter(c -> c.hasRecordedDate() && c.getRecordedDate().getTime() >= cutOffDateMillis)
         .toList();
@@ -1426,8 +1440,8 @@ public class DataItemGenerator {
    * @param cutOffDateMillis The cutoff date for filtering.
    * @return A list of observations effective after the cutoff date.
    */
-  private List<UkbObservation> filterObservationsAfterDate(
-      List<UkbObservation> observations, Long cutOffDateMillis) {
+  private List<MiiObservation> filterObservationsAfterDate(
+      List<MiiObservation> observations, Long cutOffDateMillis) {
     return observations.parallelStream()
         .filter(
             o ->
@@ -1502,19 +1516,19 @@ public class DataItemGenerator {
     return dataItem + "." + DEBUG;
   }
 
-  protected void reportMissingFields(List<UkbEncounter> encounters) {
+  protected void reportMissingFields(List<MiiEncounter> encounters) {
     // Encounter.period.start is mandatory and critical for many data items
     List<String> casesWithoutPeriodStart =
         encounters.parallelStream()
             .filter(x -> !x.isPeriodStartExistent())
-            .map(UkbEncounter::getCaseId)
+            .map(MiiEncounter::getCaseId)
             .toList();
     if (!casesWithoutPeriodStart.isEmpty()) {
       log.debug(
           "Warning: {} Encounters without period/period.start element have been detected [for "
               + "example case with id: {}]",
           casesWithoutPeriodStart.size(),
-          casesWithoutPeriodStart.get(0));
+          casesWithoutPeriodStart.getFirst());
     }
     // Inform about Encounter.location entries that probably contain identifier instead of
     // references which is technically valid but doesn't allow gathering icu information.
@@ -1523,32 +1537,32 @@ public class DataItemGenerator {
             .filter(Encounter::hasLocation)
             .filter(
                 x -> x.getLocation().stream().anyMatch(loc -> !isLocationReferenceExisting(loc)))
-            .map(UkbEncounter::getId)
+            .map(MiiEncounter::getId)
             .toList();
     if (!encounterIdsWithLocationEntryButMissingRef.isEmpty()) {
       log.warn(
           "Warning: {} Encounters with Encounter.location attribute but missing reference found. "
               + "[for example encounter with id: {}]",
           encounterIdsWithLocationEntryButMissingRef.size(),
-          encounterIdsWithLocationEntryButMissingRef.get(0));
+          encounterIdsWithLocationEntryButMissingRef.getFirst());
     }
   }
 
-  protected void reportAttributeArtifacts(List<UkbEncounter> encounters) {
+  protected void reportAttributeArtifacts(List<MiiEncounter> encounters) {
     Set<String> encounterIdsToBeFiltered = new HashSet<>();
     // Pre-stationary and post-stationary encounter must have class = AMB
     List<String> preOrPostEncounterNotOutpatient =
         encounters.parallelStream()
-            .filter(UkbEncounter::isCaseClassInpatientOrShortStay)
+            .filter(MiiEncounter::isCaseClassInpatientOrShortStay)
             .filter(x -> x.isCaseTypePreStationary() || x.isCaseTypePostStationary())
-            .map(UkbEncounter::getId)
+            .map(MiiEncounter::getId)
             .toList();
     if (!preOrPostEncounterNotOutpatient.isEmpty()) {
       log.debug(
           "Warning: {} Encounters found where pre-/poststationary encounter don't have class "
               + "'AMB' [example: Encounter/{}]",
           preOrPostEncounterNotOutpatient.size(),
-          preOrPostEncounterNotOutpatient.get(0));
+          preOrPostEncounterNotOutpatient.getFirst());
       encounterIdsToBeFiltered.addAll(preOrPostEncounterNotOutpatient);
     }
     // Filtering encounters where the discharge date lies after the admission date
@@ -1556,14 +1570,14 @@ public class DataItemGenerator {
         encounters.parallelStream()
             .filter(x -> x.hasPeriod() && x.getPeriod().hasStart() && x.getPeriod().hasEnd())
             .filter(x -> x.getPeriod().getEnd().before(x.getPeriod().getStart()))
-            .map(UkbEncounter::getId)
+            .map(MiiEncounter::getId)
             .toList();
     if (!dischargeDateBeforeAdmissionDate.isEmpty()) {
       log.debug(
           "Warning: {} Encounters found where the discharge date is before the admission date "
               + "[example: Encounter/{}]",
           dischargeDateBeforeAdmissionDate.size(),
-          dischargeDateBeforeAdmissionDate.get(0));
+          dischargeDateBeforeAdmissionDate.getFirst());
       encounterIdsToBeFiltered.addAll(dischargeDateBeforeAdmissionDate);
     }
     if (!encounterIdsToBeFiltered.isEmpty())
@@ -1572,7 +1586,7 @@ public class DataItemGenerator {
           encounterIdsToBeFiltered.size());
   }
 
-  private boolean isSupplyContactFound(List<UkbEncounter> supplyContacts) {
+  private boolean isSupplyContactFound(List<MiiEncounter> supplyContacts) {
     boolean supplyContactsFound = !supplyContacts.isEmpty();
     if (!supplyContactsFound) {
       log.warn(
@@ -1600,11 +1614,11 @@ public class DataItemGenerator {
    * @param globalConfiguration global config containing feature flags
    * @return list of encounters considered valid for further processing
    */
-  protected List<UkbEncounter> filterEncounterByStatus(
-      List<UkbEncounter> encounters, GlobalConfiguration globalConfiguration) {
+  protected List<MiiEncounter> filterEncounterByStatus(
+      List<MiiEncounter> encounters, GlobalConfiguration globalConfiguration) {
 
     // Partition the encounters into valid (true) and invalid (false) groups
-    Map<Boolean, List<UkbEncounter>> partitioned =
+    Map<Boolean, List<MiiEncounter>> partitioned =
         encounters.stream()
             .collect(
                 Collectors.partitioningBy(
@@ -1613,15 +1627,15 @@ public class DataItemGenerator {
                             || (globalConfiguration.getUseOutpatientEncounterWithStatusUnknown()
                                 && encounter.getStatus() == EncounterStatus.UNKNOWN)));
 
-    List<UkbEncounter> validEncounters = partitioned.get(true);
-    List<UkbEncounter> filteredOut = partitioned.get(false);
+    List<MiiEncounter> validEncounters = partitioned.get(true);
+    List<MiiEncounter> filteredOut = partitioned.get(false);
 
     // Defensive logging for unexpected cases — mostly for unit testing or fallback scenarios
     if (!filteredOut.isEmpty()) {
       log.debug(
           "Warning: {} encounters with invalid status were filtered out [e.g. case ID: {}]",
           filteredOut.size(),
-          filteredOut.get(0).getId());
+          filteredOut.getFirst().getId());
     }
     return validEncounters;
   }
@@ -1650,11 +1664,11 @@ public class DataItemGenerator {
    * @param cumulativeIcuEcmoEncounter List of ECMO cases for cumulative logic
    */
   private void removeDuplicatePids(
-      List<UkbEncounter> cumulativeOutpatientEncounter,
-      List<UkbEncounter> cumulativeStandardWardEncounter,
-      List<UkbEncounter> cumulativeIcuEncounter,
-      List<UkbEncounter> cumulativeIcuVentEncounter,
-      List<UkbEncounter> cumulativeIcuEcmoEncounter) {
+      List<MiiEncounter> cumulativeOutpatientEncounter,
+      List<MiiEncounter> cumulativeStandardWardEncounter,
+      List<MiiEncounter> cumulativeIcuEncounter,
+      List<MiiEncounter> cumulativeIcuVentEncounter,
+      List<MiiEncounter> cumulativeIcuEcmoEncounter) {
 
     // Create sets of patient IDs for each encounter type
     Set<String> pidsOutpatient = createPidList(cumulativeOutpatientEncounter);
@@ -1678,9 +1692,9 @@ public class DataItemGenerator {
   }
 
   private void removeDuplicatePids(
-      List<UkbEncounter> cumulativeOutpatientEncounter,
-      List<UkbEncounter> cumulativeStandardWardEncounter,
-      List<UkbEncounter> cumulativeIcuUndiffEncounter) {
+      List<MiiEncounter> cumulativeOutpatientEncounter,
+      List<MiiEncounter> cumulativeStandardWardEncounter,
+      List<MiiEncounter> cumulativeIcuUndiffEncounter) {
 
     // Create sets of patient IDs for each encounter type
     Set<String> pidsOutpatient = createPidList(cumulativeOutpatientEncounter);
@@ -1705,13 +1719,13 @@ public class DataItemGenerator {
   }
 
   /** Filters the given encounter list by retaining only entries with valid patient IDs. */
-  private void filterEncounters(List<UkbEncounter> encounters, Set<String> validPids) {
+  private void filterEncounters(List<MiiEncounter> encounters, Set<String> validPids) {
     encounters.removeIf(e -> !validPids.contains(e.getPatientId()));
   }
 
-  private Set<String> createPidList(List<UkbEncounter> listCumulativeEncounter) {
+  private Set<String> createPidList(List<MiiEncounter> listCumulativeEncounter) {
     return listCumulativeEncounter.parallelStream()
-        .map(UkbEncounter::getPatientId)
+        .map(MiiEncounter::getPatientId)
         .collect(Collectors.toSet());
   }
 
@@ -1730,12 +1744,15 @@ public class DataItemGenerator {
    */
   public static String determineLabel(DataItemContext context, String defaultLabel) {
     return switch (context) {
-      case COVID -> defaultLabel;
+      // Covid uses default label
       case INFLUENZA -> INFLUENZA_PREFIX + defaultLabel;
       case KIDS_RADAR -> KIDS_RADAR_PREFIX + defaultLabel;
       case KIDS_RADAR_KJP -> KIDS_RADAR_PREFIX_KJP + defaultLabel;
-      case KIDS_RADAR_RSV -> KIDS_RADAR_PREFIX_RSV + defaultLabel;
+      case KIDS_RADAR_PED -> KIDS_RADAR_PREFIX_PED + defaultLabel;
+      case KIDS_RADAR_PED_RSV -> KIDS_RADAR_PREFIX_PED_RSV + defaultLabel;
       case ACRIBIS -> KIDS_RADAR_PREFIX_ACRIBIS + defaultLabel;
+      case BCT -> BCT_PREFIX + defaultLabel;
+      case SNID -> SNID_PREFIX + defaultLabel;
       default -> defaultLabel;
     };
   }
@@ -1747,54 +1764,67 @@ public class DataItemGenerator {
   public static String determineKiRaLabel(KidsRadarDataItemContext context, String defaultLabel) {
     return switch (context) {
       case KJP -> KIDS_RADAR_PREFIX_KJP + defaultLabel;
-      case RSV -> KIDS_RADAR_PREFIX_RSV + defaultLabel;
+      case PED -> KIDS_RADAR_PREFIX_PED + defaultLabel;
+      case PED_RSV -> KIDS_RADAR_PREFIX_PED_RSV + defaultLabel;
+      case PED_COV -> KIDS_RADAR_PREFIX_PED_COV + defaultLabel;
+      case PED_INFL -> KIDS_RADAR_PREFIX_PED_INFL + defaultLabel;
+      case PED_PERTUSSIS -> KIDS_RADAR_PREFIX_PED_PERTUSSIS + defaultLabel;
     };
   }
 
   // Method to create cumulative length of stay hospital data for different vital statuses
   private void createCumulativeLengthOfStayHospitalData(
-      List<UkbEncounter> facilityEncounters,
+      List<MiiEncounter> facilityEncounters,
       String label,
       Map<String, Map<Long, Set<String>>> mapDays,
       boolean debug,
       VitalStatus vitalStatus,
       List<DiseaseDataItem> currentDataList) {
+
     // Create mapDays based on vital status
     Map<String, Map<Long, Set<String>>> mapDaysFiltered =
         createLengthOfStayHospitalByVitalstatus(facilityEncounters, mapDays, vitalStatus);
 
-    // Initialize lists to maintain the association between hospital days and case IDs
-    List<Entry<Long, Set<String>>> hospitalEntries = new ArrayList<>();
-
-    // Populate hospitalEntries with days and case IDs
+    // Sum days per patient and keep case ids for debug
+    Map<String, Long> totalDaysPerPatient = new HashMap<>();
+    Map<String, Set<String>> caseIdsPerPatient = new HashMap<>();
     mapDaysFiltered.forEach(
-        (patientId, daysMap) ->
-            daysMap.forEach(
-                (days, caseIds) -> hospitalEntries.add(new SimpleEntry<>(days, caseIds))));
+        (patientId, daysMap) -> {
+          long totalDays =
+              daysMap.entrySet().stream()
+                  // multiplication needed because cases can have the same length of stay
+                  .mapToLong(e -> e.getKey() * e.getValue().size())
+                  .sum();
+          Set<String> allCaseIds =
+              daysMap.values().stream().flatMap(Set::stream).collect(Collectors.toSet());
+          totalDaysPerPatient.put(patientId, totalDays);
+          caseIdsPerPatient.put(patientId, allCaseIds);
+        });
 
-    // Sort hospital entries based on hospital days
-    hospitalEntries.sort(Comparator.comparingLong(Entry::getKey));
+    // Keep sorted output
+    List<Map.Entry<String, Long>> sortedPatients =
+        totalDaysPerPatient.entrySet().stream().sorted(Map.Entry.comparingByValue()).toList();
 
-    // Extract hospital days and case IDs maintaining the association
     List<Long> hospitalDays =
-        hospitalEntries.stream().map(Entry::getKey).collect(Collectors.toList());
-    List<String> caseIdsHospital =
-        hospitalEntries.stream()
-            .flatMap(entry -> entry.getValue().stream())
+        sortedPatients.stream().map(Map.Entry::getValue).collect(Collectors.toList());
+
+    List<Map<String, Set<String>>> debugPerPatient =
+        sortedPatients.stream()
+            .map(e -> Map.of(e.getKey(), caseIdsPerPatient.get(e.getKey())))
             .collect(Collectors.toList());
 
     // Add data to currentDataList
     currentDataList.add(new DiseaseDataItem(label, ITEMTYPE_LIST, hospitalDays));
     if (debug) {
       currentDataList.add(
-          new DiseaseDataItem(addDebugLabel(label), ITEMTYPE_DEBUG, caseIdsHospital));
+          new DiseaseDataItem(addDebugLabel(label), ITEMTYPE_DEBUG, debugPerPatient));
     }
   }
 
   // Method to create cumulative length of stay ICU data for different vital statuses
   private void createCumulativeLengthOfStayIcuData(
       String label,
-      Map<TreatmentLevels, List<UkbEncounter>> mapIcuDiseasePositiveOverall,
+      Map<TreatmentLevels, List<MiiEncounter>> mapIcuDiseasePositiveOverall,
       boolean debug,
       VitalStatus vitalStatus,
       List<DiseaseDataItem> currentDataList,
@@ -1811,7 +1841,7 @@ public class DataItemGenerator {
 
     // Populate icuEntries with hours and case IDs
     mapDaysFiltered.forEach(
-        (patientId, hoursMap) ->
+        (_, hoursMap) ->
             hoursMap.forEach(
                 (hours, caseIds) -> icuEntries.add(new SimpleEntry<>(hours, caseIds))));
 
@@ -1838,8 +1868,8 @@ public class DataItemGenerator {
       List<DiseaseDataItem> currentDataList,
       Map<String, Boolean> mapExcludeDataItems,
       String currentMaxtreatmentlevelLabel,
-      Map<TreatmentLevels, List<UkbEncounter>> mapIcuDiseasePositiveOverall,
-      Map<TreatmentLevels, List<UkbEncounter>> mapPositiveEncounterByClass,
+      Map<TreatmentLevels, List<MiiEncounter>> mapIcuDiseasePositiveOverall,
+      Map<TreatmentLevels, List<MiiEncounter>> mapPositiveEncounterByClass,
       DashboardData dbData,
       Boolean useIcuUndiff) {
 
@@ -1869,7 +1899,7 @@ public class DataItemGenerator {
     }
   }
 
-  private Set<UkbObservation> buildObservationsByResult(
+  private Set<MiiObservation> buildObservationsByResult(
       DashboardLogicFixedValues result, DataItemContext context, DashboardData dbData) {
     return new DataBuilder()
         .labResult(result)

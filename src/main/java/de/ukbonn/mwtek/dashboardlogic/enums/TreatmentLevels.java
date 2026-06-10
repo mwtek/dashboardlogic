@@ -17,6 +17,7 @@
  */
 package de.ukbonn.mwtek.dashboardlogic.enums;
 
+import java.util.List;
 import lombok.Getter;
 
 @Getter
@@ -38,5 +39,19 @@ public enum TreatmentLevels {
 
   TreatmentLevels(String value) {
     this.value = value;
+  }
+
+  /** Pediatric treatment levels with specific order of severity. */
+  public static class Pediatric {
+    public static final String NORMAL_WARD = "Normal_ward_pediatric";
+    public static final String ICU = "PICU_no_ventilation";
+    public static final String HIGHFLOW = "PICU_with_highflow";
+    public static final String CPAP = "PICU_with_NIV_CPAP";
+    public static final String INVASIVE_VENTILATION = "PICU_with_invasive_ventilation";
+    public static final String ECMO = "PICU_with_ecmo";
+    public static final String UNDIFFERENTIATED = "PICU_undifferentiated";
+
+    public static final List<String> ORDERED =
+        List.of(NORMAL_WARD, ICU, HIGHFLOW, CPAP, INVASIVE_VENTILATION, ECMO);
   }
 }

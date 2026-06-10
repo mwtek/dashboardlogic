@@ -23,7 +23,7 @@ import de.ukbonn.mwtek.dashboardlogic.enums.DataItemContext;
 import de.ukbonn.mwtek.dashboardlogic.examples.InputCodeSettingsExampleData;
 import de.ukbonn.mwtek.dashboardlogic.logic.DashboardData;
 import de.ukbonn.mwtek.dashboardlogic.logic.cumulative.results.CumulativeResult;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbObservation;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiObservation;
 import java.util.ArrayList;
 import java.util.List;
 import org.hl7.fhir.r4.model.Enumeration;
@@ -41,7 +41,7 @@ public class CumulativeResultTests {
   void testCumulativeResults() {
 
     // Initialization of the input list
-    List<UkbObservation> observations = new ArrayList<>();
+    List<MiiObservation> observations = new ArrayList<>();
 
     DashboardData dashboardData =
         new DashboardData()
@@ -60,8 +60,8 @@ public class CumulativeResultTests {
     Enumeration<ObservationStatus> observationStatus =
         new Enumeration<>(new ObservationStatusEnumFactory());
     observationStatus.setValue(ObservationStatus.FINAL);
-    UkbObservation observationWithoutValue =
-        new UkbObservation("pid", "caseid", observationStatus, null);
+    MiiObservation observationWithoutValue =
+        new MiiObservation("pid", "caseid", observationStatus, null);
     observations.add(observationWithoutValue);
 
     new CumulativeResult()

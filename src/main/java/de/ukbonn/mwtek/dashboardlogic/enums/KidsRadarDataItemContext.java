@@ -19,5 +19,9 @@ package de.ukbonn.mwtek.dashboardlogic.enums;
 
 public enum KidsRadarDataItemContext {
   KJP,
-  RSV
+  PED,
+  PED_RSV,
+  PED_COV,
+  PED_INFL,
+  PED_PERTUSSIS
 }

@@ -84,9 +84,15 @@ public class DataItems {
   // The prefix for the kids radar data items
   public static final String KIDS_RADAR_PREFIX = "kira.";
   public static final String KIDS_RADAR_PREFIX_KJP = KIDS_RADAR_PREFIX + "kjp.";
-  public static final String KIDS_RADAR_PREFIX_RSV = KIDS_RADAR_PREFIX + "rsv.";
+  public static final String KIDS_RADAR_PREFIX_PED = KIDS_RADAR_PREFIX + "ped.";
+  public static final String KIDS_RADAR_PREFIX_PED_RSV = KIDS_RADAR_PREFIX_PED + "rsv.";
+  public static final String KIDS_RADAR_PREFIX_PED_COV = KIDS_RADAR_PREFIX_PED + "covid.";
+  public static final String KIDS_RADAR_PREFIX_PED_INFL = KIDS_RADAR_PREFIX_PED + "influenza.";
+  public static final String KIDS_RADAR_PREFIX_PED_PERTUSSIS = KIDS_RADAR_PREFIX_PED + "pertussis.";
 
   public static final String KIDS_RADAR_PREFIX_ACRIBIS = "acr.";
+  public static final String BCT_PREFIX = "bct.";
+  public static final String SNID_PREFIX = "snid.";
 
   // Kids radar related items
   public static final String CUMULATIVE_DIAGS_ZIPCODE = "cumulative.diags.zipcode";
@@ -95,8 +101,27 @@ public class DataItems {
   public static final String CUMULATIVE_LENGTHOFSTAY = "cumulative.diags.lengthofstay";
   public static final String TIMELINE_DIAGS_OCCURRENCE = "timeline.diags.occurrence";
 
+  public static final String TIMELINE_ADMISSION = "timeline.admission";
+  public static final String TIMELINE_DIAGS_ADMISSION = "timeline.diags.admission";
+
+  public static final String TIMELINE_PSYCH_INTENSIVE_CARE = "timeline.psychintensivecare";
+  public static final String TIMELINE_PSYCH_INTENSIVE_CARE_RATIO =
+      TIMELINE_PSYCH_INTENSIVE_CARE + "_ratio";
+  public static final String TIMELINE_PSYCH_INTENSIVE_CARE_CHANGE =
+      TIMELINE_PSYCH_INTENSIVE_CARE + "_change";
+  public static final String CUMULATIVE_PSYCH_INTENSIVE_CARE = "cumulative.psychintensivecare";
+  public static final String CUMULATIVE_PSYCH_INTENSIVE_CARE_3_MONTHS =
+      CUMULATIVE_PSYCH_INTENSIVE_CARE + "_3months";
+
   public static final String CURRENT_RECRUITMENT = "current.recruitment";
   public static final String TIMELINE_RECRUITMENT = "timeline.recruitment";
   public static final String CURRENT_DISCHARGEDIAGS_COHORTS = "current.dischargediags.cohorts";
   public static final String TIMELINE_DISCHARGEDIAGS_COHORTS = "timeline.dischargediags.cohorts";
+
+  public static final String CURRENT_ZIPCODE = "current.zipcode";
+  public static final String TIMELINE_AGE = "timeline.age";
+  public static final String TIMELINE_AGE_PCR = TIMELINE_AGE + ".pcr";
+
+  public static final String CURRENT_CONSENT = "current.consent";
+  public static final String TIMELINE_CONSENT = "timeline.consent";
 }

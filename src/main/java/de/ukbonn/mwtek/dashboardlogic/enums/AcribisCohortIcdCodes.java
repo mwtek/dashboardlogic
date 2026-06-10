@@ -40,7 +40,7 @@ public class AcribisCohortIcdCodes {
   public static final String PAD = "I70.2";
 
   // Automatically gathered list of all ICD codes via reflection
-  public static final List<String> ALL_CODES;
+  public static final List<String> ALL_CODES_PREFIXES;
 
   public static final List<String> INCLUSION_CRITERIA_COHORT_1 = List.of(CHRONIC_HEART_FAILURE);
 
@@ -72,6 +72,6 @@ public class AcribisCohortIcdCodes {
   public static final List<String> EXCLUSION_CRITERIA_COHORT_3 = EXCLUSION_CRITERIA_COHORT_2;
 
   static {
-    ALL_CODES = CodeUtils.extractAllCodes(AcribisCohortIcdCodes.class);
+    ALL_CODES_PREFIXES = CodeUtils.extractAllCodes(AcribisCohortIcdCodes.class);
   }
 }

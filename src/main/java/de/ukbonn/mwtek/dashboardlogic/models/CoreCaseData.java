@@ -18,11 +18,14 @@
 
 package de.ukbonn.mwtek.dashboardlogic.models;
 
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbPatient;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiPatient;
 import java.util.Date;
+import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;
+import org.hl7.fhir.r4.model.Encounter.EncounterLocationComponent;
+import org.hl7.fhir.r4.model.Period;
 
 @Getter
 @Setter
@@ -33,7 +36,16 @@ public class CoreCaseData {
   Date dischargeDate;
   String facilityEncounterId;
   String patientId;
-  UkbPatient patient;
+  MiiPatient patient;
   int ageAtAdmission;
   int ageAtAdmissionInMonths;
+  List<EncounterLocationComponent> locationComponentList;
+  AdmissionStatus status;
+  List<Period> gapPeriods;
+  List<Date> intensiveCareDays;
+
+  public enum AdmissionStatus {
+    RE_ADMISSION,
+    NEW_ADMISSION
+  }
 }

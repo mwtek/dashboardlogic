@@ -16,8 +16,8 @@
  * this file. If not, visit http://www.gnu.de/documents/gpl-3.0.en.html
  */ package de.ukbonn.mwtek.dashboardlogic.tools;
 
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbProcedure;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiEncounter;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiProcedure;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -30,19 +30,19 @@ public class ProcedureFilter {
    * Filters ICU procedures based on whether the linked case contains at least one icu stay in its
    * supply contact encounter resource.
    */
-  public static List<UkbProcedure> filterProceduresByIcuWardCheck(
-      List<UkbProcedure> icuProcedures, List<UkbEncounter> icuSupplyContactEncounters) {
+  public static List<MiiProcedure> filterProceduresByIcuWardCheck(
+      List<MiiProcedure> icuProcedures, List<MiiEncounter> icuSupplyContactEncounters) {
 
     // Extract all facility contact IDs from ICU encounters
     Set<String> facilityContactIds =
         icuSupplyContactEncounters.parallelStream()
-            .map(UkbEncounter::getFacilityContactId)
+            .map(MiiEncounter::getFacilityContactId)
             .collect(Collectors.toSet());
 
     // Identify procedures that do not have a matching ICU stay
     List<String> caseIdsWithoutIcuStay =
         icuProcedures.parallelStream()
-            .map(UkbProcedure::getCaseId)
+            .map(MiiProcedure::getCaseId)
             .filter(caseId -> !facilityContactIds.contains(caseId))
             .toList();
 

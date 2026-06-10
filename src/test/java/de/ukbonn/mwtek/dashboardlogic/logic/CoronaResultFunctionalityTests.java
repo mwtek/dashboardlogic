@@ -19,7 +19,7 @@
 package de.ukbonn.mwtek.dashboardlogic.logic;
 
 import de.ukbonn.mwtek.dashboardlogic.examples.ProcedureExampleData;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbProcedure;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiProcedure;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -34,9 +34,9 @@ public class CoronaResultFunctionalityTests {
   void testProceduresWithoutCaseReference() {
 
     // Initialization of the input list
-    List<UkbProcedure> procedures = new ArrayList<>();
+    List<MiiProcedure> procedures = new ArrayList<>();
 
-    UkbProcedure activeEcmoProcedure = ProcedureExampleData.getActiveEcmoProcedure();
+    MiiProcedure activeEcmoProcedure = ProcedureExampleData.getActiveEcmoProcedure();
 
     // We want to test the logic with an omitted encounter reference
     activeEcmoProcedure.setCaseId(null);

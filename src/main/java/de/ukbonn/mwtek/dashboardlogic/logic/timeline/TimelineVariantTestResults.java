@@ -17,7 +17,6 @@
  */
 package de.ukbonn.mwtek.dashboardlogic.logic.timeline;
 
-import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.DATE;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.VARIANT_ALPHA;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.VARIANT_ALPHA_LOINC;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.VARIANT_BETA;
@@ -43,7 +42,7 @@ import de.ukbonn.mwtek.dashboardlogic.enums.NumDashboardConstants;
 import de.ukbonn.mwtek.dashboardlogic.models.DiseaseDataItem;
 import de.ukbonn.mwtek.dashboardlogic.settings.InputCodeSettings;
 import de.ukbonn.mwtek.dashboardlogic.settings.VariantSettings;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbObservation;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiObservation;
 import de.ukbonn.mwtek.utilities.generic.time.DateTools;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -64,7 +63,7 @@ import org.hl7.fhir.r4.model.Observation;
 public class TimelineVariantTestResults extends DashboardDataItemLogic {
 
   public Map<String, List<Long>> createTimelineVariantsTests(
-      List<UkbObservation> observations,
+      List<MiiObservation> observations,
       VariantSettings variantSettings,
       InputCodeSettings inputCodeSettings) {
     Map<String, List<Long>> variantMap = new LinkedHashMap<>();
@@ -81,7 +80,7 @@ public class TimelineVariantTestResults extends DashboardDataItemLogic {
     variantMap.put(VARIANT_NON_VOC, new ArrayList<>());
     variantMap.put(VARIANT_UNKNOWN, new ArrayList<>());
 
-    List<UkbObservation> variantObservations =
+    List<MiiObservation> variantObservations =
         observations.stream()
             .filter(x -> isCodingValid(x.getCode(), LOINC, observationVariantLoincCodes))
             .filter(Observation::hasValueCodeableConcept)
@@ -105,7 +104,7 @@ public class TimelineVariantTestResults extends DashboardDataItemLogic {
       final long nextDateUnix = startDate + NumDashboardConstants.DAY_IN_SECONDS;
 
       // Retrieve all observations for the checked date
-      List<UkbObservation> validVariantObservations =
+      List<MiiObservation> validVariantObservations =
           variantObservations.stream()
               .filter(
                   x ->
@@ -117,7 +116,7 @@ public class TimelineVariantTestResults extends DashboardDataItemLogic {
                           > DateTools.dateToUnixTime(x.getEffectiveDateTimeType().getValue()))
               .toList();
 
-      for (UkbObservation variantObservation : validVariantObservations) {
+      for (MiiObservation variantObservation : validVariantObservations) {
         //        boolean observationContainsLoinc =
         //            variantObservation.getValueCodeableConcept().getCoding().stream()
         //                .filter(x -> x.hasSystem()).anyMatch(

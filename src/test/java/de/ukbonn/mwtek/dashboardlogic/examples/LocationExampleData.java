@@ -20,7 +20,7 @@ package de.ukbonn.mwtek.dashboardlogic.examples;
 
 import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.ICU;
 
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbLocation;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiLocation;
 import java.util.ArrayList;
 import java.util.List;
 import org.hl7.fhir.r4.model.CodeableConcept;
@@ -33,14 +33,14 @@ public class LocationExampleData {
   public static String ICU_LOCATION_ID = "VALID-LOCATION";
   public static String NON_VALID_LOCATION_ID = "NON-VALID-LOCATION";
 
-  public static List<UkbLocation> getExampleList() {
+  public static List<MiiLocation> getExampleList() {
 
-    List<UkbLocation> locationExamples = new ArrayList<>();
+    List<MiiLocation> locationExamples = new ArrayList<>();
 
     List<Identifier> identifierIcuLocation = new ArrayList<>();
     identifierIcuLocation.add(new Identifier().setValue(ICU_LOCATION_ID));
-    UkbLocation icuLocation =
-        new UkbLocation(
+    MiiLocation icuLocation =
+        new MiiLocation(
             identifierIcuLocation,
             new CodeableConcept()
                 .addCoding(
@@ -54,8 +54,8 @@ public class LocationExampleData {
     // Location without .physicalType and .type
     List<Identifier> identifierNonValidLocation = new ArrayList<>();
     identifierNonValidLocation.add(new Identifier().setValue(NON_VALID_LOCATION_ID));
-    UkbLocation nonValidLocation =
-        new UkbLocation(
+    MiiLocation nonValidLocation =
+        new MiiLocation(
             identifierNonValidLocation,
             new CodeableConcept().addCoding(new Coding(null, null, null)));
     nonValidLocation.addType(new CodeableConcept().addCoding(new Coding(null, null, null)));

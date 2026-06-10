@@ -18,8 +18,8 @@
 
 package de.ukbonn.mwtek.dashboardlogic.tools;
 
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbPatient;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiEncounter;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiPatient;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -32,16 +32,16 @@ public class PatientFilter {
   /**
    * Filters a list of patients based on the patient IDs present in the given encounters.
    *
-   * @param patients A list with all the {@link UkbPatient} base entries.
-   * @param facilityContactEncountersFiltered A list of {@link UkbEncounter} objects from which
+   * @param patients A list with all the {@link MiiPatient} base entries.
+   * @param facilityContactEncountersFiltered A list of {@link MiiEncounter} objects from which
    *     patient IDs are extracted.
-   * @return A list of {@link UkbPatient} objects whose IDs match those in the provided encounters.
+   * @return A list of {@link MiiPatient} objects whose IDs match those in the provided encounters.
    */
-  public static List<UkbPatient> filterPatientByExistingEncounter(
-      List<UkbPatient> patients, List<UkbEncounter> facilityContactEncountersFiltered) {
+  public static List<MiiPatient> filterPatientByExistingEncounter(
+      List<MiiPatient> patients, List<MiiEncounter> facilityContactEncountersFiltered) {
     Set<String> patientIds =
         facilityContactEncountersFiltered.parallelStream()
-            .map(UkbEncounter::getPatientId)
+            .map(MiiEncounter::getPatientId)
             .collect(Collectors.toSet());
     return patients.parallelStream().filter(x -> patientIds.contains(x.getId())).toList();
   }

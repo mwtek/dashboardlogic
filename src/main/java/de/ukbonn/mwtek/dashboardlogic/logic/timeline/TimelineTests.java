@@ -30,7 +30,7 @@ import de.ukbonn.mwtek.dashboardlogic.models.TimestampedListPair;
 import de.ukbonn.mwtek.dashboardlogic.settings.InputCodeSettings;
 import de.ukbonn.mwtek.dashboardlogic.settings.QualitativeLabCodesSettings;
 import de.ukbonn.mwtek.dashboardlogic.tools.ObservationFilter;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbObservation;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiObservation;
 import de.ukbonn.mwtek.utilities.generic.time.DateTools;
 import de.ukbonn.mwtek.utilities.generic.time.TimerTools;
 import java.time.Instant;
@@ -50,7 +50,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class TimelineTests extends DashboardDataItemLogic implements TimelineFunctionalities {
 
-  private Set<UkbObservation> diseasePositiveObservations;
+  private Set<MiiObservation> diseasePositiveObservations;
 
   /**
    * To create a {@link TimestampedListPair} for each day since the qualifying date to determine the
@@ -60,7 +60,7 @@ public class TimelineTests extends DashboardDataItemLogic implements TimelineFun
    */
   public TimestampedListPair createTimelineTestsMap(
       DataItemContext dataItemContext,
-      List<UkbObservation> observations,
+      List<MiiObservation> observations,
       InputCodeSettings inputCodeSettings) {
     log.debug("started createTimelineTestsMap");
     Instant startTimer = TimerTools.startTimer();
@@ -79,8 +79,8 @@ public class TimelineTests extends DashboardDataItemLogic implements TimelineFun
     // Initialization of the map with the date entries to keep the order ascending
     List<Long> labEffectiveDates =
         diseasePositiveObservations.parallelStream()
-            .filter(UkbObservation::hasEffectiveDateTimeType)
-            .map(UkbObservation::getEffectiveDateTimeType)
+            .filter(MiiObservation::hasEffectiveDateTimeType)
+            .map(MiiObservation::getEffectiveDateTimeType)
             .map(x -> DateTools.dateToUnixTime(x.getValue()))
             .toList();
 
@@ -117,7 +117,7 @@ public class TimelineTests extends DashboardDataItemLogic implements TimelineFun
    */
   public TimestampedListPair createTimelineTestPositiveMap(
       DataItemContext dataItemContext,
-      List<UkbObservation> observations,
+      List<MiiObservation> observations,
       InputCodeSettings inputCodeSettings,
       QualitativeLabCodesSettings qualitativeLabCodesSettings) {
     log.debug("started createTimelineTestPositiveMap");
@@ -145,10 +145,10 @@ public class TimelineTests extends DashboardDataItemLogic implements TimelineFun
             ObservationFilter.getObservationsByValue(
                     diseasePositiveObservations, POSITIVE, qualitativeLabCodesSettings)
                 .parallelStream()
-                .filter(UkbObservation::hasEffectiveDateTimeType)
+                .filter(MiiObservation::hasEffectiveDateTimeType)
                 // Caution with using getEffectiveDateTimeType since the default (if its null) will
                 // be a date object of the current time.
-                .map(UkbObservation::getEffectiveDateTimeType)
+                .map(MiiObservation::getEffectiveDateTimeType)
                 .map(x -> DateTools.dateToUnixTime(x.getValue()))
                 .toList());
 
@@ -156,10 +156,10 @@ public class TimelineTests extends DashboardDataItemLogic implements TimelineFun
     labEffectiveDatesOfPositives.addAll(
         ObservationFilter.getObservationsByInterpretation(diseasePositiveObservations, POSITIVE)
             .parallelStream()
-            .filter(UkbObservation::hasEffectiveDateTimeType)
+            .filter(MiiObservation::hasEffectiveDateTimeType)
             // Caution with using getEffectiveDateTimeType since the default (if its null) will
             // be a date object of the current time.
-            .map(UkbObservation::getEffectiveDateTimeType)
+            .map(MiiObservation::getEffectiveDateTimeType)
             .map(x -> DateTools.dateToUnixTime(x.getValue()))
             .toList());
 
@@ -186,7 +186,7 @@ public class TimelineTests extends DashboardDataItemLogic implements TimelineFun
    * Initializes a map that holds a list with all the midnight timestamps in the relevant time
    * period and initializes them with sum value 0.
    */
-  private static Map<Long, Long> getDateMapWithoutValues(DataItemContext dataItemContext) {
+  protected static Map<Long, Long> getDateMapWithoutValues(DataItemContext dataItemContext) {
     Map<Long, Long> valueDateMap = new ConcurrentHashMap<>();
     for (int i = 0; i < getDatesOutputList(dataItemContext).size(); i++) {
       valueDateMap.put(getDatesOutputList(dataItemContext).get(i), 0L);

@@ -31,6 +31,8 @@ public class DataItemTypes {
   public static final String ITEMTYPE_LIST_NESTED_ARRAYS = "listnestedarrays";
   public static final String ITEMTYPE_LIST_TUPEL = "listtupel";
   public static final String ITEMTYPE_STACKED_BAR_CHARTS = "stackedbarcharts";
+  public static final String ITEMTYPE_STACKED_BAR_CHARTS_UNIFORM = "stackedbarcharts_uniform";
+  public static final String ITEMTYPE_GROUPED_BAR_CHARTS_CALC = "groupedbarcharts_calc";
   public static final String ITEMTYPE_PIE_CHARTS = "piecharts";
   public static final String ITEMTYPE_DEBUG = "debug";
   public static final String SUBITEMTYPE_DATE = "date";

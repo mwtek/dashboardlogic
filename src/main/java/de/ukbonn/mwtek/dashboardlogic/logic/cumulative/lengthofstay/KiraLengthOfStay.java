@@ -19,8 +19,9 @@ package de.ukbonn.mwtek.dashboardlogic.logic.cumulative.lengthofstay;
 
 import static de.ukbonn.mwtek.dashboardlogic.enums.KidsRadarConstants.KJP_DIAGNOSES_ALL;
 import static de.ukbonn.mwtek.dashboardlogic.enums.KidsRadarConstants.RSV_DIAGNOSES_ALL;
-import static de.ukbonn.mwtek.dashboardlogic.logic.DashboardData.LENGTH_OF_STAY_STACKS;
+import static de.ukbonn.mwtek.dashboardlogic.logic.DashboardData.RSV_LENGTH_OF_STAY_STACKS;
 import static de.ukbonn.mwtek.dashboardlogic.logic.KiraData.createLabelList;
+import static de.ukbonn.mwtek.dashboardlogic.tools.KidsRadarTools.getRsvOnlyCoreCaseDataByGroups;
 
 import de.ukbonn.mwtek.dashboardlogic.DashboardDataItemLogic;
 import de.ukbonn.mwtek.dashboardlogic.enums.KidsRadarDataItemContext;
@@ -29,10 +30,13 @@ import de.ukbonn.mwtek.dashboardlogic.models.CoreCaseData;
 import de.ukbonn.mwtek.dashboardlogic.models.StackedBarChartsItem;
 import de.ukbonn.mwtek.utilities.generic.time.DateTools;
 import de.ukbonn.mwtek.utilities.generic.time.TimerTools;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -54,26 +58,31 @@ public class KiraLengthOfStay extends DashboardDataItemLogic implements Timeline
    * @return a {@link StackedBarChartsItem} containing the bar chart data, including labels and
    *     values
    */
-  public static StackedBarChartsItem createStackedBarCharts(
+  public static StackedBarChartsItem<Double> createStackedBarCharts(
       KidsRadarDataItemContext kidsRadarDataItemContext,
       Map<String, Map<String, CoreCaseData>> coreCaseDataByGroups) {
     log.debug("started KiraLengthOfStayDisorders.createStackedBarCharts");
     Instant startTimer = TimerTools.startTimer();
 
+    Map<String, Map<String, CoreCaseData>> coreCaseDataByGroupsFiltered = coreCaseDataByGroups;
+
     String chartsLabel = "";
     switch (kidsRadarDataItemContext) {
       case KJP -> chartsLabel = KJP_DIAGNOSES_ALL;
-      case RSV -> chartsLabel = RSV_DIAGNOSES_ALL;
+      case PED -> {
+        coreCaseDataByGroupsFiltered = getRsvOnlyCoreCaseDataByGroups(coreCaseDataByGroups);
+        chartsLabel = RSV_DIAGNOSES_ALL;
+      }
     }
     // Setting chart, stack, and bar labels
-    StackedBarChartsItem result = new StackedBarChartsItem();
+    StackedBarChartsItem<Double> result = new StackedBarChartsItem<>();
     result.setCharts(new ArrayList<>(List.of(chartsLabel)));
-    result.setStacks(List.of(LENGTH_OF_STAY_STACKS));
-    result.setBars(List.of(createLabelList(coreCaseDataByGroups.keySet())));
+    result.setStacks(List.of(RSV_LENGTH_OF_STAY_STACKS));
+    result.setBars(List.of(createLabelList(coreCaseDataByGroupsFiltered.keySet())));
 
-    List<List<? extends Number>> resultValues = new ArrayList<>();
+    List<List<Double>> resultValues = new ArrayList<>();
 
-    coreCaseDataByGroups.forEach(
+    coreCaseDataByGroupsFiltered.forEach(
         (groupKey, coreCaseDataItem) -> {
           double meanByScope = 0;
           List<Long> lengthOfStaysByScope = new ArrayList<>();
@@ -103,9 +112,13 @@ public class KiraLengthOfStay extends DashboardDataItemLogic implements Timeline
           if (!lengthOfStaysByScope.isEmpty()) {
             meanByScope =
                 lengthOfStaysByScope.stream()
-                    .mapToLong(Long::longValue)
-                    .average()
-                    .orElseThrow(() -> new IllegalArgumentException("The list must not be empty"));
+                    .collect(
+                        Collectors.collectingAndThen(
+                            Collectors.averagingLong(Long::longValue),
+                            avg ->
+                                BigDecimal.valueOf(avg)
+                                    .setScale(1, RoundingMode.HALF_UP)
+                                    .doubleValue()));
           }
           resultValues.add(List.of(meanByScope));
         });

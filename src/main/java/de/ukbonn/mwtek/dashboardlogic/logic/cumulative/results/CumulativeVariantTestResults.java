@@ -27,7 +27,7 @@ import de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues;
 import de.ukbonn.mwtek.dashboardlogic.models.DiseaseDataItem;
 import de.ukbonn.mwtek.dashboardlogic.settings.InputCodeSettings;
 import de.ukbonn.mwtek.dashboardlogic.settings.VariantSettings;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbObservation;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiObservation;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -60,7 +60,7 @@ public class CumulativeVariantTestResults extends DashboardDataItemLogic {
    * @return Map with frequencies per covid variant.
    */
   public Map<String, Integer> createVariantTestResultMap(
-      List<UkbObservation> observations,
+      List<MiiObservation> observations,
       VariantSettings variantSettings,
       InputCodeSettings inputCodeSettings) {
     this.variantSettings = variantSettings;

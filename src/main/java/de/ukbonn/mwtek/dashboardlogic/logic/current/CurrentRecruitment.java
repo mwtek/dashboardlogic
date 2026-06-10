@@ -20,13 +20,16 @@ package de.ukbonn.mwtek.dashboardlogic.logic.current;
 import de.ukbonn.mwtek.dashboardlogic.DashboardDataItemLogic;
 import de.ukbonn.mwtek.dashboardlogic.models.DiseaseDataItem;
 import de.ukbonn.mwtek.dashboardlogic.models.StackedBarChartsItem;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbConsent;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiConsent;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiQuestionnaireResponse;
 import de.ukbonn.mwtek.utilities.generic.time.TimerTools;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Map;
+import java.util.Objects;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -42,28 +45,48 @@ public class CurrentRecruitment extends DashboardDataItemLogic {
   public static final String ACR_NUMBER_PATIENTS = "acr_number_patients";
   public static final String ACR_PROJECT = "acr_project";
 
-  public StackedBarChartsItem createStackedBarCharts(Collection<UkbConsent> ukbConsents) {
+  public StackedBarChartsItem<Integer> createStackedBarCharts(
+      Collection<MiiConsent> ukbConsents,
+      Collection<MiiQuestionnaireResponse> questionnaireResponses) {
 
     log.debug("started CurrentRecruitment.createStackedBarCharts");
     Instant startTimer = TimerTools.startTimer();
 
-    StackedBarChartsItem result = new StackedBarChartsItem();
+    StackedBarChartsItem<Integer> result = new StackedBarChartsItem<>();
     result.setCharts(new ArrayList<>(List.of(ACR_PROJECT)));
 
     // Generate valid date list using the determined format.
     result.setBars(List.of(List.of(ACR_RECRUITMENT_CONSENT, ACR_RECRUITMENT_FOLLOWUP)));
     result.setStacks(List.of(List.of(ACR_NUMBER_PATIENTS)));
-    List<List<? extends Number>> resultList = new ArrayList<>();
-    // Each patient gets count once
-    resultList.add(
-        List.of(
-            ukbConsents.stream().map(UkbConsent::getPatientId).collect(Collectors.toSet()).size()));
-    resultList.add(List.of(0));
 
+    List<String> consentPatientIds =
+        ukbConsents.stream()
+            .map(MiiConsent::getPatientId)
+            .filter(Objects::nonNull)
+            .distinct()
+            .map(String::valueOf)
+            .toList();
+
+    List<String> followUpPatientIds =
+        questionnaireResponses.stream()
+            .map(MiiQuestionnaireResponse::getPatientId)
+            .filter(Objects::nonNull)
+            .distinct()
+            .map(String::valueOf)
+            .toList();
+
+    List<List<Integer>> resultList = new ArrayList<>();
+    resultList.add(List.of(consentPatientIds.size()));
+    resultList.add(List.of(followUpPatientIds.size()));
     result.setValues(List.of(resultList));
-    TimerTools.stopTimerAndLog(startTimer, "finished CurrentRecruitment.createStackedBarCharts");
 
-    // Order ascending regarding the specification.
+    // Saving ids to generate debug items
+    Map<String, List<String>> debugData = new LinkedHashMap<>();
+    debugData.put(ACR_RECRUITMENT_CONSENT, consentPatientIds);
+    debugData.put(ACR_RECRUITMENT_FOLLOWUP, followUpPatientIds);
+    result.setDebugData(debugData);
+
+    TimerTools.stopTimerAndLog(startTimer, "finished CurrentRecruitment.createStackedBarCharts");
     return result;
   }
 }

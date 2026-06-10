@@ -26,8 +26,8 @@ import de.ukbonn.mwtek.dashboardlogic.DataItemGenerator;
 import de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues;
 import de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels;
 import de.ukbonn.mwtek.dashboardlogic.models.CoronaTreatmentLevelExport;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbPatient;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiEncounter;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiPatient;
 import de.ukbonn.mwtek.utilities.generic.time.TimerTools;
 import java.io.FileNotFoundException;
 import java.io.PrintWriter;
@@ -61,8 +61,8 @@ public class CoronaResultFunctionality extends DiseaseResultFunctionality {
    * @return List with the crosstab states and their values
    */
   public static List<String[]> generateCrosstabList(
-      Map<TreatmentLevels, List<UkbEncounter>> mapCumulativeMaxTreatments,
-      List<UkbPatient> listPatient) {
+      Map<TreatmentLevels, List<MiiEncounter>> mapCumulativeMaxTreatments,
+      List<MiiPatient> listPatient) {
     log.debug("started generateCrosstabList");
     Instant startTimer = TimerTools.startTimer();
     List<String[]> resultList = new ArrayList<>();
@@ -76,7 +76,7 @@ public class CoronaResultFunctionality extends DiseaseResultFunctionality {
     List<String> listNoBonnAndEcmo = new ArrayList<>();
     Map<String, Boolean> mapIsBonnPatient = new HashMap<>();
     // go through each patient check if they are living in Bonn
-    for (UkbPatient patient : listPatient) {
+    for (MiiPatient patient : listPatient) {
       try {
         Address address = patient.getAddressFirstRep();
         mapIsBonnPatient.put(
@@ -88,10 +88,10 @@ public class CoronaResultFunctionality extends DiseaseResultFunctionality {
       }
     }
     // iterate through each encounter, and sort them to the right list
-    for (Map.Entry<TreatmentLevels, List<UkbEncounter>> entry :
+    for (Map.Entry<TreatmentLevels, List<MiiEncounter>> entry :
         mapCumulativeMaxTreatments.entrySet()) {
       TreatmentLevels key = entry.getKey();
-      for (UkbEncounter encounter : entry.getValue()) {
+      for (MiiEncounter encounter : entry.getValue()) {
         if (mapIsBonnPatient.containsKey(encounter.getPatientId())) {
           boolean isBonn = mapIsBonnPatient.get(encounter.getPatientId());
           switch (key) {

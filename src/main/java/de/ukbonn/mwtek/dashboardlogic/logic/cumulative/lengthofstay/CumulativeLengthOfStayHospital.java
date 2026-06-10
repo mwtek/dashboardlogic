@@ -26,11 +26,10 @@ import de.ukbonn.mwtek.dashboardlogic.DashboardDataItemLogic;
 import de.ukbonn.mwtek.dashboardlogic.enums.VitalStatus;
 import de.ukbonn.mwtek.dashboardlogic.models.DiseaseDataItem;
 import de.ukbonn.mwtek.dashboardlogic.tools.EncounterFilter;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbEncounter;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiEncounter;
 import de.ukbonn.mwtek.utilities.generic.time.DateTools;
 import de.ukbonn.mwtek.utilities.generic.time.TimerTools;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -52,14 +51,14 @@ public class CumulativeLengthOfStayHospital extends DashboardDataItemLogic {
   /**
    * Creates a map with the time in days that patients have spent as inpatients in the hospital
    *
-   * <p>Used for cumulative.lengthofstay.hospital
+   * <p>Used for {@code cumulative.lengthofstay.hospital}
    *
    * @return A map with the pid as key and the value is a map containing the information on how many
    *     days a patient has spent in the hospital, and how often he was there, shown by the number
    *     of caseIds
    */
   public static Map<String, Map<Long, Set<String>>> createMapDaysHospitalList(
-      List<UkbEncounter> facilityEncounters) {
+      List<MiiEncounter> facilityEncounters) {
     log.debug("started createMapDaysHospitalList");
     // If there are no location resources existing, it's impossible to calculate icu stay lengths
     if (facilityEncounters == null) {
@@ -73,13 +72,13 @@ public class CumulativeLengthOfStayHospital extends DashboardDataItemLogic {
     // Filter encounters to include only inpatient cases with positive disease status
     Map<String, Map<Long, Set<String>>> mapResult =
         facilityEncounters.stream()
-            .filter(UkbEncounter::isCaseClassInpatientOrShortStay)
+            .filter(MiiEncounter::isCaseClassInpatientOrShortStay)
             .filter(EncounterFilter::isDiseasePositive)
-            .filter(UkbEncounter::isPeriodStartExistent)
+            .filter(MiiEncounter::isPeriodStartExistent)
             // Group encounters by patient ID
             .collect(
                 Collectors.groupingBy(
-                    UkbEncounter::getPatientId,
+                    MiiEncounter::getPatientId,
                     // Group encounters by the number of days
                     Collectors.groupingBy(
                         e -> {
@@ -95,7 +94,7 @@ public class CumulativeLengthOfStayHospital extends DashboardDataItemLogic {
                           }
                           return daysBetween;
                         },
-                        Collectors.mapping(UkbEncounter::getId, Collectors.toSet()))));
+                        Collectors.mapping(MiiEncounter::getId, Collectors.toSet()))));
 
     // Stop the timer and log the finish message
     TimerTools.stopTimerAndLog(startTimer, "finished createMapDaysHospitalList");
@@ -103,7 +102,9 @@ public class CumulativeLengthOfStayHospital extends DashboardDataItemLogic {
   }
 
   /**
-   * Calculates the amount of time in days that a patient stayed in the hospital.
+   * Filters hospital length of stay data by patient vital status.
+   *
+   * <p>If a patient got multiple positive cases, all these will get summed up.
    *
    * <p>Used for {@code cumulative.lengthofstay.hospital.alive} and {@code
    * cumulative.lengthofstay.hospital.dead}.
@@ -115,53 +116,39 @@ public class CumulativeLengthOfStayHospital extends DashboardDataItemLogic {
    *     all the case ids from which this total was calculated.
    */
   public static Map<String, Map<Long, Set<String>>> createLengthOfStayHospitalByVitalstatus(
-      List<UkbEncounter> facilityEncounters,
+      List<MiiEncounter> facilityEncounters,
       Map<String, Map<Long, Set<String>>> mapDays,
       VitalStatus vitalStatus) {
     log.debug("started createLengthOfStayHospitalByVitalstatus");
     Instant startTimer = TimerTools.startTimer();
 
-    // Filter encounters based on disease-positive results
-    List<UkbEncounter> filteredEncounters =
+    // build patient-level vital status from positive encounters
+    Map<String, Boolean> patientDeceasedMap =
         facilityEncounters.parallelStream()
             .filter(x -> x.hasExtension(POSITIVE_RESULT.getValue()))
-            .toList();
+            .collect(
+                Collectors.toConcurrentMap(
+                    MiiEncounter::getPatientId,
+                    MiiEncounter::isPatientDeceased,
+                    Boolean::logicalOr));
 
     Map<String, Map<Long, Set<String>>> resultMap = new ConcurrentHashMap<>();
     mapDays.entrySet().parallelStream()
         .forEach(
             entry -> {
-              Map<Long, Set<String>> mapTimeAndCaseNrs = entry.getValue();
+              String patientId = entry.getKey();
+              Map<Long, Set<String>> daysMap = entry.getValue();
 
-              mapTimeAndCaseNrs.forEach(
-                  (key, caseNrs) -> {
-                    List<UkbEncounter> listFilteredEncounter = new ArrayList<>();
-
-                    if (vitalStatus == ALIVE) {
-                      listFilteredEncounter =
-                          filteredEncounters.parallelStream()
-                              .filter(encounter -> caseNrs.contains(encounter.getId()))
-                              .filter(encounter -> !encounter.isPatientDeceased())
-                              .toList();
-                    } else if (vitalStatus == DEAD) {
-                      listFilteredEncounter =
-                          filteredEncounters.parallelStream()
-                              .filter(encounter -> caseNrs.contains(encounter.getId()))
-                              .filter(UkbEncounter::isPatientDeceased)
-                              .toList();
-                    } else if (vitalStatus == null) {
-                      listFilteredEncounter =
-                          filteredEncounters.parallelStream()
-                              .filter(encounter -> caseNrs.contains(encounter.getId()))
-                              .toList();
-                    }
-
-                    if (!listFilteredEncounter.isEmpty()) {
-                      resultMap
-                          .computeIfAbsent(entry.getKey(), k -> new ConcurrentHashMap<>())
-                          .put(key, caseNrs);
-                    }
-                  });
+              boolean isDeceased = patientDeceasedMap.getOrDefault(patientId, false);
+              // check if patient matches requested vital status (null = no filter)
+              boolean matches =
+                  vitalStatus == null
+                      || (vitalStatus == ALIVE && !isDeceased)
+                      || (vitalStatus == DEAD && isDeceased);
+              // include all cases of this patient
+              if (matches) {
+                resultMap.put(patientId, daysMap);
+              }
             });
 
     TimerTools.stopTimerAndLog(startTimer, "finished createLengthOfOfStayHospitalByVitalstatus");

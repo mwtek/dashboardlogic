@@ -18,8 +18,10 @@
 package de.ukbonn.mwtek.dashboardlogic.tools;
 
 import de.ukbonn.mwtek.dashboardlogic.models.CoreCaseData;
-import de.ukbonn.mwtek.utilities.fhir.resources.UkbPatient;
+import de.ukbonn.mwtek.utilities.fhir.resources.MiiPatient;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -37,8 +39,14 @@ public class KidsRadarTools {
         .collect(Collectors.toList());
   }
 
-  public static List<UkbPatient> removeEntriesByAge(
-      Map<String, CoreCaseData> coreCaseDataByEncounterId, List<UkbPatient> patientsFiltered) {
+  /** The icd codes for kids radar in one list. */
+  public static List<String> getKidsRadarIcdCodesKjp(
+      Map<String, List<String>> kidsRadarDiagnosisIcdCodesKjp) {
+    return new ArrayList<>(getIcdCodesAsString(kidsRadarDiagnosisIcdCodesKjp));
+  }
+
+  public static List<MiiPatient> removeEntriesByAge(
+      Map<String, CoreCaseData> coreCaseDataByEncounterId, List<MiiPatient> patientsFiltered) {
     Set<String> validPids = new HashSet<>();
     Set<String> encounterIdsToBeRemoved = new HashSet<>();
     coreCaseDataByEncounterId.forEach(
@@ -62,5 +70,15 @@ public class KidsRadarTools {
         coreCaseDataByEncounterId.size());
     encounterIdsToBeRemoved.forEach(coreCaseDataByEncounterId::remove);
     return patientsFiltered.parallelStream().filter(x -> validPids.contains(x.getId())).toList();
+  }
+
+  /** Filter the coreCaseDataByGroups map to entries starting with "rsv". */
+  public static LinkedHashMap<String, Map<String, CoreCaseData>> getRsvOnlyCoreCaseDataByGroups(
+      Map<String, Map<String, CoreCaseData>> coreCaseDataByGroups) {
+    return coreCaseDataByGroups.entrySet().stream()
+        .filter(e -> e.getKey() != null && e.getKey().startsWith("rsv"))
+        .collect(
+            Collectors.toMap(
+                Map.Entry::getKey, Map.Entry::getValue, (a, b) -> a, LinkedHashMap::new));
   }
 }

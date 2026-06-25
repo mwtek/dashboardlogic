@@ -77,7 +77,7 @@ public class KiraKjpTimelineIntensiveCare extends DashboardDataItemLogic
   public static final List<String> PSYCH_INTENSIVE_3_MONTHS_PARAM_PY =
       List.of("psychintensive_care_days_3m_py", "total_care_days_3m_py");
 
-  private static final TimeZone TZ_BERLIN = TimeZone.getTimeZone(DateTools.timeZoneEuropeBerlin);
+  private static final TimeZone TZ_BERLIN = TimeZone.getTimeZone(DateTools.TIME_ZONE_EUROPE_BERLIN);
 
   /** Simple lazy cache: computed once, reused until explicitly invalidated. */
   private Map<String, KiraMonthAgg> monthAggCache = null;
@@ -288,7 +288,7 @@ public class KiraKjpTimelineIntensiveCare extends DashboardDataItemLogic
 
   // "yyyy-MM"
   private static String formatYearMonth(Date d) {
-    Calendar c = Calendar.getInstance(TimeZone.getTimeZone(DateTools.timeZoneEuropeBerlin));
+    Calendar c = Calendar.getInstance(TimeZone.getTimeZone(DateTools.TIME_ZONE_EUROPE_BERLIN));
     c.setTime(d);
     int y = c.get(Calendar.YEAR);
     int m = c.get(Calendar.MONTH) + 1;

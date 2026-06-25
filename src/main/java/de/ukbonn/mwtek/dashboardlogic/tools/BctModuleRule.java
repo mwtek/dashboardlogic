@@ -28,29 +28,28 @@ import static de.ukbonn.mwtek.dashboardlogic.logic.current.CurrentConsent.BCT_MO
 import static de.ukbonn.mwtek.dashboardlogic.logic.current.CurrentConsent.BCT_MOD_8;
 import static de.ukbonn.mwtek.dashboardlogic.logic.current.CurrentConsent.BCT_MOD_9;
 import static de.ukbonn.mwtek.utilities.enums.MiiConsentPolicyValueSet.BIOMAT_ADDITIONAL_QUANTITIES;
-import static de.ukbonn.mwtek.utilities.enums.MiiConsentPolicyValueSet.BIOMAT_ADDITIONAL_SAMPLING;
-import static de.ukbonn.mwtek.utilities.enums.MiiConsentPolicyValueSet.BIOMAT_COLLECT_STORE_USE;
 import static de.ukbonn.mwtek.utilities.enums.MiiConsentPolicyValueSet.BIOMAT_RETRO_SCIENTIFIC_USAGE_DSGVO;
 import static de.ukbonn.mwtek.utilities.enums.MiiConsentPolicyValueSet.BIOMAT_RETRO_STORAGE_PROCESS;
-import static de.ukbonn.mwtek.utilities.enums.MiiConsentPolicyValueSet.BIOMAT_RETRO_STORING_USAGE;
 import static de.ukbonn.mwtek.utilities.enums.MiiConsentPolicyValueSet.BIOMAT_SCIENTIFIC_USAGE_DSGVO;
 import static de.ukbonn.mwtek.utilities.enums.MiiConsentPolicyValueSet.BIOMAT_STORE_TRANSFER;
 import static de.ukbonn.mwtek.utilities.enums.MiiConsentPolicyValueSet.IDAT_SAVE_PROCESS;
-import static de.ukbonn.mwtek.utilities.enums.MiiConsentPolicyValueSet.KKDAT_5_YEARS_PROSPECTIVE_SAVE_USAGE;
-import static de.ukbonn.mwtek.utilities.enums.MiiConsentPolicyValueSet.KKDAT_5_YEARS_PROSPECTIVE_SCIENTIFIC_USAGE;
+import static de.ukbonn.mwtek.utilities.enums.MiiConsentPolicyValueSet.KKDAT_5_YEARS_PROSPECTIVE_TRANSFER;
+import static de.ukbonn.mwtek.utilities.enums.MiiConsentPolicyValueSet.KKDAT_5_YEARS_PROSPECTIVE_TRANSFER_KVNR;
 import static de.ukbonn.mwtek.utilities.enums.MiiConsentPolicyValueSet.KKDAT_5_YEARS_RETRO_SCIENTIFIC_USAGE;
 import static de.ukbonn.mwtek.utilities.enums.MiiConsentPolicyValueSet.KKDAT_5_YEARS_RETRO_TRANSFER_SAVE_USAGE;
-import static de.ukbonn.mwtek.utilities.enums.MiiConsentPolicyValueSet.KKDAT_PROSPECTIVE_TRANSFER_SAVE_USAGE;
-import static de.ukbonn.mwtek.utilities.enums.MiiConsentPolicyValueSet.KKDAT_RETRO_TRANSFER_SAVE_USAGE;
 import static de.ukbonn.mwtek.utilities.enums.MiiConsentPolicyValueSet.MDAT_RETRO_SAVE_PROCESS;
-import static de.ukbonn.mwtek.utilities.enums.MiiConsentPolicyValueSet.MDAT_RETRO_SCIENTIFIC_USAGE_DSGVO;
 import static de.ukbonn.mwtek.utilities.enums.MiiConsentPolicyValueSet.MDAT_SAVE_PROCESS;
 import static de.ukbonn.mwtek.utilities.enums.MiiConsentPolicyValueSet.MDAT_SCIENTIFIC_USAGE_DSGVO;
-import static de.ukbonn.mwtek.utilities.enums.MiiConsentPolicyValueSet.PATDAT_RETRIEVAL_SAVING_USING;
-import static de.ukbonn.mwtek.utilities.enums.MiiConsentPolicyValueSet.PATDAT_RETROSPECTIVE_USAGE;
-import static de.ukbonn.mwtek.utilities.enums.MiiConsentPolicyValueSet.RECONTACTING_ADDITIONAL_FINDING;
+import static de.ukbonn.mwtek.utilities.enums.MiiConsentPolicyValueSet.MOD_BIOMAT_ADDITIONAL_SAMPLING;
+import static de.ukbonn.mwtek.utilities.enums.MiiConsentPolicyValueSet.MOD_BIOMAT_COLLECT_STORE_USE;
+import static de.ukbonn.mwtek.utilities.enums.MiiConsentPolicyValueSet.MOD_BIOMAT_RETRO_STORING_USAGE;
+import static de.ukbonn.mwtek.utilities.enums.MiiConsentPolicyValueSet.MOD_KKDAT_PROSPECTIVE_TRANSFER_SAVE_USAGE;
+import static de.ukbonn.mwtek.utilities.enums.MiiConsentPolicyValueSet.MOD_KKDAT_RETRO_TRANSFER_SAVE_USAGE;
+import static de.ukbonn.mwtek.utilities.enums.MiiConsentPolicyValueSet.MOD_PATDAT_RETRIEVAL_SAVING_USING;
+import static de.ukbonn.mwtek.utilities.enums.MiiConsentPolicyValueSet.MOD_PATDAT_RETROSPECTIVE_USAGE;
+import static de.ukbonn.mwtek.utilities.enums.MiiConsentPolicyValueSet.MOD_RECONTACTING_ADDITIONAL_FINDING;
+import static de.ukbonn.mwtek.utilities.enums.MiiConsentPolicyValueSet.MOD_RECONTACTING_ADDITIONS;
 import static de.ukbonn.mwtek.utilities.enums.MiiConsentPolicyValueSet.RECONTACTING_ADDITIONAL_FINDING_LVL_2;
-import static de.ukbonn.mwtek.utilities.enums.MiiConsentPolicyValueSet.RECONTACTING_ADDITIONS;
 import static de.ukbonn.mwtek.utilities.enums.MiiConsentPolicyValueSet.RECONTACTING_FURTHER_COLLECTION;
 import static de.ukbonn.mwtek.utilities.enums.MiiConsentPolicyValueSet.RECONTACTING_FURTHER_STUDIES;
 import static de.ukbonn.mwtek.utilities.enums.MiiConsentPolicyValueSet.RECONTACTING_MERGING_DBS;
@@ -65,7 +64,7 @@ public record BctModuleRule(String levelOneKey, List<List<String>> levelTwoKeys)
         new BctModuleRule(
             BCT_MOD_1,
             List.of(
-                List.of(PATDAT_RETRIEVAL_SAVING_USING.getCode()),
+                List.of(MOD_PATDAT_RETRIEVAL_SAVING_USING.getCode()),
                 List.of(
                     IDAT_SAVE_PROCESS.getCode(),
                     MDAT_SAVE_PROCESS.getCode(),
@@ -73,45 +72,43 @@ public record BctModuleRule(String levelOneKey, List<List<String>> levelTwoKeys)
         new BctModuleRule(
             BCT_MOD_2,
             List.of(
-                List.of(PATDAT_RETROSPECTIVE_USAGE.getCode()),
-                List.of(
-                    MDAT_RETRO_SAVE_PROCESS.getCode(),
-                    MDAT_RETRO_SCIENTIFIC_USAGE_DSGVO.getCode()))),
+                List.of(MOD_PATDAT_RETROSPECTIVE_USAGE.getCode()),
+                List.of(MDAT_RETRO_SAVE_PROCESS.getCode()))),
         new BctModuleRule(
             BCT_MOD_3,
             List.of(
-                List.of(KKDAT_RETRO_TRANSFER_SAVE_USAGE.getCode()),
+                List.of(MOD_KKDAT_RETRO_TRANSFER_SAVE_USAGE.getCode()),
                 List.of(
                     KKDAT_5_YEARS_RETRO_TRANSFER_SAVE_USAGE.getCode(),
                     KKDAT_5_YEARS_RETRO_SCIENTIFIC_USAGE.getCode()))),
         new BctModuleRule(
             BCT_MOD_4,
             List.of(
-                List.of(KKDAT_PROSPECTIVE_TRANSFER_SAVE_USAGE.getCode()),
+                List.of(MOD_KKDAT_PROSPECTIVE_TRANSFER_SAVE_USAGE.getCode()),
                 List.of(
-                    KKDAT_5_YEARS_PROSPECTIVE_SAVE_USAGE.getCode(),
-                    KKDAT_5_YEARS_PROSPECTIVE_SCIENTIFIC_USAGE.getCode()))),
+                    KKDAT_5_YEARS_PROSPECTIVE_TRANSFER.getCode(),
+                    KKDAT_5_YEARS_PROSPECTIVE_TRANSFER_KVNR.getCode()))),
         new BctModuleRule(
             BCT_MOD_5,
             List.of(
-                List.of(BIOMAT_COLLECT_STORE_USE.getCode()),
+                List.of(MOD_BIOMAT_COLLECT_STORE_USE.getCode()),
                 List.of(BIOMAT_STORE_TRANSFER.getCode(), BIOMAT_SCIENTIFIC_USAGE_DSGVO.getCode()))),
         new BctModuleRule(
             BCT_MOD_6,
             List.of(
-                List.of(BIOMAT_ADDITIONAL_SAMPLING.getCode()),
+                List.of(MOD_BIOMAT_ADDITIONAL_SAMPLING.getCode()),
                 List.of(BIOMAT_ADDITIONAL_QUANTITIES.getCode()))),
         new BctModuleRule(
             BCT_MOD_7,
             List.of(
-                List.of(BIOMAT_RETRO_STORING_USAGE.getCode()),
+                List.of(MOD_BIOMAT_RETRO_STORING_USAGE.getCode()),
                 List.of(
                     BIOMAT_RETRO_STORAGE_PROCESS.getCode(),
                     BIOMAT_RETRO_SCIENTIFIC_USAGE_DSGVO.getCode()))),
         new BctModuleRule(
             BCT_MOD_8,
             List.of(
-                List.of(RECONTACTING_ADDITIONS.getCode()),
+                List.of(MOD_RECONTACTING_ADDITIONS.getCode()),
                 List.of(
                     RECONTACTING_MERGING_DBS.getCode(),
                     RECONTACTING_FURTHER_COLLECTION.getCode(),
@@ -119,7 +116,7 @@ public record BctModuleRule(String levelOneKey, List<List<String>> levelTwoKeys)
         new BctModuleRule(
             BCT_MOD_9,
             List.of(
-                List.of(RECONTACTING_ADDITIONAL_FINDING.getCode()),
+                List.of(MOD_RECONTACTING_ADDITIONAL_FINDING.getCode()),
                 List.of(RECONTACTING_ADDITIONAL_FINDING_LVL_2.getCode()))));
   }
 

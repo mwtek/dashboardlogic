@@ -20,6 +20,7 @@ package de.ukbonn.mwtek.dashboardlogic.logic.timeline;
 import static de.ukbonn.mwtek.dashboardlogic.enums.NumDashboardConstants.DAY_IN_SECONDS;
 import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.Pediatric.ECMO;
 import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.Pediatric.ICU;
+import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.Pediatric.INVASIVE_VENTILATION;
 import static de.ukbonn.mwtek.dashboardlogic.logic.timeline.TimelineTests.getDateMapWithoutValues;
 
 import de.ukbonn.mwtek.dashboardlogic.DashboardDataItemLogic;
@@ -172,7 +173,6 @@ public class KiraPedTimelineMaxTreatmentLevel extends DashboardDataItemLogic
         }
       }
     }
-
     levelCounts.put(DATE, dateList);
     return levelCounts;
   }
@@ -222,7 +222,7 @@ public class KiraPedTimelineMaxTreatmentLevel extends DashboardDataItemLogic
             p ->
                 isProcedureActiveOnDate(p, dateUnix)
                     && matchesCode(p, inputCodeSettings.getProcedureVentilationCodes()))) {
-      return TreatmentLevels.Pediatric.INVASIVE_VENTILATION;
+      return INVASIVE_VENTILATION;
     }
 
     if (procedures.stream()

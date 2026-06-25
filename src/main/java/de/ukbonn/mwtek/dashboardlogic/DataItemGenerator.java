@@ -1568,7 +1568,20 @@ public class DataItemGenerator {
     // Filtering encounters where the discharge date lies after the admission date
     List<String> dischargeDateBeforeAdmissionDate =
         encounters.parallelStream()
-            .filter(x -> x.hasPeriod() && x.getPeriod().hasStart() && x.getPeriod().hasEnd())
+            .filter(Encounter::hasPeriod)
+            .filter(
+                x -> {
+                  boolean valid =
+                      x.getPeriod().getStart() != null && x.getPeriod().getEnd() != null;
+                  if (!valid) {
+                    log.warn(
+                        "Encounter {} has an invalid period. start={}, end={}",
+                        x.getId(),
+                        x.getPeriod().getStart(),
+                        x.getPeriod().getEnd());
+                  }
+                  return valid;
+                })
             .filter(x -> x.getPeriod().getEnd().before(x.getPeriod().getStart()))
             .map(MiiEncounter::getId)
             .toList();

@@ -236,6 +236,9 @@ public class DataItemGenerator {
     boolean useIcuUndiff = globalConfiguration.getUseIcuUndifferentiated();
     boolean debug = globalConfiguration.getDebug();
 
+    // Save the in the YAML configured data items exclude map
+    Map<String, Boolean> effExcludeDataItems = new HashMap<>(mapExcludeDataItems);
+
     // If there are resources with unfilled mandatory attributes, report them immediately (may give
     // partially reduced result sets)
     reportMissingFields(encounters);
@@ -289,7 +292,7 @@ public class DataItemGenerator {
           "No encounter with level 'Versorgungsstellenkontakt' and/or location resources were"
               + " found. All data items that require a 'maxtreatmentlevel' separation are"
               + " filtered.");
-      mapExcludeDataItems.putAll(getAllDataItemsThatNeedSupplyContacts(dataItemContext));
+      effExcludeDataItems.putAll(getAllDataItemsThatNeedSupplyContacts(dataItemContext));
     }
 
     // Marking encounter resources as positive via setting of extensions
@@ -427,7 +430,7 @@ public class DataItemGenerator {
     DiseaseDataItem cd;
     // current treatmentlevel
     String currentTreatmentlevelItemName = determineLabel(dataItemContext, CURRENT_TREATMENTLEVEL);
-    if (isItemNotExcluded(mapExcludeDataItems, currentTreatmentlevelItemName, false)) {
+    if (isItemNotExcluded(effExcludeDataItems, currentTreatmentlevelItemName, false)) {
       Map<String, Number> mapCurrent = new LinkedHashMap<>();
       currentStandardWardEncounters =
           new DataBuilder()
@@ -502,7 +505,7 @@ public class DataItemGenerator {
     String currentMaxtreatmentlevelLabel =
         determineLabel(dataItemContext, CURRENT_MAXTREATMENTLEVEL);
     // current maxtreatmentlevel
-    if (isItemNotExcluded(mapExcludeDataItems, currentMaxtreatmentlevelLabel, false)) {
+    if (isItemNotExcluded(effExcludeDataItems, currentMaxtreatmentlevelLabel, false)) {
       Map<String, Number> mapCurrentMax = new LinkedHashMap<>();
       currentMaxStationary =
           new DataBuilder()
@@ -584,8 +587,8 @@ public class DataItemGenerator {
     String currentAgeMaxtreatmentlevelNormalWard =
         determineLabel(dataItemContext, CURRENT_AGE_MAXTREATMENTLEVEL_NORMAL_WARD);
     // current.age.maxtreatmentlevel.normal_ward
-    if (isItemNotExcluded(mapExcludeDataItems, currentAgeMaxtreatmentlevelNormalWard, false)) {
-      if (mapExcludeDataItems.getOrDefault(currentMaxtreatmentlevelLabel, false)) {
+    if (isItemNotExcluded(effExcludeDataItems, currentAgeMaxtreatmentlevelNormalWard, false)) {
+      if (effExcludeDataItems.getOrDefault(currentMaxtreatmentlevelLabel, false)) {
         currentMaxStationary =
             new DataBuilder()
                 .icuDiseaseMap(mapIcuDiseasePositiveOverall)
@@ -611,7 +614,7 @@ public class DataItemGenerator {
           CURRENT_AGE_MAXTREATMENTLEVEL_ICU,
           ICU,
           currentDataList,
-          mapExcludeDataItems,
+          effExcludeDataItems,
           currentMaxtreatmentlevelLabel,
           mapIcuDiseasePositiveOverall,
           mapPositiveEncounterByClass,
@@ -622,7 +625,7 @@ public class DataItemGenerator {
           CURRENT_AGE_MAXTREATMENTLEVEL_ICU_WITH_VENTILATION,
           ICU_VENTILATION,
           currentDataList,
-          mapExcludeDataItems,
+          effExcludeDataItems,
           currentMaxtreatmentlevelLabel,
           mapIcuDiseasePositiveOverall,
           mapPositiveEncounterByClass,
@@ -633,7 +636,7 @@ public class DataItemGenerator {
           CURRENT_AGE_MAXTREATMENTLEVEL_ICU_WITH_ECMO,
           ICU_ECMO,
           currentDataList,
-          mapExcludeDataItems,
+          effExcludeDataItems,
           currentMaxtreatmentlevelLabel,
           mapIcuDiseasePositiveOverall,
           mapPositiveEncounterByClass,
@@ -646,7 +649,7 @@ public class DataItemGenerator {
           CURRENT_AGE_MAXTREATMENTLEVEL_ICU_UNDIFF,
           ICU_UNDIFF,
           currentDataList,
-          mapExcludeDataItems,
+          effExcludeDataItems,
           currentMaxtreatmentlevelLabel,
           mapIcuDiseasePositiveOverall,
           mapPositiveEncounterByClass,
@@ -656,7 +659,7 @@ public class DataItemGenerator {
 
     // cumulative.results
     String cumulativeResultsLabel = determineLabel(dataItemContext, CUMULATIVE_RESULTS);
-    if (isItemNotExcluded(mapExcludeDataItems, cumulativeResultsLabel, false)) {
+    if (isItemNotExcluded(effExcludeDataItems, cumulativeResultsLabel, false)) {
       Map<String, Number> cumulativeResultMap = new LinkedHashMap<>();
       for (DashboardLogicFixedValues result : List.of(POSITIVE, BORDERLINE, NEGATIVE)) {
         Set<MiiObservation> observations =
@@ -668,7 +671,7 @@ public class DataItemGenerator {
     }
 
     String cumulativeGenderLabel = determineLabel(dataItemContext, CUMULATIVE_GENDER);
-    if (isItemNotExcluded(mapExcludeDataItems, cumulativeGenderLabel, false)) {
+    if (isItemNotExcluded(effExcludeDataItems, cumulativeGenderLabel, false)) {
       Map<String, Number> cumulativeGenderMap = new LinkedHashMap<>();
       Map<String, Set<String>> cumulativeGenderPids = debug ? new LinkedHashMap<>() : null;
 
@@ -698,7 +701,7 @@ public class DataItemGenerator {
 
     // cumulative.age
     String cumulativeAgeLabel = determineLabel(dataItemContext, CUMULATIVE_AGE);
-    if (isItemNotExcluded(mapExcludeDataItems, cumulativeAgeLabel, false)) {
+    if (isItemNotExcluded(effExcludeDataItems, cumulativeAgeLabel, false)) {
       currentDataList.add(
           new DiseaseDataItem(
               cumulativeAgeLabel,
@@ -712,7 +715,7 @@ public class DataItemGenerator {
     // cumulative.maxtreatmentlevel
     String cumulativeMaxTreatmentLevelLabel =
         determineLabel(dataItemContext, CUMULATIVE_MAXTREATMENTLEVEL);
-    if (isItemNotExcluded(mapExcludeDataItems, cumulativeMaxTreatmentLevelLabel, false)) {
+    if (isItemNotExcluded(effExcludeDataItems, cumulativeMaxTreatmentLevelLabel, false)) {
       Map<String, Number> mapCumulativeMaxtreatmentlevel =
           getStringNumberMap(
               cumulativeOutpatientEncounters, cumulativeStandardWardEncounters, useIcuUndiff);
@@ -760,7 +763,7 @@ public class DataItemGenerator {
         determineLabel(dataItemContext, CUMULATIVE_AGE_MAXTREATMENTLEVEL_OUTPATIENT);
     // cumulative.age.maxtreatmentlevel.outpatient
     if (isItemNotExcluded(
-        mapExcludeDataItems, cumulativeAgeMaxTreatmentlevelOutpatientLabel, false)) {
+        effExcludeDataItems, cumulativeAgeMaxTreatmentlevelOutpatientLabel, false)) {
       List<Integer> cumulativeMaxtreatmentlevelOutpatientAgeList =
           new DataBuilder()
               .mapPositiveEncounterByClass(mapPositiveEncounterByClass)
@@ -779,7 +782,7 @@ public class DataItemGenerator {
         determineLabel(dataItemContext, CUMULATIVE_AGE_MAXTREATMENTLEVEL_NORMAL_WARD);
     // cumulative.age.maxtreatmentlevel.normal_ward
     if (isItemNotExcluded(
-        mapExcludeDataItems, cumulativeAgeMaxTreatmentlevelNormalWardLabel, false)) {
+        effExcludeDataItems, cumulativeAgeMaxTreatmentlevelNormalWardLabel, false)) {
       List<Integer> cumulativeMaxtreatmentlevelNormalWardAgeList =
           new DataBuilder()
               .mapPositiveEncounterByClass(mapPositiveEncounterByClass)
@@ -799,7 +802,7 @@ public class DataItemGenerator {
     if (!useIcuUndiff) {
       String cumulativeAgeMaxTreatmentlevelIcuLabel =
           determineLabel(dataItemContext, CUMULATIVE_AGE_MAXTREATMENTLEVEL_ICU);
-      if (isItemNotExcluded(mapExcludeDataItems, cumulativeAgeMaxTreatmentlevelIcuLabel, false)) {
+      if (isItemNotExcluded(effExcludeDataItems, cumulativeAgeMaxTreatmentlevelIcuLabel, false)) {
         List<Integer> cumulativeMaxtreatmentlevelIcuAgeList =
             new DataBuilder()
                 .mapPositiveEncounterByClass(mapPositiveEncounterByClass)
@@ -817,7 +820,7 @@ public class DataItemGenerator {
       String cumulativeAgeMaxTreatmentlevelVentLabel =
           determineLabel(dataItemContext, CUMULATIVE_AGE_MAXTREATMENTLEVEL_ICU_WITH_VENTILATION);
       // cumulative.age.maxtreatmentlevel.icu_with_ventilation
-      if (isItemNotExcluded(mapExcludeDataItems, cumulativeAgeMaxTreatmentlevelVentLabel, false)) {
+      if (isItemNotExcluded(effExcludeDataItems, cumulativeAgeMaxTreatmentlevelVentLabel, false)) {
         List<Integer> cumulativeMaxtreatmentlevelIcuVentAgeList =
             new DataBuilder()
                 .mapPositiveEncounterByClass(mapPositiveEncounterByClass)
@@ -835,7 +838,7 @@ public class DataItemGenerator {
       // cumulative.age.maxtreatmentlevel.icu_with_ecmo
       String cumulativeAgeMaxTreatmentlevelEcmoLabel =
           determineLabel(dataItemContext, CUMULATIVE_AGE_MAXTREATMENTLEVEL_ICU_WITH_ECMO);
-      if (isItemNotExcluded(mapExcludeDataItems, cumulativeAgeMaxTreatmentlevelEcmoLabel, false)) {
+      if (isItemNotExcluded(effExcludeDataItems, cumulativeAgeMaxTreatmentlevelEcmoLabel, false)) {
         List<Integer> cumulativeMaxtreatmentlevelIcuEcmoAgeList =
             new DataBuilder()
                 .mapPositiveEncounterByClass(mapPositiveEncounterByClass)
@@ -854,7 +857,7 @@ public class DataItemGenerator {
       String cumulativeAgeMaxTreatmentlevelIcuUndiffLabel =
           determineLabel(dataItemContext, CUMULATIVE_AGE_MAXTREATMENTLEVEL_ICU_UNDIFF);
       if (isItemNotExcluded(
-          mapExcludeDataItems, cumulativeAgeMaxTreatmentlevelIcuUndiffLabel, false)) {
+          effExcludeDataItems, cumulativeAgeMaxTreatmentlevelIcuUndiffLabel, false)) {
         List<Integer> cumMtlIcuUndiffAgeList =
             new DataBuilder()
                 .mapPositiveEncounterByClass(mapPositiveEncounterByClass)
@@ -872,7 +875,7 @@ public class DataItemGenerator {
     }
     // cumulative zip code
     String cumulativeZipCodeLabel = determineLabel(dataItemContext, CUMULATIVE_ZIPCODE);
-    if (isItemNotExcluded(mapExcludeDataItems, cumulativeZipCodeLabel, false)) {
+    if (isItemNotExcluded(effExcludeDataItems, cumulativeZipCodeLabel, false)) {
       currentDataList.add(
           new DiseaseDataItem(
               cumulativeZipCodeLabel,
@@ -882,7 +885,7 @@ public class DataItemGenerator {
 
     // timeline tests
     String timelineTestsLabel = determineLabel(dataItemContext, TIMELINE_TESTS);
-    if (isItemNotExcluded(mapExcludeDataItems, timelineTestsLabel, false)) {
+    if (isItemNotExcluded(effExcludeDataItems, timelineTestsLabel, false)) {
       currentDataList.add(
           new DiseaseDataItem(
               timelineTestsLabel,
@@ -895,7 +898,7 @@ public class DataItemGenerator {
 
     // timeline.test.positive
     String timelineTestPositiveLabel = determineLabel(dataItemContext, TIMELINE_TEST_POSITIVE);
-    if (isItemNotExcluded(mapExcludeDataItems, timelineTestPositiveLabel, false)) {
+    if (isItemNotExcluded(effExcludeDataItems, timelineTestPositiveLabel, false)) {
       TimestampedListPair timelineTestPositivePair =
           new DataBuilder()
               .dataItemContext(dataItemContext)
@@ -908,7 +911,7 @@ public class DataItemGenerator {
     // timeline.maxtreatmentlevel
     String timelineMaxtreatmentlevelLabel =
         determineLabel(dataItemContext, TIMELINE_MAXTREATMENTLEVEL);
-    if (isItemNotExcluded(mapExcludeDataItems, timelineMaxtreatmentlevelLabel, false)) {
+    if (isItemNotExcluded(effExcludeDataItems, timelineMaxtreatmentlevelLabel, false)) {
       Map<TreatmentLevels, Map<Long, Set<String>>> resultMaxTreatmentTimeline;
       Map<String, List<Long>> mapResultTreatment = new LinkedHashMap<>();
 
@@ -954,7 +957,7 @@ public class DataItemGenerator {
     // cumulative inpatient gender
     String cumulativeInpatientGenderLabel =
         determineLabel(dataItemContext, CUMULATIVE_INPATIENT_GENDER);
-    if (isItemNotExcluded(mapExcludeDataItems, cumulativeInpatientGenderLabel, false)) {
+    if (isItemNotExcluded(effExcludeDataItems, cumulativeInpatientGenderLabel, false)) {
       Map<String, Number> cumulativeInpatientGenderMap = new HashMap<>();
       Map<String, Set<String>> cumulativeInpatientGenderPids = debug ? new HashMap<>() : null;
 
@@ -988,7 +991,7 @@ public class DataItemGenerator {
     // cumulative outpatient gender
     String cumulativeOutpatientGenderLabel =
         determineLabel(dataItemContext, CUMULATIVE_OUTPATIENT_GENDER);
-    if (isItemNotExcluded(mapExcludeDataItems, cumulativeOutpatientGenderLabel, false)) {
+    if (isItemNotExcluded(effExcludeDataItems, cumulativeOutpatientGenderLabel, false)) {
       Map<String, Number> cumulativeOutpatientGender = new HashMap<>();
       Set<String> outpatientsMale =
           new DataBuilder()
@@ -1030,7 +1033,7 @@ public class DataItemGenerator {
 
     String cumulativeInpatientAge = determineLabel(dataItemContext, CUMULATIVE_INPATIENT_AGE);
     // cumulative inpatient age
-    if (isItemNotExcluded(mapExcludeDataItems, cumulativeInpatientAge, false)) {
+    if (isItemNotExcluded(effExcludeDataItems, cumulativeInpatientAge, false)) {
       currentDataList.add(
           new DiseaseDataItem(
               cumulativeInpatientAge,
@@ -1044,7 +1047,7 @@ public class DataItemGenerator {
     // cumulative outpatient age
     String cumulativeOutpatientAgeLabel =
         determineLabel(dataItemContext, CUMULATIVE_OUTPATIENT_AGE);
-    if (isItemNotExcluded(mapExcludeDataItems, cumulativeOutpatientAgeLabel, false)) {
+    if (isItemNotExcluded(effExcludeDataItems, cumulativeOutpatientAgeLabel, false)) {
       currentDataList.add(
           new DiseaseDataItem(
               cumulativeOutpatientAgeLabel,
@@ -1057,7 +1060,7 @@ public class DataItemGenerator {
 
     // timeline deaths
     String timelineDeathsLabel = determineLabel(dataItemContext, TIMELINE_DEATHS);
-    if (isItemNotExcluded(mapExcludeDataItems, timelineDeathsLabel, false)) {
+    if (isItemNotExcluded(effExcludeDataItems, timelineDeathsLabel, false)) {
       currentDataList.add(
           new DiseaseDataItem(
               timelineDeathsLabel,
@@ -1070,7 +1073,7 @@ public class DataItemGenerator {
 
     // Bonn cross-table calculation; currently just needed in the covid-19-context
     if (dataItemContext == DataItemContext.COVID) {
-      if (isItemNotExcluded(mapExcludeDataItems, CURRENT_TREATMENTLEVEL_CROSSTAB, true)) {
+      if (isItemNotExcluded(effExcludeDataItems, CURRENT_TREATMENTLEVEL_CROSSTAB, true)) {
         Map<String, List> aggData = new HashMap<>();
         aggData.put(
             "columnname",
@@ -1131,7 +1134,7 @@ public class DataItemGenerator {
         determineLabel(dataItemContext, CUMULATIVE_LENGTHOFSTAY_ICU);
     Map<String, Map<Long, Set<String>>> mapIcuLengthList =
         createIcuLengthOfStayList(icuSupplyContactEncounters, dbData.getLocations());
-    if (isItemNotExcluded(mapExcludeDataItems, cumulativeLengthOfStayIcuLabel, false)) {
+    if (isItemNotExcluded(effExcludeDataItems, cumulativeLengthOfStayIcuLabel, false)) {
       createCumulativeLengthOfStayIcuData(
           cumulativeLengthOfStayIcuLabel,
           mapIcuDiseasePositiveOverall,
@@ -1143,7 +1146,7 @@ public class DataItemGenerator {
     // list with all lengths of icu stays (in h)
     String cumulativeLengthOfStayIcuAliveLabel =
         determineLabel(dataItemContext, CUMULATIVE_LENGTHOFSTAY_ICU_ALIVE);
-    if (isItemNotExcluded(mapExcludeDataItems, cumulativeLengthOfStayIcuAliveLabel, false)) {
+    if (isItemNotExcluded(effExcludeDataItems, cumulativeLengthOfStayIcuAliveLabel, false)) {
       createCumulativeLengthOfStayIcuData(
           cumulativeLengthOfStayIcuAliveLabel,
           mapIcuDiseasePositiveOverall,
@@ -1156,7 +1159,7 @@ public class DataItemGenerator {
     // list with all lengths of icu stays (in h)
     String cumulativeLengthOfStayIcuDeadLabel =
         determineLabel(dataItemContext, CUMULATIVE_LENGTHOFSTAY_ICU_DEAD);
-    if (isItemNotExcluded(mapExcludeDataItems, cumulativeLengthOfStayIcuDeadLabel, false)) {
+    if (isItemNotExcluded(effExcludeDataItems, cumulativeLengthOfStayIcuDeadLabel, false)) {
       createCumulativeLengthOfStayIcuData(
           cumulativeLengthOfStayIcuDeadLabel,
           mapIcuDiseasePositiveOverall,
@@ -1171,7 +1174,7 @@ public class DataItemGenerator {
         determineLabel(dataItemContext, CUMULATIVE_LENGTHOFSTAY_HOSPITAL);
     Map<String, Map<Long, Set<String>>> mapDays =
         createMapDaysHospitalList(dbData.getFacilityContactEncounters());
-    if (isItemNotExcluded(mapExcludeDataItems, cumulativeLengthOfStayHospitalLabel, false)) {
+    if (isItemNotExcluded(effExcludeDataItems, cumulativeLengthOfStayHospitalLabel, false)) {
       createCumulativeLengthOfStayHospitalData(
           dbData.getFacilityContactEncounters(),
           cumulativeLengthOfStayHospitalLabel,
@@ -1183,7 +1186,7 @@ public class DataItemGenerator {
     // cumulative length of stays ALIVE
     String cumulativeLengthOfStayHospitalAliveLabel =
         determineLabel(dataItemContext, CUMULATIVE_LENGTHOFSTAY_HOSPITAL_ALIVE);
-    if (isItemNotExcluded(mapExcludeDataItems, cumulativeLengthOfStayHospitalAliveLabel, false)) {
+    if (isItemNotExcluded(effExcludeDataItems, cumulativeLengthOfStayHospitalAliveLabel, false)) {
       createCumulativeLengthOfStayHospitalData(
           dbData.getFacilityContactEncounters(),
           cumulativeLengthOfStayHospitalAliveLabel,
@@ -1195,7 +1198,7 @@ public class DataItemGenerator {
     // cumulative.lengthofstay.dead
     String cumulativeLengthOfStayHospitalDeadLabel =
         determineLabel(dataItemContext, CUMULATIVE_LENGTHOFSTAY_HOSPITAL_DEAD);
-    if (isItemNotExcluded(mapExcludeDataItems, cumulativeLengthOfStayHospitalDeadLabel, false)) {
+    if (isItemNotExcluded(effExcludeDataItems, cumulativeLengthOfStayHospitalDeadLabel, false)) {
       createCumulativeLengthOfStayHospitalData(
           dbData.getFacilityContactEncounters(),
           cumulativeLengthOfStayHospitalDeadLabel,
@@ -1208,7 +1211,7 @@ public class DataItemGenerator {
     // Handling of items that restricted to covid-19 context
     if (dataItemContext == DataItemContext.COVID) {
       // cumulative varianttestresults
-      if (isItemNotExcluded(mapExcludeDataItems, CUMULATIVE_VARIANTTESTRESULTS, false)) {
+      if (isItemNotExcluded(effExcludeDataItems, CUMULATIVE_VARIANTTESTRESULTS, false)) {
         Map<String, Integer> resultMap =
             new CumulativeVariantTestResults()
                 .createVariantTestResultMap(
@@ -1218,7 +1221,7 @@ public class DataItemGenerator {
       }
 
       // timeline.varianttestresults
-      if (isItemNotExcluded(mapExcludeDataItems, TIMELINE_VARIANTTESTRESULTS, false)) {
+      if (isItemNotExcluded(effExcludeDataItems, TIMELINE_VARIANTTESTRESULTS, false)) {
         currentDataList.add(
             new DiseaseDataItem(
                 TIMELINE_VARIANTTESTRESULTS,

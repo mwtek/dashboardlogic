@@ -17,8 +17,7 @@
  */
 package de.ukbonn.mwtek.dashboardlogic.logic;
 
-import static de.ukbonn.mwtek.dashboardlogic.enums.KidsRadarConstants.ALL_DISORDERS;
-import static de.ukbonn.mwtek.dashboardlogic.enums.KidsRadarConstants.ALL_ICD_CODES;
+import static de.ukbonn.mwtek.dashboardlogic.enums.KidsRadarConstants.KJP_PREFIX;
 import static de.ukbonn.mwtek.dashboardlogic.enums.KidsRadarConstants.MEAN_LENGTH_OF_STAY;
 import static de.ukbonn.mwtek.dashboardlogic.enums.KidsRadarConstants.RSV_PREFIX;
 import static de.ukbonn.mwtek.dashboardlogic.tools.ObservationFilter.getObservationsByContext;
@@ -35,9 +34,7 @@ import de.ukbonn.mwtek.utilities.fhir.resources.MiiPatient;
 import de.ukbonn.mwtek.utilities.fhir.resources.MiiProcedure;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicReference;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -61,15 +58,10 @@ public class DashboardData {
   @Getter private List<MiiEncounter> supplyContactEncounters;
   @Getter private List<MiiEncounter> facilityContactEncounters;
 
-  private static Map<String, Integer> encounterAgeMap = null;
-  private static boolean encounterAgeMapInitialized = false; // Flag to check if map is initialized
-  private static AtomicReference<Map<String, Integer>> encounterAgeMapRef =
-      new AtomicReference<>(null);
-
+  public static final List<String> KJP_LENGTH_OF_STAY_STACKS =
+      List.of(KJP_PREFIX + "_" + MEAN_LENGTH_OF_STAY);
   public static final List<String> RSV_LENGTH_OF_STAY_STACKS =
       List.of(RSV_PREFIX + "_" + MEAN_LENGTH_OF_STAY);
-  public static final List<String> DISORDERS_CHARTS = List.of(ALL_DISORDERS);
-  public static final List<String> ALL_ICD_CODES_CHARTS = List.of(ALL_ICD_CODES);
 
   /** Initialization of often used data collections. */
   public DashboardData initializeData(

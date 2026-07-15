@@ -26,6 +26,7 @@ public class KidsRadarConstants {
   public static final String ALL_ICD_CODES = "all_icd_codes";
 
   public static final String RSV_PREFIX = "rsv";
+  public static final String KJP_PREFIX = "kjp";
   public static final String MEAN_LENGTH_OF_STAY = "mean_length_of_stay";
 
   public static final String KJP_DIAGNOSES_ALL = "kjp_diagnoses_all";

@@ -19,6 +19,7 @@ package de.ukbonn.mwtek.dashboardlogic.logic.cumulative.lengthofstay;
 
 import static de.ukbonn.mwtek.dashboardlogic.enums.KidsRadarConstants.KJP_DIAGNOSES_ALL;
 import static de.ukbonn.mwtek.dashboardlogic.enums.KidsRadarConstants.RSV_DIAGNOSES_ALL;
+import static de.ukbonn.mwtek.dashboardlogic.logic.DashboardData.KJP_LENGTH_OF_STAY_STACKS;
 import static de.ukbonn.mwtek.dashboardlogic.logic.DashboardData.RSV_LENGTH_OF_STAY_STACKS;
 import static de.ukbonn.mwtek.dashboardlogic.logic.KiraData.createLabelList;
 import static de.ukbonn.mwtek.dashboardlogic.tools.KidsRadarTools.getRsvOnlyCoreCaseDataByGroups;
@@ -66,18 +67,22 @@ public class KiraLengthOfStay extends DashboardDataItemLogic implements Timeline
 
     Map<String, Map<String, CoreCaseData>> coreCaseDataByGroupsFiltered = coreCaseDataByGroups;
 
+    // Setting chart, stack, and bar labels
+    StackedBarChartsItem<Double> result = new StackedBarChartsItem<>();
+
     String chartsLabel = "";
     switch (kidsRadarDataItemContext) {
-      case KJP -> chartsLabel = KJP_DIAGNOSES_ALL;
+      case KJP -> {
+        chartsLabel = KJP_DIAGNOSES_ALL;
+        result.setStacks(List.of(KJP_LENGTH_OF_STAY_STACKS));
+      }
       case PED -> {
         coreCaseDataByGroupsFiltered = getRsvOnlyCoreCaseDataByGroups(coreCaseDataByGroups);
         chartsLabel = RSV_DIAGNOSES_ALL;
+        result.setStacks(List.of(RSV_LENGTH_OF_STAY_STACKS));
       }
     }
-    // Setting chart, stack, and bar labels
-    StackedBarChartsItem<Double> result = new StackedBarChartsItem<>();
     result.setCharts(new ArrayList<>(List.of(chartsLabel)));
-    result.setStacks(List.of(RSV_LENGTH_OF_STAY_STACKS));
     result.setBars(List.of(createLabelList(coreCaseDataByGroupsFiltered.keySet())));
 
     List<List<Double>> resultValues = new ArrayList<>();

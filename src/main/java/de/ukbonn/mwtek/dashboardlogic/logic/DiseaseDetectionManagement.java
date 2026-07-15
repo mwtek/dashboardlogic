@@ -270,7 +270,7 @@ public class DiseaseDetectionManagement {
                       if (mapResultDiagnoseCaseIds.containsKey(icdDiagReliabilityCode)) {
                         mapResultDiagnoseCaseIds.computeIfPresent(
                             icdDiagReliabilityCode,
-                            (k, v) -> {
+                            (_, v) -> {
                               v.add(caseId);
                               return v;
                             });
@@ -279,8 +279,8 @@ public class DiseaseDetectionManagement {
                       }
                     } else {
                       log.warn(
-                          "No case id found in the condition resource with ID: "
-                              + condition.getId());
+                          "No case id found in the condition resource with ID: {}",
+                          condition.getId());
                     }
                   }
                 });
@@ -313,6 +313,7 @@ public class DiseaseDetectionManagement {
           case INFLUENZA, KIDS_RADAR_PED_INFL ->
               inputCodeSettings.getInfluenzaObservationPcrLoincCodes();
           case KIDS_RADAR,
+              KIDS_RADAR_KJP_NO_ICU,
               KIDS_RADAR_PED,
               KIDS_RADAR_KJP,
               KIDS_RADAR_PED_RSV,

@@ -119,7 +119,7 @@ public class KiraCumulativeDiagsGender extends DashboardDataItemLogic {
                     + " Patient/{}]",
                 unknowns.size(),
                 groupKey,
-                unknowns.get(0).getPatientId());
+                unknowns.getFirst().getPatientId());
           }
           if (!missing.isEmpty()) {
             log.warn(
@@ -127,7 +127,7 @@ public class KiraCumulativeDiagsGender extends DashboardDataItemLogic {
                     + " Patient/{}]",
                 missing.size(),
                 groupKey,
-                missing.get(0).getPatientId());
+                missing.getFirst().getPatientId());
           }
         });
 

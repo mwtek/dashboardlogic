@@ -126,7 +126,9 @@ public class KiRaPedDataItemGenerator extends DataItemGenerator {
     if (mapExcludeDataItems == null) {
       mapExcludeDataItems = new HashMap<>();
     }
-    boolean useIcuUndiff = globalConfiguration.getUseIcuUndifferentiated();
+    boolean useIcuUndiff =
+        globalConfiguration.getUseIcuUndifferentiated()
+            || globalConfiguration.getUseIcuUndifferentiatedKiradar();
     boolean debug = globalConfiguration.getDebug();
 
     // If there are resources with unfilled mandatory attributes, report them immediately (may give

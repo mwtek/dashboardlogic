@@ -56,6 +56,12 @@ public class GlobalConfiguration {
   private Boolean useIcuUndifferentiated = false;
 
   /**
+   * Replacing all data (sub)items that separate between icu + icu_ventilation + icu_ecmo + CPAP
+   * etc. icu_undifferentiated [default: false] explicitly on the kiradar project.
+   */
+  private Boolean useIcuUndifferentiatedKiradar = false;
+
+  /**
    * Should procedures that don't have a linked encounter with at least one icu stay get filtered?
    * [default: true]
    */

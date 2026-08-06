@@ -106,13 +106,4 @@ public class InputCodeSettings {
     allKidsRadarPedLoincCodes.addAll(influenzaObservationPcrLoincCodes);
     return allKidsRadarPedLoincCodes;
   }
-
-  public List<String> getKidsRadarPedAllProcSnomedCodes() {
-    List<String> allKidsRadarPedProcSnomedCodes = new ArrayList<>();
-    allKidsRadarPedProcSnomedCodes.addAll(procedureHighFlowCodes);
-    allKidsRadarPedProcSnomedCodes.addAll(procedureVentilationCodes);
-    allKidsRadarPedProcSnomedCodes.addAll(procedureCpapCodes);
-    allKidsRadarPedProcSnomedCodes.addAll(procedureEcmoCodes);
-    return allKidsRadarPedProcSnomedCodes;
-  }
 }

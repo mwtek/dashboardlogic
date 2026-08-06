@@ -41,12 +41,14 @@ import static de.ukbonn.mwtek.dashboardlogic.tools.EncounterFilter.filterEncount
 import static de.ukbonn.mwtek.dashboardlogic.tools.EncounterFilter.getInpatientFacilityEncounters;
 import static de.ukbonn.mwtek.dashboardlogic.tools.KidsRadarTools.getKidsRadarIcdCodesKjp;
 import static de.ukbonn.mwtek.dashboardlogic.tools.KidsRadarTools.removeEntriesByAge;
+import static de.ukbonn.mwtek.dashboardlogic.tools.LogHelper.logFilterStep;
 import static de.ukbonn.mwtek.dashboardlogic.tools.PatientFilter.filterPatientByExistingEncounter;
 import static de.ukbonn.mwtek.utilities.fhir.misc.FhirConditionTools.filterConditionsByRecordDate;
 import static de.ukbonn.mwtek.utilities.fhir.misc.FhirConditionTools.getConditionsByIcdCodes;
 import static de.ukbonn.mwtek.utilities.fhir.misc.FhirProcedureTools.filterProceduresByRecordDate;
 import static de.ukbonn.mwtek.utilities.fhir.misc.FhirProcedureTools.getProceduresByAnyOpsCodePrefix;
 import static org.hl7.fhir.r4.model.ResourceType.Condition;
+import static org.hl7.fhir.r4.model.ResourceType.Encounter;
 import static org.hl7.fhir.r4.model.ResourceType.Procedure;
 
 import de.ukbonn.mwtek.dashboardlogic.enums.DataItemContext;
@@ -84,6 +86,9 @@ import org.hl7.fhir.r4.model.ResourceType;
  */
 @Slf4j
 public class KiRaKjpDataItemGenerator extends DataItemGenerator {
+
+  public static final String OLDER_THAN_Q_DATE_TEXT = "older than " + QUALIFYING_DATE;
+  public static final String NOT_KJP_RELEVANT_TEXT = "not KJP relevant";
 
   /**
    * Initialization of the CoronaResults object with the required FhirRessource lists.
@@ -128,7 +133,7 @@ public class KiRaKjpDataItemGenerator extends DataItemGenerator {
     if (mapExcludeDataItems == null) {
       mapExcludeDataItems = new HashMap<>();
     }
-    boolean debug = globalConfiguration.getDebug();
+    boolean debug = globalConfiguration.getOutputDebugItems();
 
     // If there are resources with unfilled mandatory attributes, report them immediately (may give
     // partially reduced result sets)
@@ -142,25 +147,48 @@ public class KiRaKjpDataItemGenerator extends DataItemGenerator {
     reportAttributeArtifacts(facilityContactEncountersInpatient);
 
     // Filter conditions to the ones that lie after the starting date (2020-01)
-    List<MiiCondition> conditionsFiltered =
+    List<MiiCondition> conditionsDateFiltered =
         filterConditionsByRecordDate(conditions, QUALIFYING_DATE);
+    logFilterStep(
+        Condition,
+        "Date",
+        conditions.size(),
+        conditionsDateFiltered.size(),
+        OLDER_THAN_Q_DATE_TEXT);
+
     // Filter conditions that are not kjp related
-    conditionsFiltered =
+    List<MiiCondition> conditionsFiltered =
         new ArrayList<>(
             getConditionsByIcdCodes(
-                conditionsFiltered,
+                conditionsDateFiltered,
                 getKidsRadarIcdCodesKjp(inputCodeSettings.getKidsRadarConditionKjpIcdCodes())));
-    logDateFiltering(Condition, conditions.size(), conditionsFiltered.size());
+    logFilterStep(
+        Condition,
+        "ICD/KJP",
+        conditionsDateFiltered.size(),
+        conditionsFiltered.size(),
+        NOT_KJP_RELEVANT_TEXT);
 
     // Filter conditions that are not kjp related
     List<MiiProcedure> proceduresFilteredCode =
         new ArrayList<>(
             getProceduresByAnyOpsCodePrefix(
                 procedures, List.of(inputCodeSettings.getKidsRadarKjpOpsCodePrefix())));
+    logFilterStep(
+        Procedure,
+        "OPS/KJP",
+        procedures.size(),
+        proceduresFilteredCode.size(),
+        NOT_KJP_RELEVANT_TEXT);
     // Filter procedures to the ones that lie after the starting date (2020-01)
     List<MiiProcedure> proceduresFiltered =
         filterProceduresByRecordDate(proceduresFilteredCode, QUALIFYING_DATE);
-    logDateFiltering(Procedure, proceduresFilteredCode.size(), proceduresFiltered.size());
+    logFilterStep(
+        Procedure,
+        "Date",
+        proceduresFilteredCode.size(),
+        proceduresFiltered.size(),
+        OLDER_THAN_Q_DATE_TEXT);
 
     // Patient IDs of patients with a valid condition
     Set<String> conditionPids =
@@ -204,9 +232,12 @@ public class KiRaKjpDataItemGenerator extends DataItemGenerator {
     List<MiiEncounter> facilityContactEncountersKjpMerged = merge.mergedEncounters();
     // Merge these lists for overall patient filtering
     Map<String, CoreCaseData> coreCaseDataAll = merge.registryByEncounterId();
-    log.debug(
-        "{} Facility contacts got filtered after merging and age condition check. ",
-        before - facilityContactEncountersKjpMerged.size());
+    logFilterStep(
+        Encounter,
+        "FacilityEncounters",
+        before,
+        facilityContactEncountersKjpMerged.size(),
+        "after merging and age condition check");
 
     Map<String, Map<String, CoreCaseData>> coreCaseDataByKjpDiagnosis =
         createCasesByDiag(
@@ -421,20 +452,11 @@ public class KiRaKjpDataItemGenerator extends DataItemGenerator {
   private static void logFilteredAgeAtAdmission(
       ResourceType resourceType, int sumBefore, int sumFiltered) {
     if (sumFiltered > 0)
-      log.info(
-          "{} {} resource(s) were filtered because they were older than 19 years at the time of"
-              + " admission.",
-          sumBefore - sumFiltered,
-          resourceType.name());
-  }
-
-  private void logDateFiltering(ResourceType resourceType, int sumBefore, int sumFiltered) {
-    if (sumFiltered > 0)
-      log.info(
-          "{} {} resource(s) were filtered because they are older than {} or do not contain any"
-              + " recorded date. date. ",
-          sumBefore - sumFiltered,
-          resourceType.name(),
-          QUALIFYING_DATE);
+      logFilterStep(
+          resourceType,
+          "AGE",
+          sumBefore,
+          sumFiltered,
+          "older than 19 years at the time of admission");
   }
 }

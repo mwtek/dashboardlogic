@@ -90,7 +90,7 @@ public class KidsRadarDataItemGenerator extends DataItemGenerator {
     if (mapExcludeDataItems == null) {
       mapExcludeDataItems = new HashMap<>();
     }
-    boolean debug = globalConfiguration.getDebug();
+    boolean debug = globalConfiguration.getOutputDebugItems();
 
     // If there are resources with unfilled mandatory attributes, report them immediately (may give
     // partially reduced result sets)

@@ -83,7 +83,7 @@ public class BctDataItemGenerator extends DataItemGenerator {
     if (mapExcludeDataItems == null) {
       mapExcludeDataItems = new HashMap<>();
     }
-    boolean debug = globalConfiguration.getDebug();
+    boolean debug = globalConfiguration.getOutputDebugItems();
 
     // The valid cases in our use case must have agreed to three specific fields
     consents = getValidBroadConsents(consents);

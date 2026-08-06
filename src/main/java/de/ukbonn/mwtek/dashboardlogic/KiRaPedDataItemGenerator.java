@@ -43,8 +43,12 @@ import static de.ukbonn.mwtek.dashboardlogic.logic.DiseaseResultFunctionality.ge
 import static de.ukbonn.mwtek.dashboardlogic.logic.KiraHandlingLogic.createCasesByDiag;
 import static de.ukbonn.mwtek.dashboardlogic.tools.EncounterFilter.filterEncounterByAge;
 import static de.ukbonn.mwtek.dashboardlogic.tools.EncounterFilter.getInpatientFacilityEncounters;
+import static de.ukbonn.mwtek.dashboardlogic.tools.LogHelper.logFilterStep;
 import static de.ukbonn.mwtek.dashboardlogic.tools.PatientFilter.filterPatientByExistingEncounter;
 import static de.ukbonn.mwtek.utilities.fhir.misc.FhirConditionTools.filterConditionsByRecordDate;
+import static org.hl7.fhir.r4.model.ResourceType.Condition;
+import static org.hl7.fhir.r4.model.ResourceType.Encounter;
+import static org.hl7.fhir.r4.model.ResourceType.Patient;
 
 import de.ukbonn.mwtek.dashboardlogic.enums.DataItemContext;
 import de.ukbonn.mwtek.dashboardlogic.enums.KidsRadarDataItemContext;
@@ -82,6 +86,9 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Slf4j
 public class KiRaPedDataItemGenerator extends DataItemGenerator {
+
+  public static final String PATIENTS_WERE_OLDER_THAN_17_YEARS_AT_ADMISSION_DATE =
+      "patients were older than 17 years at admission date";
 
   /**
    * Initialization of the CoronaResults object with the required FhirRessource lists.
@@ -129,7 +136,7 @@ public class KiRaPedDataItemGenerator extends DataItemGenerator {
     boolean useIcuUndiff =
         globalConfiguration.getUseIcuUndifferentiated()
             || globalConfiguration.getUseIcuUndifferentiatedKiradar();
-    boolean debug = globalConfiguration.getDebug();
+    boolean debug = globalConfiguration.getOutputDebugItems();
 
     // If there are resources with unfilled mandatory attributes, report them immediately (may give
     // partially reduced result sets)
@@ -175,26 +182,32 @@ public class KiRaPedDataItemGenerator extends DataItemGenerator {
     // Filter conditions to the ones that lie after the starting date (2020-01)
     List<MiiCondition> conditionsFiltered =
         filterConditionsByRecordDate(conditions, QUALIFYING_DATE);
-    log.info(
-        "{} conditions got filtered because they're older than {} or doesn't contain any recorded"
-            + " date. ",
-        conditions.size() - conditionsFiltered.size(),
-        QUALIFYING_DATE);
+    logFilterStep(
+        Condition,
+        "RecordDate",
+        conditions.size(),
+        conditionsFiltered.size(),
+        "older than " + QUALIFYING_DATE + " or doesn't contain any recorded");
 
     // Filtering of all cases where the patient age is >=18 at admission date
     List<MiiEncounter> facilityContactsFilteredByAge =
         filterEncounterByAge(facilityContactEncountersInpatient, patients, UPPER_AGE_BORDER);
-    log.info(
-        "{} encounter got filtered because the patients were older than 17 years at admission "
-            + "date. ",
-        facilityContactEncountersInpatient.size() - facilityContactsFilteredByAge.size());
+    logFilterStep(
+        Encounter,
+        "Age",
+        facilityContactEncountersInpatient.size(),
+        facilityContactsFilteredByAge.size(),
+        PATIENTS_WERE_OLDER_THAN_17_YEARS_AT_ADMISSION_DATE);
 
     // Filter the patients to the ones that have at least 1 encounter with age <19
     List<MiiPatient> patientsFiltered =
         filterPatientByExistingEncounter(patients, facilityContactsFilteredByAge);
-    log.info(
-        "{} patients got filtered because they were older than 17 years at any admission date ",
-        patients.size() - patientsFiltered.size());
+    logFilterStep(
+        Patient,
+        "Age",
+        patients.size(),
+        patientsFiltered.size(),
+        PATIENTS_WERE_OLDER_THAN_17_YEARS_AT_ADMISSION_DATE);
 
     Map<String, Map<String, CoreCaseData>> coreCaseDataByRsvDiagnosis =
         createCasesByDiag(

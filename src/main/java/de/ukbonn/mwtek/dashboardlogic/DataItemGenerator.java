@@ -234,7 +234,7 @@ public class DataItemGenerator {
       mapExcludeDataItems = new HashMap<>();
     }
     boolean useIcuUndiff = globalConfiguration.getUseIcuUndifferentiated();
-    boolean debug = globalConfiguration.getDebug();
+    boolean debug = globalConfiguration.getOutputDebugItems();
 
     // Save the in the YAML configured data items exclude map
     Map<String, Boolean> effExcludeDataItems = new HashMap<>(mapExcludeDataItems);

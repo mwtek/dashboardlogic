@@ -39,7 +39,7 @@ public class GlobalConfiguration {
   private Map<String, Object> inputCodes = new HashMap<>();
 
   /** Flag to add debug information (e.g. case ids / resource ids) to the output. */
-  private Boolean debug = false;
+  private Boolean outputDebugItems = false;
 
   private Map<String, Boolean> predictionModels = new HashMap<>();
 

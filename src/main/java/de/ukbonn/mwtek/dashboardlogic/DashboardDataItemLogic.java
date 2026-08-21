@@ -50,6 +50,7 @@ public class DashboardDataItemLogic {
   public static final String ACR_COHORT_K_2 = "acr_cohort_k2";
   public static final String ACR_COHORT_K_3 = "acr_cohort_k3";
   public static final String KJP_PATIENT = "kjp_patient";
+  public static final String RSV_PATIENT = "rsv_patient";
 
   // Accepts forms like "2020-Q1", "2020-q4"
   private static final Pattern YEAR_QUARTER_PATTERN = Pattern.compile("^(\\d{4})-[Qq]([1-4])$");

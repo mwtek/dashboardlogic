@@ -32,6 +32,7 @@ import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.TIMELINE_AGE;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.TIMELINE_AGE_PCR;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.TIMELINE_DIAGS_OCCURRENCE;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.TIMELINE_MAXTREATMENTLEVEL;
+import static de.ukbonn.mwtek.dashboardlogic.enums.EncounterReferenceResourceType.ICU_PROCEDURE;
 import static de.ukbonn.mwtek.dashboardlogic.enums.KidsRadarConstants.UPPER_AGE_BORDER;
 import static de.ukbonn.mwtek.dashboardlogic.enums.KidsRadarDataItemContext.PED;
 import static de.ukbonn.mwtek.dashboardlogic.enums.KidsRadarDataItemContext.PED_COV;
@@ -39,8 +40,9 @@ import static de.ukbonn.mwtek.dashboardlogic.enums.KidsRadarDataItemContext.PED_
 import static de.ukbonn.mwtek.dashboardlogic.enums.KidsRadarDataItemContext.PED_PERTUSSIS;
 import static de.ukbonn.mwtek.dashboardlogic.enums.KidsRadarDataItemContext.PED_RSV;
 import static de.ukbonn.mwtek.dashboardlogic.enums.NumDashboardConstants.KidsRadar.QUALIFYING_DATE;
-import static de.ukbonn.mwtek.dashboardlogic.logic.DiseaseResultFunctionality.generateSupplyContactToFacilityContactMap;
 import static de.ukbonn.mwtek.dashboardlogic.logic.KiraHandlingLogic.createCasesByDiag;
+import static de.ukbonn.mwtek.dashboardlogic.logic.ReferenceFunctionality.generateSupplyContactToFacilityContactMap;
+import static de.ukbonn.mwtek.dashboardlogic.logic.ReferenceFunctionality.updateEncounterReferences;
 import static de.ukbonn.mwtek.dashboardlogic.tools.EncounterFilter.filterEncounterByAge;
 import static de.ukbonn.mwtek.dashboardlogic.tools.EncounterFilter.getInpatientFacilityEncounters;
 import static de.ukbonn.mwtek.dashboardlogic.tools.LogHelper.logFilterStep;
@@ -133,6 +135,16 @@ public class KiRaPedDataItemGenerator extends DataItemGenerator {
     if (mapExcludeDataItems == null) {
       mapExcludeDataItems = new HashMap<>();
     }
+
+    // Procedure updating currently redundant since it's done directly after the data retrieval but
+    // logic might shift to here in the near future.
+    procedures =
+        updateEncounterReferences(
+            procedures,
+            encounters,
+            globalConfiguration.getEncounterReferenceTargetType(ICU_PROCEDURE),
+            ICU_PROCEDURE);
+
     boolean useIcuUndiff =
         globalConfiguration.getUseIcuUndifferentiated()
             || globalConfiguration.getUseIcuUndifferentiatedKiradar();

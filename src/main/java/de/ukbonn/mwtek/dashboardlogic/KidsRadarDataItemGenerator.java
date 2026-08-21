@@ -18,9 +18,12 @@
 package de.ukbonn.mwtek.dashboardlogic;
 
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItemContext.KIDS_RADAR;
+import static de.ukbonn.mwtek.dashboardlogic.enums.EncounterReferenceResourceType.CONDITION;
+import static de.ukbonn.mwtek.dashboardlogic.logic.ReferenceFunctionality.updateEncounterReferences;
 import static de.ukbonn.mwtek.dashboardlogic.tools.EncounterFilter.getInpatientFacilityEncounters;
 
 import de.ukbonn.mwtek.dashboardlogic.enums.DataItemContext;
+import de.ukbonn.mwtek.dashboardlogic.enums.EncounterReferenceResourceType;
 import de.ukbonn.mwtek.dashboardlogic.models.DiseaseDataItem;
 import de.ukbonn.mwtek.dashboardlogic.settings.GlobalConfiguration;
 import de.ukbonn.mwtek.dashboardlogic.settings.InputCodeSettings;
@@ -95,6 +98,15 @@ public class KidsRadarDataItemGenerator extends DataItemGenerator {
     // If there are resources with unfilled mandatory attributes, report them immediately (may give
     // partially reduced result sets)
     reportMissingFields(encounters);
+
+    // Update condition and procedure references from supply/department contact to facility contact
+    // if set
+    conditions =
+        updateEncounterReferences(
+            conditions,
+            encounters,
+            globalConfiguration.getEncounterReferenceTargetType(CONDITION),
+            EncounterReferenceResourceType.CONDITION);
 
     // Filtering outpatient and semi-stationary encounter (that could hold Encounter.class =
     // 'IMP' as well)

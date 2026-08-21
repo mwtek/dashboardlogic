@@ -19,6 +19,8 @@
 import static de.ukbonn.mwtek.dashboardlogic.enums.KidsRadarConstants.CASE_MERGED;
 import static de.ukbonn.mwtek.dashboardlogic.enums.KidsRadarConstants.THRESHOLD_DAYS_CASE_MERGE;
 import static de.ukbonn.mwtek.dashboardlogic.enums.KidsRadarConstants.UPPER_AGE_BORDER;
+import static de.ukbonn.mwtek.dashboardlogic.logic.ReferenceFunctionality.updateConditionEncounterReferencesOnMerge;
+import static de.ukbonn.mwtek.dashboardlogic.logic.ReferenceFunctionality.updateProcedureEncounterReferences;
 import static de.ukbonn.mwtek.dashboardlogic.tools.EncounterFilter.filterEncountersByIds;
 import static de.ukbonn.mwtek.dashboardlogic.tools.EncounterFilter.isEncounterValidByAge;
 import static de.ukbonn.mwtek.dashboardlogic.tools.KidsRadarTools.getIcdCodesAsString;
@@ -292,7 +294,7 @@ public class KiraHandlingLogic {
       Map<String, CoreCaseData> coreCaseDataByEncounterIdMap) {
 
     // Update encounter references
-    updateConditionEncounterReferences(
+    updateConditionEncounterReferencesOnMerge(
         conditions, nextCase.getFacilityEncounterId(), currentCase.getFacilityEncounterId());
     updateProcedureEncounterReferences(
         procedures, nextCase.getFacilityEncounterId(), currentCase.getFacilityEncounterId());
@@ -321,61 +323,6 @@ public class KiraHandlingLogic {
   /** Helper method to determine if the discharge date should be updated. */
   private static boolean shouldUpdateDate(Date current, Date proposed) {
     return proposed != null && current.before(proposed);
-  }
-
-  /**
-   * Updates the encounter references for conditions of the cases that get merged.
-   *
-   * @param oldEncounterId the old encounter ID to be replaced, must not be null
-   * @param newEncounterId the new encounter ID to replace with, must not be null
-   * @throws IllegalArgumentException if either oldEncounterId or newEncounterId is null
-   */
-  public static void updateConditionEncounterReferences(
-      List<MiiCondition> conditions, String oldEncounterId, String newEncounterId) {
-    if (oldEncounterId == null || newEncounterId == null) {
-      throw new IllegalArgumentException("Encounter IDs must not be null");
-    }
-    conditions.stream()
-        .filter(condition -> condition.getCaseId().equals(oldEncounterId))
-        .forEach(
-            condition -> {
-              condition.setCaseId(newEncounterId);
-              log.info(
-                  "Updated condition {} encounter id from {} to {}",
-                  condition.getId(),
-                  oldEncounterId,
-                  newEncounterId);
-            });
-  }
-
-  /**
-   * Updates the encounter references for procedures of the cases that get merged.
-   *
-   * @param procedures the list of procedures to update; may be empty but not null-safe if method is
-   *     called with null
-   * @param oldEncounterId the old encounter ID to be replaced, must not be null
-   * @param newEncounterId the new encounter ID to replace with, must not be null
-   */
-  public static void updateProcedureEncounterReferences(
-      List<MiiProcedure> procedures, String oldEncounterId, String newEncounterId) {
-
-    if (oldEncounterId == null || newEncounterId == null) {
-      throw new IllegalArgumentException("Encounter IDs must not be null");
-    }
-    if (procedures == null || procedures.isEmpty()) return;
-
-    procedures.stream()
-        .filter(Objects::nonNull)
-        .filter(p -> oldEncounterId.equals(p.getCaseId()))
-        .forEach(
-            p -> {
-              p.setCaseId(newEncounterId);
-              log.info(
-                  "Updated procedure {} encounter id from {} to {}",
-                  p.getId(),
-                  oldEncounterId,
-                  newEncounterId);
-            });
   }
 
   private static Map<String, CoreCaseData> generateCoreCaseDataByEncounterIdMap(

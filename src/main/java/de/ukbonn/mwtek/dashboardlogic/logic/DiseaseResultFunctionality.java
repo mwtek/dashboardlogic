@@ -30,7 +30,6 @@ import static de.ukbonn.mwtek.dashboardlogic.tools.ObservationFilter.getObservat
 import static de.ukbonn.mwtek.dashboardlogic.tools.ObservationFilter.getPatientIdsByObsInterpretation;
 import static de.ukbonn.mwtek.dashboardlogic.tools.ObservationFilter.getPatientIdsByObsValue;
 import static de.ukbonn.mwtek.utilities.enums.TerminologySystems.SNOMED;
-import static de.ukbonn.mwtek.utilities.fhir.mapping.kdscase.valuesets.KdsEncounterFixedValues.IDENTIFIER_TYPE_VISIT_NUMBER_CC;
 
 import de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues;
 import de.ukbonn.mwtek.dashboardlogic.enums.DataItemContext;
@@ -41,7 +40,6 @@ import de.ukbonn.mwtek.dashboardlogic.enums.NumDashboardConstants.Covid;
 import de.ukbonn.mwtek.dashboardlogic.enums.NumDashboardConstants.Influenza;
 import de.ukbonn.mwtek.dashboardlogic.enums.NumDashboardConstants.KidsRadar;
 import de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels;
-import de.ukbonn.mwtek.dashboardlogic.models.FacilityEncounterToIcuSupplyContactsMap;
 import de.ukbonn.mwtek.dashboardlogic.settings.InputCodeSettings;
 import de.ukbonn.mwtek.dashboardlogic.settings.QualitativeLabCodesSettings;
 import de.ukbonn.mwtek.dashboardlogic.tools.EncounterFilter;
@@ -73,7 +71,6 @@ import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.hl7.fhir.r4.model.CodeableConcept;
 import org.hl7.fhir.r4.model.Encounter.EncounterLocationComponent;
-import org.hl7.fhir.r4.model.Identifier;
 import org.hl7.fhir.r4.model.Reference;
 
 /**
@@ -184,181 +181,6 @@ public class DiseaseResultFunctionality {
 
     TimerTools.stopTimerAndLog(start, "finished createIcuMap");
     return resultMap;
-  }
-
-  public static FacilityEncounterToIcuSupplyContactsMap assignSupplyEncountersToFacilityEncounter(
-      List<MiiEncounter> icuSupplyContactEncounters, List<MiiEncounter> inpatientEncounters) {
-
-    // Initialize output map
-    FacilityEncounterToIcuSupplyContactsMap output = new FacilityEncounterToIcuSupplyContactsMap();
-
-    // Group ICU supply contacts by official identifier value
-    Map<String, List<MiiEncounter>> icuSupplyContactsMap =
-        icuSupplyContactEncounters.stream()
-            .filter(
-                enc -> {
-                  boolean hasValue = enc.hasVisitNumberIdentifierValue();
-                  if (!hasValue) {
-                    log.warn("Encounter {} has no valid visit number identifier", enc.getId());
-                  }
-                  return hasValue;
-                })
-            .collect(Collectors.groupingBy(MiiEncounter::getVisitNumberIdentifierValue));
-
-    List<MiiEncounter> facilityContacts =
-        inpatientEncounters.parallelStream().filter(MiiEncounter::isFacilityContact).toList();
-
-    // Iterate over facility contacts and map supply contacts
-    for (MiiEncounter facilityContact : facilityContacts) {
-      try {
-        String visitNumber = facilityContact.getVisitNumberIdentifierValue();
-        // Skipping element if visit number is empty
-        if (visitNumber == null) {
-          log.warn("Facility contact {} has no visit number identifier", facilityContact.getId());
-          continue;
-        }
-        // Get supply contacts for the facility contact
-        List<MiiEncounter> supplyContacts =
-            icuSupplyContactsMap.getOrDefault(visitNumber, Collections.emptyList());
-        // Add the mapping to the output, using an empty list if no supply contacts are present
-        output
-            .computeIfAbsent(facilityContact.getId(), k -> new ArrayList<>())
-            .addAll(supplyContacts);
-      } catch (Exception ex) {
-        log.error(
-            "Unable to determine the supply contacts for facility contact {}",
-            facilityContact.getId());
-      }
-    }
-    return output;
-  }
-
-  /**
-   * This method generates a mapping from supply contacts to facility contacts. The input sets are
-   * lists of UkbEncounter objects.
-   *
-   * @param supplyContactEncounters The list of supply contacts.
-   * @param departmentEncounters The list of department contacts.
-   * @param facilityEncounters The list of facility contacts.
-   * @param usePartOf Use {@link MiiEncounter#getPartOf()} attribute instead the visit number in
-   *     {@link MiiEncounter#getIdentifier()}
-   * @return A mapping from supply contacts to facility contacts.
-   * @throws RuntimeException if no encounter with an identifier.slice 'Aufnahmenummer' was found.
-   */
-  public static Map<String, String> generateSupplyContactToFacilityContactMap(
-      List<MiiEncounter> supplyContactEncounters,
-      List<MiiEncounter> departmentEncounters,
-      List<MiiEncounter> facilityEncounters,
-      boolean usePartOf) {
-
-    // Initialize output map
-    Map<String, String> output = new ConcurrentHashMap<>();
-
-    // Index facility encounters by visit number
-    Map<String, MiiEncounter> facilityEncounterMap = new ConcurrentHashMap<>();
-    facilityEncounters.forEach(
-        facilityEncounter -> {
-          String visitNumber = facilityEncounter.getVisitNumberIdentifierValue();
-          if (visitNumber != null) {
-            facilityEncounterMap.put(visitNumber, facilityEncounter);
-          } else {
-            log.warn(
-                "No identifier with slice 'Aufnahmenummer' was found for encounter with id {}",
-                facilityEncounter.getId());
-          }
-        });
-
-    // Process supply contacts and map them to facility contacts
-    supplyContactEncounters.parallelStream()
-        .forEach(
-            supplyContactEncounter -> {
-              try {
-                String visitNumber = supplyContactEncounter.getVisitNumberIdentifierValue();
-                if (visitNumber != null) {
-                  MiiEncounter facilityEncounter = facilityEncounterMap.get(visitNumber);
-                  if (facilityEncounter != null) {
-                    supplyContactEncounter.setFacilityContactId(facilityEncounter.getId());
-                    output.put(supplyContactEncounter.getId(), facilityEncounter.getId());
-                  }
-                } else {
-                  log.warn(
-                      "No visit number identifier found for supply contact encounter with id {}",
-                      supplyContactEncounter.getId());
-                }
-              } catch (Exception ex) {
-                log.error("Error processing supply contact: {}", ex.getMessage());
-              }
-            });
-
-    // If no facility encounters were found, try hierarchical determination via Encounter.partOf
-    if (usePartOf) {
-      log.info("Encounter hierarchy resolution via .partOf was activated in the config.");
-      supplyContactEncounters.forEach(
-          supplyContact -> {
-            if (supplyContact.hasPartOf()) {
-              if (supplyContact.getPartOf().hasReference()) {
-                String supplyContactPartOf = extractIdFromReference(supplyContact.getPartOf());
-                if (supplyContactPartOf != null) {
-                  MiiEncounter departmentContact =
-                      departmentEncounters.stream()
-                          .filter(x -> x.getId().equals(supplyContactPartOf))
-                          .findFirst()
-                          .orElse(null);
-                  if (departmentContact != null) {
-                    String departmentContactPartOf =
-                        extractIdFromReference(departmentContact.getPartOf());
-                    if (departmentContactPartOf != null) {
-                      MiiEncounter facilityContact =
-                          facilityEncounters.stream()
-                              .filter(x -> x.getId().equals(departmentContactPartOf))
-                              .findFirst()
-                              .orElse(null);
-                      if (facilityContact != null) {
-                        supplyContact.setFacilityContactId(facilityContact.getId());
-                        output.put(supplyContact.getId(), facilityContact.getId());
-                        // Using the facility contact id as Encounter.identifier for easier usage in
-                        // the
-                        // further workflow
-                        supplyContact.addIdentifier(createIdentifierVisitNumber(facilityContact));
-                        facilityContact.addIdentifier(createIdentifierVisitNumber(facilityContact));
-                      }
-                    } else {
-                      log.warn(
-                          "No partOf identifier found for 'Encounter.abteilungskontakt' with id {}",
-                          departmentContact.getId());
-                    }
-                  } else {
-                    log.warn(
-                        "No department reference found for 'Encounter.versorgungsstellenkontakt'"
-                            + " with id {}",
-                        supplyContact.getId());
-                  }
-                } else {
-                  log.warn(
-                      "No partOf identifier found for 'Encounter.versorgungsstellenkontakt' with id"
-                          + " {}",
-                      supplyContact.getId());
-                }
-              } else {
-                log.warn(
-                    "Encounter with id {} holds a .partOf element but no literal reference",
-                    supplyContact.getId());
-              }
-            }
-          });
-    }
-
-    if (output.isEmpty()) {
-      throw new RuntimeException(
-          "No encounter with an identifier.slice 'Aufnahmenummer' was found.");
-    }
-    return output;
-  }
-
-  private static Identifier createIdentifierVisitNumber(MiiEncounter facilityContact) {
-    return new Identifier()
-        .setType(IDENTIFIER_TYPE_VISIT_NUMBER_CC)
-        .setValue(facilityContact.getId());
   }
 
   /**

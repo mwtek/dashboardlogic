@@ -26,14 +26,18 @@ import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.CURRENT_DISCHARGEDI
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.CURRENT_RECRUITMENT;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.TIMELINE_DISCHARGEDIAGS_COHORTS;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.TIMELINE_RECRUITMENT;
+import static de.ukbonn.mwtek.dashboardlogic.enums.EncounterReferenceResourceType.CONDITION;
+import static de.ukbonn.mwtek.dashboardlogic.enums.EncounterReferenceResourceType.OPS_PROCEDURE;
 import static de.ukbonn.mwtek.dashboardlogic.logic.CohortLogic.getCohort1;
 import static de.ukbonn.mwtek.dashboardlogic.logic.CohortLogic.getCohort2;
 import static de.ukbonn.mwtek.dashboardlogic.logic.CohortLogic.getCohort3;
+import static de.ukbonn.mwtek.dashboardlogic.logic.ReferenceFunctionality.updateEncounterReferences;
 import static de.ukbonn.mwtek.utilities.enums.TerminologySystems.OPS;
 import static de.ukbonn.mwtek.utilities.generic.time.DateTools.calcYearsBetweenDates;
 import static de.ukbonn.mwtek.utilities.generic.time.DateTools.getCurrentDateTime;
 
 import de.ukbonn.mwtek.dashboardlogic.enums.DataItemContext;
+import de.ukbonn.mwtek.dashboardlogic.enums.EncounterReferenceResourceType;
 import de.ukbonn.mwtek.dashboardlogic.logic.current.AcribisCurrentDischargeDiags;
 import de.ukbonn.mwtek.dashboardlogic.logic.timeline.AcribisTimelineDischargeDiags;
 import de.ukbonn.mwtek.dashboardlogic.models.DiseaseDataItem;
@@ -113,11 +117,24 @@ public class AcribisDataItemGenerator extends DataItemGenerator {
     if (mapExcludeDataItems == null) {
       mapExcludeDataItems = new HashMap<>();
     }
-    boolean debug = globalConfiguration.getOutputDebugItems();
+    boolean outputDebugItems = globalConfiguration.getOutputDebugItems();
 
-    // If there are resources with unfilled mandatory attributes, report them immediately (may give
-    // partially reduced result sets)
-    //    reportMissingFields(encounters);
+    // Update condition and procedure references from supply/department contact to facility contact
+    // if set
+    conditions =
+        updateEncounterReferences(
+            conditions,
+            encounters,
+            globalConfiguration.getEncounterReferenceTargetType(CONDITION),
+            EncounterReferenceResourceType.CONDITION);
+    // Procedure updating currently redundant since it's done directly after the data retrieval but
+    // logic might shift to here in the near future.
+    procedures =
+        updateEncounterReferences(
+            procedures,
+            encounters,
+            globalConfiguration.getEncounterReferenceTargetType(OPS_PROCEDURE),
+            OPS_PROCEDURE);
 
     // The valid cases in our use case must have agreed to three specific fields
     consents = getValidConsents(consents);
@@ -135,7 +152,7 @@ public class AcribisDataItemGenerator extends DataItemGenerator {
               .buildCurrentRecruitment();
       currentDataList.add(
           new DiseaseDataItem(currentRecruitmentLabel, ITEMTYPE_STACKED_BAR_CHARTS, item));
-      if (debug) {
+      if (outputDebugItems) {
         currentDataList.add(
             new DiseaseDataItem(
                 addDebugLabel(currentRecruitmentLabel), ITEMTYPE_DEBUG, item.getDebugData()));
@@ -185,7 +202,7 @@ public class AcribisDataItemGenerator extends DataItemGenerator {
                 currentDischargeDiagsLabel,
                 ITEMTYPE_STACKED_BAR_CHARTS,
                 dataItem.createStackedBarCharts()));
-        if (debug) {
+        if (outputDebugItems) {
           currentDataList.add(
               new DiseaseDataItem(
                   addDebugLabel(currentDischargeDiagsLabel),

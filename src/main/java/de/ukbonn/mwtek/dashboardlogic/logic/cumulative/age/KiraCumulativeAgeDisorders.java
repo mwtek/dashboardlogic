@@ -156,7 +156,7 @@ public class KiraCumulativeAgeDisorders extends DashboardDataItemLogic {
     StackedBarChartsItem<Integer> result = new StackedBarChartsItem<>();
 
     // Set chart names from the disease group keys
-    result.setCharts(List.of(KJP_PATIENT));
+    result.setCharts(List.of(RSV_PATIENT));
 
     // Initialize lists to store the bars and stacks
     List<List<String>> barsOutput = List.of(KiraAgePedCluster.BARS);

@@ -20,14 +20,19 @@ package de.ukbonn.mwtek.dashboardlogic.settings;
 
 import static de.ukbonn.mwtek.dashboardlogic.enums.NumDashboardConstants.YEAR_MONTH_DATE_FORMAT;
 
+import de.ukbonn.mwtek.dashboardlogic.enums.EncounterReferenceResourceType;
+import de.ukbonn.mwtek.dashboardlogic.enums.EncounterReferenceTargetType;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.Arrays;
 import java.util.Date;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -116,6 +121,35 @@ public class GlobalConfiguration {
   private Boolean checkInProgressPeriodEnd = false;
 
   private CheckInProgressPeriodStart checkInProgressPeriodStart = new CheckInProgressPeriodStart();
+
+  private Map<EncounterReferenceResourceType, EncounterReferenceTargetType>
+      encounterReferenceTargetTypes = new EnumMap<>(EncounterReferenceResourceType.class);
+
+  /**
+   * Returns the configured encounter reference target type for the given resource type.
+   *
+   * @param resourceType the resource type
+   * @return the configured target type, or EK if no target type is configured
+   */
+  public EncounterReferenceTargetType getEncounterReferenceTargetType(
+      EncounterReferenceResourceType resourceType) {
+    return encounterReferenceTargetTypes.getOrDefault(
+        resourceType, EncounterReferenceTargetType.EK);
+  }
+
+  /**
+   * Returns the configured encounter reference target types for the given resource types.
+   *
+   * @param resourceTypes the resource types to resolve
+   * @return the configured target types, defaulting to EK where no explicit configuration exists
+   */
+  public Set<EncounterReferenceTargetType> getEncounterReferenceTargetTypes(
+      EncounterReferenceResourceType... resourceTypes) {
+
+    return Arrays.stream(resourceTypes)
+        .map(this::getEncounterReferenceTargetType)
+        .collect(Collectors.toSet());
+  }
 
   @Getter
   @Setter

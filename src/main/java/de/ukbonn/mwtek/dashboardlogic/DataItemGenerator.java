@@ -76,6 +76,9 @@ import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.TIMELINE_MAXTREATME
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.TIMELINE_TESTS;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.TIMELINE_TEST_POSITIVE;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.TIMELINE_VARIANTTESTRESULTS;
+import static de.ukbonn.mwtek.dashboardlogic.enums.EncounterReferenceResourceType.CONDITION;
+import static de.ukbonn.mwtek.dashboardlogic.enums.EncounterReferenceResourceType.ICU_PROCEDURE;
+import static de.ukbonn.mwtek.dashboardlogic.enums.EncounterReferenceResourceType.OPS_PROCEDURE;
 import static de.ukbonn.mwtek.dashboardlogic.enums.Gender.DIVERSE;
 import static de.ukbonn.mwtek.dashboardlogic.enums.Gender.FEMALE;
 import static de.ukbonn.mwtek.dashboardlogic.enums.Gender.MALE;
@@ -90,13 +93,14 @@ import static de.ukbonn.mwtek.dashboardlogic.enums.VitalStatus.ALIVE;
 import static de.ukbonn.mwtek.dashboardlogic.enums.VitalStatus.DEAD;
 import static de.ukbonn.mwtek.dashboardlogic.logic.CoronaResultFunctionality.generateCrosstabList;
 import static de.ukbonn.mwtek.dashboardlogic.logic.CoronaResultFunctionality.getDatesOutputList;
-import static de.ukbonn.mwtek.dashboardlogic.logic.DiseaseResultFunctionality.assignSupplyEncountersToFacilityEncounter;
 import static de.ukbonn.mwtek.dashboardlogic.logic.DiseaseResultFunctionality.createCumulativeMaxDebug;
 import static de.ukbonn.mwtek.dashboardlogic.logic.DiseaseResultFunctionality.createCurrentIcuMap;
 import static de.ukbonn.mwtek.dashboardlogic.logic.DiseaseResultFunctionality.createEncounterMapByClass;
 import static de.ukbonn.mwtek.dashboardlogic.logic.DiseaseResultFunctionality.createIcuMap;
-import static de.ukbonn.mwtek.dashboardlogic.logic.DiseaseResultFunctionality.generateSupplyContactToFacilityContactMap;
 import static de.ukbonn.mwtek.dashboardlogic.logic.DiseaseResultFunctionality.isLocationReferenceExisting;
+import static de.ukbonn.mwtek.dashboardlogic.logic.ReferenceFunctionality.assignSupplyEncountersToFacilityEncounter;
+import static de.ukbonn.mwtek.dashboardlogic.logic.ReferenceFunctionality.generateSupplyContactToFacilityContactMap;
+import static de.ukbonn.mwtek.dashboardlogic.logic.ReferenceFunctionality.updateEncounterReferences;
 import static de.ukbonn.mwtek.dashboardlogic.logic.cumulative.gender.CumulativeGender.translateGenderSpecIntoEnum;
 import static de.ukbonn.mwtek.dashboardlogic.logic.cumulative.lengthofstay.CumulativeLengthOfStayHospital.createLengthOfStayHospitalByVitalstatus;
 import static de.ukbonn.mwtek.dashboardlogic.logic.cumulative.lengthofstay.CumulativeLengthOfStayHospital.createMapDaysHospitalList;
@@ -106,6 +110,7 @@ import static de.ukbonn.mwtek.dashboardlogic.tools.ProcedureFilter.filterProcedu
 
 import de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues;
 import de.ukbonn.mwtek.dashboardlogic.enums.DataItemContext;
+import de.ukbonn.mwtek.dashboardlogic.enums.EncounterReferenceResourceType;
 import de.ukbonn.mwtek.dashboardlogic.enums.KidsRadarDataItemContext;
 import de.ukbonn.mwtek.dashboardlogic.enums.NumDashboardConstants.Covid;
 import de.ukbonn.mwtek.dashboardlogic.enums.NumDashboardConstants.Influenza;
@@ -242,6 +247,23 @@ public class DataItemGenerator {
     // If there are resources with unfilled mandatory attributes, report them immediately (may give
     // partially reduced result sets)
     reportMissingFields(encounters);
+
+    // Update condition and procedure references from supply/department contact to facility contact
+    // if set
+    conditions =
+        updateEncounterReferences(
+            conditions,
+            encounters,
+            globalConfiguration.getEncounterReferenceTargetType(CONDITION),
+            EncounterReferenceResourceType.CONDITION);
+    // Procedure updating currently redundant since it's done directly after the data retrieval but
+    // logic might shift to here in the near future.
+    procedures =
+        updateEncounterReferences(
+            procedures,
+            encounters,
+            globalConfiguration.getEncounterReferenceTargetType(ICU_PROCEDURE),
+            OPS_PROCEDURE);
 
     filterResourcesByDate(encounters, conditions, observations, dataItemContext);
 

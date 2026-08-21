@@ -32,11 +32,13 @@ import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.TIMELINE_DIAGS_OCCU
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.TIMELINE_PSYCH_INTENSIVE_CARE;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.TIMELINE_PSYCH_INTENSIVE_CARE_CHANGE;
 import static de.ukbonn.mwtek.dashboardlogic.enums.DataItems.TIMELINE_PSYCH_INTENSIVE_CARE_RATIO;
+import static de.ukbonn.mwtek.dashboardlogic.enums.EncounterReferenceResourceType.OPS_PROCEDURE;
 import static de.ukbonn.mwtek.dashboardlogic.enums.KidsRadarConstants.UPPER_AGE_BORDER_PREFILTER;
 import static de.ukbonn.mwtek.dashboardlogic.enums.KidsRadarDataItemContext.KJP;
 import static de.ukbonn.mwtek.dashboardlogic.enums.NumDashboardConstants.KidsRadar.QUALIFYING_DATE;
 import static de.ukbonn.mwtek.dashboardlogic.logic.KiraHandlingLogic.createCasesByDiag;
 import static de.ukbonn.mwtek.dashboardlogic.logic.KiraHandlingLogic.mergeEncounterAndFilterByAge;
+import static de.ukbonn.mwtek.dashboardlogic.logic.ReferenceFunctionality.updateEncounterReferences;
 import static de.ukbonn.mwtek.dashboardlogic.tools.EncounterFilter.filterEncounterByAge;
 import static de.ukbonn.mwtek.dashboardlogic.tools.EncounterFilter.getInpatientFacilityEncounters;
 import static de.ukbonn.mwtek.dashboardlogic.tools.KidsRadarTools.getKidsRadarIcdCodesKjp;
@@ -138,6 +140,15 @@ public class KiRaKjpDataItemGenerator extends DataItemGenerator {
     // If there are resources with unfilled mandatory attributes, report them immediately (may give
     // partially reduced result sets)
     reportMissingFields(encounters);
+
+    // Procedure updating currently redundant since it's done directly after the data retrieval but
+    // logic might shift to here in the near future.
+    procedures =
+        updateEncounterReferences(
+            procedures,
+            encounters,
+            globalConfiguration.getEncounterReferenceTargetType(OPS_PROCEDURE),
+            OPS_PROCEDURE);
 
     // Filtering outpatient and semi-stationary encounter (that could hold Encounter.class =
     // 'IMP' as well)
@@ -437,7 +448,6 @@ public class KiRaKjpDataItemGenerator extends DataItemGenerator {
                   .coreCaseDataByGroups(coreCaseDataByKjpDiagnosis)
                   .buildTimelineDiagsAdmission()));
     }
-
     return currentDataList;
   }
 

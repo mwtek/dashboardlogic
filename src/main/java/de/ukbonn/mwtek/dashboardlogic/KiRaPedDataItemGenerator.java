@@ -61,6 +61,7 @@ import de.ukbonn.mwtek.dashboardlogic.models.DiseaseDataItem;
 import de.ukbonn.mwtek.dashboardlogic.models.FacilityContactIcuLocationMap;
 import de.ukbonn.mwtek.dashboardlogic.settings.GlobalConfiguration;
 import de.ukbonn.mwtek.dashboardlogic.settings.InputCodeSettings;
+import de.ukbonn.mwtek.dashboardlogic.settings.ProviderConfiguration;
 import de.ukbonn.mwtek.dashboardlogic.settings.QualitativeLabCodesSettings;
 import de.ukbonn.mwtek.dashboardlogic.settings.VariantSettings;
 import de.ukbonn.mwtek.dashboardlogic.tools.DataBuilder;
@@ -130,7 +131,8 @@ public class KiRaPedDataItemGenerator extends DataItemGenerator {
       InputCodeSettings inputCodeSettings,
       QualitativeLabCodesSettings qualitativeLabCodesSettings,
       DataItemContext dataItemContext,
-      GlobalConfiguration globalConfiguration) {
+      GlobalConfiguration globalConfiguration,
+      ProviderConfiguration providerConfiguration) {
     List<DiseaseDataItem> resultDataItems = new ArrayList<>();
     if (mapExcludeDataItems == null) {
       mapExcludeDataItems = new HashMap<>();
@@ -286,6 +288,7 @@ public class KiRaPedDataItemGenerator extends DataItemGenerator {
                   .dbData(kiraData)
                   .applyDiseasePositiveFilter(false)
                   .encounterSubSet(kiraData.getFacilityContactEncounters())
+                  .globalConfiguration(globalConfiguration)
                   .buildCurrentZipCodeList()));
     }
 
@@ -422,6 +425,7 @@ public class KiRaPedDataItemGenerator extends DataItemGenerator {
                   .coreCaseDataByGroups(coreCaseDataByRsvDiagnosis)
                   .encounterSubSet(kiraData.getFacilityContactEncounters())
                   .kiraData(kiraData)
+                  .globalConfiguration(globalConfiguration)
                   .buildKiraZipCodeList()));
     }
 

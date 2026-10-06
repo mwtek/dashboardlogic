@@ -25,6 +25,7 @@ import static de.ukbonn.mwtek.dashboardlogic.examples.EncounterExampleData.getEx
 import de.ukbonn.mwtek.dashboardlogic.enums.DataItemContext;
 import de.ukbonn.mwtek.dashboardlogic.examples.InputCodeSettingsExampleData;
 import de.ukbonn.mwtek.dashboardlogic.logic.DashboardData;
+import de.ukbonn.mwtek.dashboardlogic.settings.GlobalConfiguration;
 import de.ukbonn.mwtek.utilities.fhir.resources.MiiPatient;
 import java.util.ArrayList;
 import java.util.List;
@@ -95,7 +96,13 @@ public class CumulativeZipCodeTests {
 
     List<String> result =
         new CumulativeZipCode()
-            .createZipCodeList(dbData.getEncounters(), null, dbData.getPatients(), null, true);
+            .createZipCodeList(
+                dbData.getEncounters(),
+                null,
+                dbData.getPatients(),
+                null,
+                true,
+                new GlobalConfiguration());
     // Even the ones with missing value should return a "null" string.
     Assert.isTrue(result.size() == patients.size(), "");
   }

@@ -25,7 +25,10 @@ import static de.ukbonn.mwtek.dashboardlogic.logic.DiseaseResultFunctionality.ge
 import de.ukbonn.mwtek.dashboardlogic.DashboardDataItemLogic;
 import de.ukbonn.mwtek.dashboardlogic.enums.DataItemContext;
 import de.ukbonn.mwtek.dashboardlogic.models.DiseaseDataItem;
+import de.ukbonn.mwtek.dashboardlogic.models.ParametersTimelineItem;
+import de.ukbonn.mwtek.dashboardlogic.models.TimestampedListPair;
 import de.ukbonn.mwtek.dashboardlogic.models.TimestampedListTriple;
+import de.ukbonn.mwtek.dashboardlogic.settings.ProviderConfiguration;
 import de.ukbonn.mwtek.utilities.fhir.resources.MiiConsent;
 import de.ukbonn.mwtek.utilities.fhir.resources.MiiQuestionnaireResponse;
 import de.ukbonn.mwtek.utilities.generic.time.DateTools;
@@ -49,6 +52,7 @@ public class TimelineRecruitment extends DashboardDataItemLogic implements Timel
 
   public static final String ACR_RECRUITMENT_CONSENT = "acr_recruitment_consent";
   public static final String ACR_RECRUITMENT_FOLLOWUP = "acr_recruitment_followup";
+  public static final String SNID_RECRUITMENT_CONSENT_DIZ = "snid_recruitment_consent_diz";
 
   /**
    * Creates a TimestampedListTriple that contains the number of deceased patients for each day
@@ -133,6 +137,69 @@ public class TimelineRecruitment extends DashboardDataItemLogic implements Timel
     return resultTriple;
   }
 
+  /**
+   * Creates a TimestampedListTriple that contains the number of deceased patients for each day
+   * since Qualifying date
+   *
+   * @return ListNumberPair Containing dates and number of deceased people
+   */
+  public TimestampedListPair createTimelineRecruitmentDiz(
+      List<MiiConsent> consents, DataItemContext dataItemContext) {
+    log.debug("started createTimelineRecruitmentDiz");
+    Instant startTimer = TimerTools.startTimer();
+    TimestampedListPair resultPair = new TimestampedListPair();
+
+    try {
+      long kickOffDateUnix = getKickOffDateInSeconds(dataItemContext);
+      // Get the earliest valid consent date for each patient
+      List<Long> consentPermitStartDatesUnix =
+          consents.stream()
+              // Grouping consents by pid
+              .collect(Collectors.groupingBy(MiiConsent::getPatientId))
+              .values()
+              .stream()
+              // For each patient's consent list, take the first valid consent date
+              .map(
+                  patientConsents ->
+                      patientConsents.stream()
+                          // Filter valid dates
+                          .map(MiiConsent::getSnidPermitStartDate)
+                          .filter(Objects::nonNull)
+                          // Take only the first valid date
+                          .map(DateTools::dateToUnixTime)
+                          .min(Long::compareTo)
+                          .orElse(null))
+              .filter(Objects::nonNull)
+              .toList();
+
+      // Assign each consent directly to its corresponding utc midnight timestamp bucket
+      Map<Long, Long> consentCountByDate =
+          consentPermitStartDatesUnix.stream()
+              .filter(timestamp -> timestamp >= kickOffDateUnix)
+              .collect(
+                  Collectors.groupingBy(
+                      timestamp ->
+                          kickOffDateUnix
+                              + ((timestamp - kickOffDateUnix) / DAY_IN_SECONDS) * DAY_IN_SECONDS,
+                      Collectors.counting()));
+
+      // output date list
+      List<Long> dateList = getDatesOutputList(dataItemContext);
+      // Map each output date to its consent count
+      List<Long> recruitmentConsentList =
+          dateList.stream().map(date -> consentCountByDate.getOrDefault(date, 0L)).toList();
+
+      resultPair.setDate(dateList);
+      resultPair.setValue(recruitmentConsentList);
+
+    } catch (Exception e) {
+      log.debug("Error in calculating the SNID recruitment timeline: {}", e.getMessage());
+    }
+
+    TimerTools.stopTimerAndLog(startTimer, "finished createTimelineRecruitmentDiz");
+    return resultPair;
+  }
+
   private static List<Long> getFollowUpDatesOnlyLastOne(
       List<MiiQuestionnaireResponse> questionnaireResponses) {
     return questionnaireResponses.stream()
@@ -214,6 +281,17 @@ public class TimelineRecruitment extends DashboardDataItemLogic implements Timel
     dataMap.put(SUBITEMTYPE_DATE, timestampedListTriple.getDate());
     dataMap.put(ACR_RECRUITMENT_CONSENT, timestampedListTriple.getValue1());
     dataMap.put(ACR_RECRUITMENT_FOLLOWUP, timestampedListTriple.getValue2());
+    return dataMap;
+  }
+
+  public ParametersTimelineItem<Long> createTimelineRecruitmentDizMap(
+      TimestampedListPair timestampedListPair, ProviderConfiguration providerConfiguration) {
+    ParametersTimelineItem<Long> dataMap = new ParametersTimelineItem<>();
+    dataMap.setDate(timestampedListPair.getDate());
+    dataMap.setValues(
+        List.of(timestampedListPair.getValue().stream().map(Number::longValue).toList()));
+    dataMap.setName(providerConfiguration.getName());
+    dataMap.setLineGraphs(List.of(SNID_RECRUITMENT_CONSENT_DIZ));
     return dataMap;
   }
 

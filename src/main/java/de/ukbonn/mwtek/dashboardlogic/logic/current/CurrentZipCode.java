@@ -20,6 +20,7 @@ package de.ukbonn.mwtek.dashboardlogic.logic.current;
 import de.ukbonn.mwtek.dashboardlogic.DashboardDataItemLogic;
 import de.ukbonn.mwtek.dashboardlogic.logic.cumulative.CumulativeZipCode;
 import de.ukbonn.mwtek.dashboardlogic.models.DiseaseDataItem;
+import de.ukbonn.mwtek.dashboardlogic.settings.GlobalConfiguration;
 import de.ukbonn.mwtek.utilities.fhir.resources.MiiEncounter;
 import de.ukbonn.mwtek.utilities.fhir.resources.MiiPatient;
 import java.util.List;
@@ -43,7 +44,8 @@ public class CurrentZipCode extends DashboardDataItemLogic {
       List<MiiEncounter> encounterSubSet,
       List<MiiPatient> patients,
       Integer charsToBeTrimmed,
-      boolean applyDiseasePositiveFilter) {
+      boolean applyDiseasePositiveFilter,
+      GlobalConfiguration globalConfiguration) {
     // Log the start of the method
     log.debug("started CurrentZipCode.createZipCodeList");
 
@@ -55,6 +57,7 @@ public class CurrentZipCode extends DashboardDataItemLogic {
         encounterSubSetActive,
         patients,
         charsToBeTrimmed,
-        applyDiseasePositiveFilter);
+        applyDiseasePositiveFilter,
+        globalConfiguration);
   }
 }

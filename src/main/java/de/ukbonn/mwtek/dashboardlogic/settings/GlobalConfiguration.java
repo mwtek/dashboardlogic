@@ -120,6 +120,9 @@ public class GlobalConfiguration {
   /** Threat in-progress encounter that got a `period.end` set as `FINISHED` */
   private Boolean checkInProgressPeriodEnd = false;
 
+  /** Custom mapping of ZIP codes into other (most likely) "broader" codes */
+  private Map<String, String> zipCodeMapping = new HashMap<>();
+
   private CheckInProgressPeriodStart checkInProgressPeriodStart = new CheckInProgressPeriodStart();
 
   private Map<EncounterReferenceResourceType, EncounterReferenceTargetType>

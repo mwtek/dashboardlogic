@@ -115,6 +115,8 @@ public class DataItems {
 
   public static final String CURRENT_RECRUITMENT = "current.recruitment";
   public static final String TIMELINE_RECRUITMENT = "timeline.recruitment";
+  public static final String CURRENT_RECRUITMENT_DIZ = CURRENT_RECRUITMENT + ".diz";
+  public static final String TIMELINE_RECRUITMENT_DIZ = TIMELINE_RECRUITMENT + ".diz";
   public static final String CURRENT_DISCHARGEDIAGS_COHORTS = "current.dischargediags.cohorts";
   public static final String TIMELINE_DISCHARGEDIAGS_COHORTS = "timeline.dischargediags.cohorts";
 

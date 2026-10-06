@@ -39,6 +39,7 @@ import de.ukbonn.mwtek.dashboardlogic.enums.NumDashboardConstants.Bct;
 import de.ukbonn.mwtek.dashboardlogic.enums.NumDashboardConstants.Covid;
 import de.ukbonn.mwtek.dashboardlogic.enums.NumDashboardConstants.Influenza;
 import de.ukbonn.mwtek.dashboardlogic.enums.NumDashboardConstants.KidsRadar;
+import de.ukbonn.mwtek.dashboardlogic.enums.NumDashboardConstants.Snid;
 import de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels;
 import de.ukbonn.mwtek.dashboardlogic.settings.InputCodeSettings;
 import de.ukbonn.mwtek.dashboardlogic.settings.QualitativeLabCodesSettings;
@@ -391,6 +392,7 @@ public class DiseaseResultFunctionality {
       case KIDS_RADAR -> currentDate = KidsRadar.QUALIFYING_DATE_AS_LONG;
       case ACRIBIS -> currentDate = Acribis.QUALIFYING_DATE_SECONDS;
       case BCT -> currentDate = Bct.QUALIFYING_DATE_SECONDS;
+      case SNID -> currentDate = Snid.QUALIFYING_DATE_SECONDS;
     }
     return currentDate;
   }
@@ -516,7 +518,7 @@ public class DiseaseResultFunctionality {
       // update the encounter in the map
       pidAdmissionMap.computeIfPresent(
           pid,
-          (key, prevEncounter) -> {
+          (_, prevEncounter) -> {
             Date prevStartDate = prevEncounter.getPeriod().getStart();
             Instant prevInstant = prevStartDate.toInstant();
             LocalDateTime prevAdmission =

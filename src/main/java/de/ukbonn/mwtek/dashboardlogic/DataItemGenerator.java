@@ -127,6 +127,7 @@ import de.ukbonn.mwtek.dashboardlogic.models.TimestampedListPair;
 import de.ukbonn.mwtek.dashboardlogic.settings.GlobalConfiguration;
 import de.ukbonn.mwtek.dashboardlogic.settings.GlobalConfiguration.CheckInProgressPeriodStart;
 import de.ukbonn.mwtek.dashboardlogic.settings.InputCodeSettings;
+import de.ukbonn.mwtek.dashboardlogic.settings.ProviderConfiguration;
 import de.ukbonn.mwtek.dashboardlogic.settings.QualitativeLabCodesSettings;
 import de.ukbonn.mwtek.dashboardlogic.settings.VariantSettings;
 import de.ukbonn.mwtek.dashboardlogic.tools.DataBuilder;
@@ -233,7 +234,8 @@ public class DataItemGenerator {
       InputCodeSettings inputCodeSettings,
       QualitativeLabCodesSettings qualitativeLabCodesSettings,
       DataItemContext dataItemContext,
-      GlobalConfiguration globalConfiguration) {
+      GlobalConfiguration globalConfiguration,
+      ProviderConfiguration providerConfiguration) {
     List<DiseaseDataItem> currentDataList = new ArrayList<>();
     if (mapExcludeDataItems == null) {
       mapExcludeDataItems = new HashMap<>();
@@ -902,7 +904,10 @@ public class DataItemGenerator {
           new DiseaseDataItem(
               cumulativeZipCodeLabel,
               ITEMTYPE_LIST,
-              new DataBuilder().dbData(dbData).buildCumulativeZipCodeList()));
+              new DataBuilder()
+                  .dbData(dbData)
+                  .globalConfiguration(globalConfiguration)
+                  .buildCumulativeZipCodeList()));
     }
 
     // timeline tests
@@ -1594,19 +1599,7 @@ public class DataItemGenerator {
     List<String> dischargeDateBeforeAdmissionDate =
         encounters.parallelStream()
             .filter(Encounter::hasPeriod)
-            .filter(
-                x -> {
-                  boolean valid =
-                      x.getPeriod().getStart() != null && x.getPeriod().getEnd() != null;
-                  if (!valid) {
-                    log.warn(
-                        "Encounter {} has an invalid period. start={}, end={}",
-                        x.getId(),
-                        x.getPeriod().getStart(),
-                        x.getPeriod().getEnd());
-                  }
-                  return valid;
-                })
+            .filter(x -> x.getPeriod().hasStart() && x.getPeriod().hasEnd())
             .filter(x -> x.getPeriod().getEnd().before(x.getPeriod().getStart()))
             .map(MiiEncounter::getId)
             .toList();

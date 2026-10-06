@@ -41,6 +41,7 @@ import de.ukbonn.mwtek.dashboardlogic.logic.cumulative.results.CumulativeResult;
 import de.ukbonn.mwtek.dashboardlogic.logic.current.CurrentConsent;
 import de.ukbonn.mwtek.dashboardlogic.logic.current.CurrentMaxTreatmentLevel;
 import de.ukbonn.mwtek.dashboardlogic.logic.current.CurrentRecruitment;
+import de.ukbonn.mwtek.dashboardlogic.logic.current.CurrentRecruitmentDiz;
 import de.ukbonn.mwtek.dashboardlogic.logic.current.CurrentTreatmentLevel;
 import de.ukbonn.mwtek.dashboardlogic.logic.current.CurrentZipCode;
 import de.ukbonn.mwtek.dashboardlogic.logic.current.KiraCurrentTreatmentLevel;
@@ -62,9 +63,13 @@ import de.ukbonn.mwtek.dashboardlogic.models.CoreCaseData;
 import de.ukbonn.mwtek.dashboardlogic.models.FacilityContactIcuLocationMap;
 import de.ukbonn.mwtek.dashboardlogic.models.GroupedBarChartsCalcItem;
 import de.ukbonn.mwtek.dashboardlogic.models.KiraInteger;
+import de.ukbonn.mwtek.dashboardlogic.models.ParametersSetItem;
+import de.ukbonn.mwtek.dashboardlogic.models.ParametersTimelineItem;
 import de.ukbonn.mwtek.dashboardlogic.models.StackedBarChartsItem;
 import de.ukbonn.mwtek.dashboardlogic.models.StackedBarChartsUniformItem;
 import de.ukbonn.mwtek.dashboardlogic.models.TimestampedListPair;
+import de.ukbonn.mwtek.dashboardlogic.settings.GlobalConfiguration;
+import de.ukbonn.mwtek.dashboardlogic.settings.ProviderConfiguration;
 import de.ukbonn.mwtek.utilities.fhir.resources.MiiConsent;
 import de.ukbonn.mwtek.utilities.fhir.resources.MiiEncounter;
 import de.ukbonn.mwtek.utilities.fhir.resources.MiiObservation;
@@ -98,6 +103,8 @@ public class DataBuilder {
 
   private DashboardLogicFixedValues labResult;
   private DataItemContext dataItemContext;
+  private GlobalConfiguration globalConfiguration;
+  private ProviderConfiguration providerConfiguration;
   private Gender gender;
 
   private KidsRadarDataItemContext kidsRadarDataItemContext;
@@ -232,7 +239,8 @@ public class DataBuilder {
         encounterSubSet,
         dbData.getPatients(),
         null,
-        applyDiseasePositiveFilter);
+        applyDiseasePositiveFilter,
+        globalConfiguration);
   }
 
   public List<String> buildCurrentZipCodeList() {
@@ -242,7 +250,8 @@ public class DataBuilder {
             encounterSubSet,
             dbData.getPatients(),
             null,
-            applyDiseasePositiveFilter);
+            applyDiseasePositiveFilter,
+            globalConfiguration);
   }
 
   public ChartListItem buildKiraZipCodeList() {
@@ -251,7 +260,8 @@ public class DataBuilder {
             kidsRadarDataItemContext,
             coreCaseDataByGroups,
             encounterSubSet,
-            kiraData.getPatients());
+            kiraData.getPatients(),
+            globalConfiguration);
   }
 
   public AggregatedDataItem buildCurrentTreatmentlevel() {
@@ -343,11 +353,22 @@ public class DataBuilder {
     return new CurrentRecruitment().createStackedBarCharts(consents, questionnaireResponses);
   }
 
+  public ParametersSetItem<Integer> buildCurrentRecruitmentDiz() {
+    return new CurrentRecruitmentDiz().createParametersSet(consents, providerConfiguration);
+  }
+
   public Map<String, List<? extends Number>> buildTimelineRecruitmentMap() {
     return new TimelineRecruitment()
         .createTimelineRecruitmentMap(
             new TimelineRecruitment()
                 .createTimelineRecruitment(consents, questionnaireResponses, dataItemContext));
+  }
+
+  public ParametersTimelineItem<Long> buildTimelineRecruitmentDizMap() {
+    return new TimelineRecruitment()
+        .createTimelineRecruitmentDizMap(
+            new TimelineRecruitment().createTimelineRecruitmentDiz(consents, DataItemContext.SNID),
+            providerConfiguration);
   }
 
   public Map<String, List<Integer>> buildTimelineAgeByIcd(Collection<String> icdCodes) {

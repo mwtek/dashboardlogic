@@ -27,6 +27,7 @@ import de.ukbonn.mwtek.dashboardlogic.enums.EncounterReferenceResourceType;
 import de.ukbonn.mwtek.dashboardlogic.models.DiseaseDataItem;
 import de.ukbonn.mwtek.dashboardlogic.settings.GlobalConfiguration;
 import de.ukbonn.mwtek.dashboardlogic.settings.InputCodeSettings;
+import de.ukbonn.mwtek.dashboardlogic.settings.ProviderConfiguration;
 import de.ukbonn.mwtek.dashboardlogic.settings.QualitativeLabCodesSettings;
 import de.ukbonn.mwtek.dashboardlogic.settings.VariantSettings;
 import de.ukbonn.mwtek.utilities.fhir.resources.MiiCondition;
@@ -88,7 +89,8 @@ public class KidsRadarDataItemGenerator extends DataItemGenerator {
       InputCodeSettings inputCodeSettings,
       QualitativeLabCodesSettings qualitativeLabCodesSettings,
       DataItemContext dataItemContext,
-      GlobalConfiguration globalConfiguration) {
+      GlobalConfiguration globalConfiguration,
+      ProviderConfiguration providerConfiguration) {
     List<DiseaseDataItem> currentDataList = new ArrayList<>();
     if (mapExcludeDataItems == null) {
       mapExcludeDataItems = new HashMap<>();
@@ -126,7 +128,8 @@ public class KidsRadarDataItemGenerator extends DataItemGenerator {
               inputCodeSettings,
               qualitativeLabCodesSettings,
               DataItemContext.KIDS_RADAR_PED,
-              globalConfiguration));
+              globalConfiguration,
+              providerConfiguration));
     }
     if (dataItemContext == DataItemContext.KIDS_RADAR_KJP || dataItemContext == KIDS_RADAR) {
 
@@ -139,7 +142,8 @@ public class KidsRadarDataItemGenerator extends DataItemGenerator {
               inputCodeSettings,
               qualitativeLabCodesSettings,
               DataItemContext.KIDS_RADAR_KJP,
-              globalConfiguration));
+              globalConfiguration,
+              providerConfiguration));
     }
     return currentDataList;
   }

@@ -18,7 +18,6 @@
 package de.ukbonn.mwtek.dashboardlogic.logic.cumulative;
 
 import static de.ukbonn.mwtek.dashboardlogic.enums.DashboardLogicFixedValues.COUNTRY_CODE;
-import static de.ukbonn.mwtek.dashboardlogic.enums.KidsRadarConstants.KIRA_NUMBER_OF_CHARS_ZIP_CODES;
 import static de.ukbonn.mwtek.dashboardlogic.enums.KidsRadarConstants.KIRA_PED_NUMBER_OF_CHARS_ZIP_CODES;
 import static de.ukbonn.mwtek.dashboardlogic.enums.KidsRadarConstants.RSV_DIAGNOSES_ALL;
 import static de.ukbonn.mwtek.dashboardlogic.tools.KidsRadarTools.getRsvOnlyCoreCaseDataByGroups;
@@ -29,6 +28,7 @@ import de.ukbonn.mwtek.dashboardlogic.enums.KidsRadarDataItemContext;
 import de.ukbonn.mwtek.dashboardlogic.models.ChartListItem;
 import de.ukbonn.mwtek.dashboardlogic.models.CoreCaseData;
 import de.ukbonn.mwtek.dashboardlogic.models.DiseaseDataItem;
+import de.ukbonn.mwtek.dashboardlogic.settings.GlobalConfiguration;
 import de.ukbonn.mwtek.dashboardlogic.tools.EncounterFilter;
 import de.ukbonn.mwtek.utilities.fhir.resources.MiiEncounter;
 import de.ukbonn.mwtek.utilities.fhir.resources.MiiPatient;
@@ -59,8 +59,10 @@ public class CumulativeZipCode extends DashboardDataItemLogic {
 
   /** Iterating over all the facility encounters that were initialized. */
   public List<String> createZipCodeList(
-      List<MiiEncounter> facilityContacts, List<MiiPatient> patients) {
-    return createZipCodeList(facilityContacts, null, patients, null, true);
+      List<MiiEncounter> facilityContacts,
+      List<MiiPatient> patients,
+      GlobalConfiguration globalConfiguration) {
+    return createZipCodeList(facilityContacts, null, patients, null, true, globalConfiguration);
   }
 
   /**
@@ -72,7 +74,8 @@ public class CumulativeZipCode extends DashboardDataItemLogic {
       List<MiiEncounter> encounterSubSet,
       List<MiiPatient> patients,
       Integer charsToBeTrimmed,
-      boolean applyDiseasePositiveFilter) {
+      boolean applyDiseasePositiveFilter,
+      GlobalConfiguration globalConfiguration) {
     // Log the start of the method
     log.debug("started createZipCodeList");
     // Start a timer to measure the method's execution time
@@ -80,6 +83,11 @@ public class CumulativeZipCode extends DashboardDataItemLogic {
 
     // Initialize the list to store zip codes
     List<String> results = new ArrayList<>();
+
+    // Get configured ZIP code mappings
+    Map<String, String> zipCodeMapping = globalConfiguration.getZipCodeMapping();
+    boolean applyZipCodeMapping = zipCodeMapping != null && !zipCodeMapping.isEmpty();
+
     // Using all facility contact encounters as default
     if (encounterSubSet == null) {
       encounterSubSet = facilityContacts;
@@ -98,7 +106,7 @@ public class CumulativeZipCode extends DashboardDataItemLogic {
     // Build a map of all patients for fast lookup by ID
     Map<String, MiiPatient> patientMap =
         patients.stream()
-            .collect(Collectors.toMap(MiiPatient::getId, Function.identity(), (a, b) -> a));
+            .collect(Collectors.toMap(MiiPatient::getId, Function.identity(), (a, _) -> a));
 
     // Get only the relevant patients (i.e., those who are disease-positive)
     List<MiiPatient> relevantPatients =
@@ -116,6 +124,10 @@ public class CumulativeZipCode extends DashboardDataItemLogic {
               // Add the postal code to the result list
               String postalCode = firstAddress.getPostalCode();
               if (postalCode != null) {
+                // Replace the postal code if a mapping is configured
+                if (applyZipCodeMapping) {
+                  postalCode = zipCodeMapping.getOrDefault(postalCode, postalCode);
+                }
                 // Trimming because of data protection to the given number of chars
                 if (charsToBeTrimmed != null && postalCode.length() > charsToBeTrimmed)
                   postalCode = postalCode.substring(0, charsToBeTrimmed);
@@ -141,39 +153,18 @@ public class CumulativeZipCode extends DashboardDataItemLogic {
 
     // Sort the list of zip codes
     Collections.sort(results);
+
     // Stop the timer and log the end of the method
     TimerTools.stopTimerAndLog(startTime, "finished createZipCodeList");
     // Return the list of zip codes
     return results;
   }
 
-  @Deprecated(since = "V0.5.5")
-  public ChartListItem createKiRaKjpZipCodeList(
-      Map<String, Map<String, CoreCaseData>> coreCaseDataByGroups,
-      List<MiiEncounter> facilityEncounters,
-      List<MiiPatient> patients) {
-    List<String> charts = new ArrayList<>();
-    List<List<String>> values = new ArrayList<>();
-    coreCaseDataByGroups.forEach(
-        (context, coreCaseDataByCaseId) -> {
-          charts.add(context);
-          values.add(
-              createZipCodeList(
-                  null,
-                  facilityEncounters.parallelStream()
-                      .filter(x -> coreCaseDataByCaseId.containsKey(x.getFacilityContactId()))
-                      .toList(),
-                  patients,
-                  KIRA_NUMBER_OF_CHARS_ZIP_CODES,
-                  true));
-        });
-    return new ChartListItem(charts, values);
-  }
-
   public ChartListItem createKiRaRsvZipCodeList(
       Map<String, Map<String, CoreCaseData>> coreCaseDataByGroups,
       List<MiiEncounter> facilityEncounters,
-      List<MiiPatient> patients) {
+      List<MiiPatient> patients,
+      GlobalConfiguration globalConfiguration) {
     Map<String, Map<String, CoreCaseData>> rsvOnly =
         getRsvOnlyCoreCaseDataByGroups(coreCaseDataByGroups);
     List<String> charts = new ArrayList<>(List.of(RSV_DIAGNOSES_ALL));
@@ -181,7 +172,7 @@ public class CumulativeZipCode extends DashboardDataItemLogic {
     // For RSV, all the values are aggregated in one array
     List<List<String>> values = new ArrayList<>();
 
-    // --- 1) "ALL" aggregated over all RSV groups ---
+    // 1) "ALL" aggregated over all RSV groups
     // Collect encounter IDs that have any RSV diagnosis
     Set<String> allRsvEncounterIds =
         rsvOnly.values().stream()
@@ -199,9 +190,10 @@ public class CumulativeZipCode extends DashboardDataItemLogic {
                 .toList(),
             patients,
             KIRA_PED_NUMBER_OF_CHARS_ZIP_CODES,
-            true));
+            true,
+            globalConfiguration));
 
-    // --- 2) One run per RSV key, in the same order as charts ---
+    // 2) One run per RSV key, in the same order as charts
     for (Map.Entry<String, Map<String, CoreCaseData>> entry : rsvOnly.entrySet()) {
       Map<String, CoreCaseData> perGroup = entry.getValue();
       Set<String> perGroupEncounterIds =
@@ -220,7 +212,8 @@ public class CumulativeZipCode extends DashboardDataItemLogic {
                   .toList(),
               patients,
               KIRA_PED_NUMBER_OF_CHARS_ZIP_CODES,
-              true));
+              true,
+              globalConfiguration));
     }
 
     return new ChartListItem(charts, values);
@@ -230,14 +223,16 @@ public class CumulativeZipCode extends DashboardDataItemLogic {
       KidsRadarDataItemContext kidsRadarDataItemContext,
       Map<String, Map<String, CoreCaseData>> coreCaseDataByGroups,
       List<MiiEncounter> facilityEncounters,
-      List<MiiPatient> patients) {
+      List<MiiPatient> patients,
+      GlobalConfiguration globalConfiguration) {
     switch (kidsRadarDataItemContext) {
       case KJP -> {
         // Not needed anymore since version 0.5.5
         // return createKiRaKjpZipCodeList(coreCaseDataByGroups, facilityEncounters, patients);
       }
       case PED -> {
-        return createKiRaRsvZipCodeList(coreCaseDataByGroups, facilityEncounters, patients);
+        return createKiRaRsvZipCodeList(
+            coreCaseDataByGroups, facilityEncounters, patients, globalConfiguration);
       }
     }
     return null;

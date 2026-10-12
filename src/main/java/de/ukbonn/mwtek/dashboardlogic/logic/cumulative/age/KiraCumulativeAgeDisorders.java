@@ -36,6 +36,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -141,6 +142,9 @@ public class KiraCumulativeAgeDisorders extends DashboardDataItemLogic {
     // Set the populated data list into the result object
     result.setValues(dataList);
 
+    // Apply suppression to complete age groups.
+    removeSuppressedAgeGroups(result);
+
     // Stop the timer and log the execution time
     TimerTools.stopTimerAndLog(startTimer, "Finished KiraCumulativeAgeDisorders.createKjpData");
     return result;
@@ -238,7 +242,7 @@ public class KiraCumulativeAgeDisorders extends DashboardDataItemLogic {
     // Iterate through each case group and sort cases into the appropriate age cluster
     for (Map<String, CoreCaseData> caseData : caseDataByGroup) {
       caseData.forEach(
-          (entry, coreCaseData) -> {
+          (_, coreCaseData) -> {
             // Check each age cluster and match cases based on their period (years or months)
             for (T ageCluster : ageClusters) {
               if (ageCluster.getPeriod() == KiraAgeCluster.Period.YEARS) {
@@ -256,5 +260,84 @@ public class KiraCumulativeAgeDisorders extends DashboardDataItemLogic {
           });
     }
     return result;
+  }
+
+  /** Removes age groups that must be suppressed due to conflicting diagnosis group counts. */
+  private static void removeSuppressedAgeGroups(StackedBarChartsUniformItem<KiraInteger> item) {
+
+    int inGroupIndex = item.getStacks().indexOf(IN_GROUP);
+    int outGroupIndex = item.getStacks().indexOf(OUT_GROUP);
+
+    if (inGroupIndex < 0 || outGroupIndex < 0) {
+      return;
+    }
+
+    Set<Integer> ageGroupIndexesToRemove = new HashSet<>();
+
+    // Check each age group across all diagnosis groups.
+    for (int ageGroupIndex = 0; ageGroupIndex < item.getBars().size(); ageGroupIndex++) {
+      boolean hasSuppressedOutGroup = false;
+      boolean hasUnsuppressedOutGroup = false;
+
+      for (int chartIndex = 0; chartIndex < item.getCharts().size(); chartIndex++) {
+        List<KiraInteger> values = item.getValues().get(chartIndex).get(ageGroupIndex);
+
+        KiraInteger inGroup = values.get(inGroupIndex);
+        KiraInteger outGroup = values.get(outGroupIndex);
+
+        // A visible in-group value combined with a suppressed out-group value.
+        if (inGroup.isAboveThreshold() && outGroup.isAtOrBelowThreshold()) {
+          hasSuppressedOutGroup = true;
+        }
+
+        // A visible in-group value combined with a visible out-group value.
+        if (inGroup.isAboveThreshold() && outGroup.isAboveThreshold()) {
+          hasUnsuppressedOutGroup = true;
+        }
+
+        // Remove the age group if both combinations occur across diagnosis groups.
+        if (hasSuppressedOutGroup && hasUnsuppressedOutGroup) {
+          ageGroupIndexesToRemove.add(ageGroupIndex);
+          break;
+        }
+      }
+    }
+
+    if (!ageGroupIndexesToRemove.isEmpty()) {
+      List<String> removedAgeGroups =
+          ageGroupIndexesToRemove.stream().map(item.getBars()::get).toList();
+
+      log.warn(
+          "Removing age groups {} from KJP cumulative age disorders due to suppression rule.",
+          removedAgeGroups);
+    }
+
+    removeAgeGroups(item, ageGroupIndexesToRemove);
+  }
+
+  /** Removes the given age group indexes from the bars and all chart values. */
+  private static void removeAgeGroups(
+      StackedBarChartsUniformItem<KiraInteger> item, Set<Integer> ageGroupIndexesToRemove) {
+
+    // Remove from highest to lowest index to avoid shifting following indexes.
+    List<Integer> indexes =
+        ageGroupIndexesToRemove.stream().sorted(Comparator.reverseOrder()).toList();
+
+    List<String> bars = new ArrayList<>(item.getBars());
+
+    List<List<List<KiraInteger>>> values =
+        item.getValues().stream()
+            .map(ArrayList::new)
+            .collect(Collectors.toCollection(ArrayList::new));
+
+    for (int ageGroupIndex : indexes) {
+      bars.remove(ageGroupIndex);
+      // Remove the same age group from every diagnosis group.
+      for (List<List<KiraInteger>> chartValues : values) {
+        chartValues.remove(ageGroupIndex);
+      }
+    }
+    item.setBars(bars);
+    item.setValues(values);
   }
 }

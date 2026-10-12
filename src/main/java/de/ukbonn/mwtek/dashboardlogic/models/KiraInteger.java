@@ -35,8 +35,16 @@ public record KiraInteger(Number number) {
     if (number == null) {
       return null;
     }
-    double n = number.doubleValue();
-    // Return a String for values <= 3, otherwise return the numeric value
-    return n <= THRESHOLD ? THRESHOLD_UNEQUALITY : number;
+    return isAtOrBelowThreshold() ? THRESHOLD_UNEQUALITY : number;
+  }
+
+  /** Returns whether the value is present and at or below the suppression threshold. */
+  public boolean isAtOrBelowThreshold() {
+    return number != null && number.doubleValue() <= THRESHOLD;
+  }
+
+  /** Returns whether the value is present and above the suppression threshold. */
+  public boolean isAboveThreshold() {
+    return number != null && number.doubleValue() > THRESHOLD;
   }
 }

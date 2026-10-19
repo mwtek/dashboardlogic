@@ -133,7 +133,9 @@ public class KiraTimelineDisorders extends DashboardDataItemLogic
         });
 
     result.setValues(values);
-
+    if (kidsRadarDataItemContext == KidsRadarDataItemContext.KJP) {
+      removeSuppressedOccurrenceMonths(result);
+    }
     TimerTools.stopTimerAndLog(startTimer, "Finished KiraTimelineDisorders.createGroupedBarCharts");
     return result;
   }
@@ -234,5 +236,76 @@ public class KiraTimelineDisorders extends DashboardDataItemLogic
           group,
           count);
     }
+  }
+
+  /** Removes months that must be suppressed due to conflicting diagnosis group counts. */
+  private void removeSuppressedOccurrenceMonths(StackedBarChartsUniformItem<KiraInteger> item) {
+
+    int inGroupIndex = item.getStacks().indexOf(IN_GROUP);
+    int outGroupIndex = item.getStacks().indexOf(OUT_GROUP);
+
+    // Should never happen
+    if (inGroupIndex < 0 || outGroupIndex < 0) {
+      return;
+    }
+
+    Set<Integer> monthIndexesToRemove = new HashSet<>();
+    // Check each month across all diagnosis groups.
+    for (int monthIndex = 0; monthIndex < item.getBars().size(); monthIndex++) {
+      boolean hasSuppressedOutGroup = false;
+      boolean hasUnsuppressedOutGroup = false;
+
+      for (int chartIndex = 0; chartIndex < item.getCharts().size(); chartIndex++) {
+        List<KiraInteger> values = item.getValues().get(chartIndex).get(monthIndex);
+
+        KiraInteger inGroup = values.get(inGroupIndex);
+        KiraInteger outGroup = values.get(outGroupIndex);
+
+        // Condition 1: in-group != "<=3" AND out-group == "<=3"
+        if (inGroup.isAboveThreshold() && outGroup.isAtOrBelowThreshold()) {
+          hasSuppressedOutGroup = true;
+        }
+
+        // Condition 2: in-group != "<=3" AND out-group != "<=3"
+        if (inGroup.isAboveThreshold() && outGroup.isAboveThreshold()) {
+          hasUnsuppressedOutGroup = true;
+        }
+        // Remove the month if both combinations occur across diagnosis groups.
+        if (hasSuppressedOutGroup && hasUnsuppressedOutGroup) {
+          monthIndexesToRemove.add(monthIndex);
+          break;
+        }
+      }
+    }
+    if (!monthIndexesToRemove.isEmpty()) {
+      List<String> removedMonths = monthIndexesToRemove.stream().map(item.getBars()::get).toList();
+      log.warn(
+          "Removing months {} from KJP diagnosis occurrence timeline due to suppression rule.",
+          removedMonths);
+    }
+    removeMonths(item, monthIndexesToRemove);
+  }
+
+  /** Removes the given month indexes from the bars and all chart values. */
+  private void removeMonths(
+      StackedBarChartsUniformItem<KiraInteger> item, Set<Integer> monthIndexesToRemove) {
+    // Remove from highest to lowest index to avoid shifting following indexes.
+    List<Integer> indexes =
+        monthIndexesToRemove.stream().sorted(Comparator.reverseOrder()).toList();
+    List<String> bars = new ArrayList<>(item.getBars());
+    List<List<List<KiraInteger>>> values =
+        item.getValues().stream()
+            .map(ArrayList::new)
+            .collect(Collectors.toCollection(ArrayList::new));
+
+    for (int monthIndex : indexes) {
+      bars.remove(monthIndex);
+      // Remove the same month from every diagnosis group.
+      for (List<List<KiraInteger>> chartValues : values) {
+        chartValues.remove(monthIndex);
+      }
+    }
+    item.setBars(bars);
+    item.setValues(values);
   }
 }

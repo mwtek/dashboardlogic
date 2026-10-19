@@ -1600,6 +1600,7 @@ public class DataItemGenerator {
         encounters.parallelStream()
             .filter(Encounter::hasPeriod)
             .filter(x -> x.getPeriod().hasStart() && x.getPeriod().hasEnd())
+            .filter(x -> x.getPeriod().getStart() != null && x.getPeriod().getEnd() != null)
             .filter(x -> x.getPeriod().getEnd().before(x.getPeriod().getStart()))
             .map(MiiEncounter::getId)
             .toList();

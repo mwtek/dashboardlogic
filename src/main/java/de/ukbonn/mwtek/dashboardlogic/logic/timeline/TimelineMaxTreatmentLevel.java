@@ -27,6 +27,7 @@ import static de.ukbonn.mwtek.dashboardlogic.enums.TreatmentLevels.OUTPATIENT;
 import static de.ukbonn.mwtek.dashboardlogic.logic.DiseaseResultFunctionality.extractIdFromReference;
 import static de.ukbonn.mwtek.dashboardlogic.logic.DiseaseResultFunctionality.getKickOffDateInSeconds;
 import static de.ukbonn.mwtek.dashboardlogic.logic.DiseaseResultFunctionality.isLocationReferenceExisting;
+import static de.ukbonn.mwtek.dashboardlogic.logic.ReferenceFunctionality.indexProceduresByCaseId;
 import static de.ukbonn.mwtek.utilities.fhir.misc.FhirCodingTools.getCodeOfFirstCoding;
 
 import de.ukbonn.mwtek.dashboardlogic.DashboardDataItemLogic;
@@ -136,6 +137,16 @@ public class TimelineMaxTreatmentLevel extends DashboardDataItemLogic
 
     long currentDate = getKickOffDateInSeconds(dataItemContext);
     long currentDayUnix = DateTools.getCurrentUnixTime();
+
+    // Indexing the ICU procedures by the case they belong to. Without this index every case that is
+    // checked for a day linearly searches the whole procedure list.
+    Map<String, List<MiiProcedure>> icuProceduresByCaseId = indexProceduresByCaseId(icuProcedures);
+
+    // Bucketing the cases into the days they can appear on. The day loop used to filter the whole
+    // case list from scratch for every single day since the qualifying date, which is quadratic over
+    // the days and the cases.
+    Map<Long, List<MiiEncounter>> casesByDay =
+        bucketCasesByDay(positiveSupplyContactEncounters, currentDate, currentDayUnix);
     // Storing the highest treatmentlevel undiff since its simpler to handle
     Map<String, TreatmentLevels> highestTreatmentLevelUndiff = new HashMap<>();
 
@@ -152,20 +163,9 @@ public class TimelineMaxTreatmentLevel extends DashboardDataItemLogic
         mapIcuEcmoCaseNrs.put(checkDate, ConcurrentHashMap.newKeySet());
       }
       // Pre-filtering the encounters to ones that can have intersection with the date that is
-      // currently checked
+      // currently checked (see bucketCasesByDay)
       try {
-        positiveSupplyContactEncounters.parallelStream()
-            .filter(
-                x -> {
-                  long start = DateTools.dateToUnixTime(x.getPeriod().getStart()) - DAY_IN_SECONDS;
-                  long end =
-                      DateTools.dateToUnixTime(
-                              x.getPeriod().getEnd() != null
-                                  ? x.getPeriod().getEnd()
-                                  : DateTools.getCurrentDateTime())
-                          + DAY_IN_SECONDS;
-                  return start < checkDate && end >= checkDate;
-                })
+        casesByDay.getOrDefault(checkDate, Collections.emptyList()).parallelStream()
             .forEach(
                 supplyContactEncounter -> {
                   // Since a case should just count once a day and the procedure usually references
@@ -235,7 +235,7 @@ public class TimelineMaxTreatmentLevel extends DashboardDataItemLogic
                     // At this stage it is clear that it is a stationary supplyContactEncounter
                     else if (supplyContactEncounter.isCaseClassInpatientOrShortStay()) {
                       handleInpatientEncounter(
-                          icuProcedures,
+                          icuProceduresByCaseId,
                           inputCodeSettings,
                           useIcuUndiff,
                           supplyContactEncounter,
@@ -279,8 +279,55 @@ public class TimelineMaxTreatmentLevel extends DashboardDataItemLogic
     return resultWithCaseNrsMap;
   }
 
+  /**
+   * Buckets the given cases into the days of the timeline they can appear on.
+   *
+   * <p>A case is considered on a checked day if its period - widened by one day on each side -
+   * contains the timestamp of that day, which is the same rule the day-by-day filtering this method
+   * replaces used: {@code caseStart - DAY < checkDate && caseEnd + DAY >= checkDate}. Bucketing once
+   * turns the quadratic walk over all days and all cases into a single pass over the cases.
+   *
+   * @param cases the cases to bucket
+   * @param firstDayUnix unix seconds of the first day of the timeline
+   * @param lastDayUnix unix seconds of the last day of the timeline
+   * @return a map of day timestamp (unix seconds) to the cases that can appear on that day
+   */
+  static Map<Long, List<MiiEncounter>> bucketCasesByDay(
+      Collection<MiiEncounter> cases, long firstDayUnix, long lastDayUnix) {
+    Map<Long, List<MiiEncounter>> casesByDay = new HashMap<>();
+    for (MiiEncounter encounter : cases) {
+      try {
+        long caseStartUnix = DateTools.dateToUnixTime(encounter.getPeriod().getStart());
+        long caseEndUnix =
+            DateTools.dateToUnixTime(
+                encounter.getPeriod().getEnd() != null
+                    ? encounter.getPeriod().getEnd()
+                    : DateTools.getCurrentDateTime());
+        // Smallest and largest day timestamp satisfying the overlap rule described above
+        long firstCheck = Math.max(firstDayUnix, caseStartUnix - DAY_IN_SECONDS + 1);
+        long lastCheck = Math.min(lastDayUnix, caseEndUnix + DAY_IN_SECONDS);
+        if (firstCheck > lastCheck) {
+          continue;
+        }
+        // Align the first day to the day grid of the timeline
+        long daysToFirstDay = (firstCheck - firstDayUnix + DAY_IN_SECONDS - 1) / DAY_IN_SECONDS;
+        for (long checkDate = firstDayUnix + daysToFirstDay * DAY_IN_SECONDS;
+            checkDate <= lastCheck;
+            checkDate += DAY_IN_SECONDS) {
+          casesByDay.computeIfAbsent(checkDate, _ -> new ArrayList<>()).add(encounter);
+        }
+      } catch (Exception ex) {
+        log.debug(
+            "Encounter {} cannot be assigned to the days of the timeline: {}",
+            encounter.getId(),
+            ex.getMessage());
+      }
+    }
+    return casesByDay;
+  }
+
   private static void handleInpatientEncounter(
-      List<MiiProcedure> icuProcedures,
+      Map<String, List<MiiProcedure>> icuProceduresByCaseId,
       InputCodeSettings inputCodeSettings,
       Boolean useIcuUndiff,
       MiiEncounter supplyContactEncounter,
@@ -337,9 +384,8 @@ public class TimelineMaxTreatmentLevel extends DashboardDataItemLogic
           } else {
             // check if there are any icu procedures currently going on
             List<MiiProcedure> listEncounterIcuProcedure =
-                icuProcedures.stream()
-                    .filter(icu -> facilityContactId.equals(icu.getCaseId()))
-                    .toList();
+                icuProceduresByCaseId.getOrDefault(
+                    facilityContactId, Collections.emptyList());
             // if there is no ICU Procedure, check if it is currently considered
             // as ICU or stationary
             if (listEncounterIcuProcedure.isEmpty()) {
@@ -371,9 +417,7 @@ public class TimelineMaxTreatmentLevel extends DashboardDataItemLogic
         // if an ICU case was found
         else if (isIcu && !isVent && !isEcmo) {
           List<MiiProcedure> listEncounterIcuProcedure =
-              icuProcedures.stream()
-                  .filter(icu -> facilityContactId.equals(icu.getCaseId()))
-                  .collect(Collectors.toList());
+              icuProceduresByCaseId.getOrDefault(facilityContactId, Collections.emptyList());
 
           if (listEncounterIcuProcedure.isEmpty()) {
             addCaseToTimeline(mapIcuCaseNrs, checkDate, facilityContactId);
@@ -397,9 +441,7 @@ public class TimelineMaxTreatmentLevel extends DashboardDataItemLogic
         // if a ventilation case was found
         else if (isVent && !isEcmo) {
           List<MiiProcedure> icuProceduresEncounter =
-              icuProcedures.stream()
-                  .filter(icu -> facilityContactId.equals(icu.getCaseId()))
-                  .toList();
+              icuProceduresByCaseId.getOrDefault(facilityContactId, Collections.emptyList());
           sortToVentOrEcmoTimeline(
               supplyContactEncounter,
               icuProceduresEncounter,

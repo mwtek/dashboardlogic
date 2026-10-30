@@ -32,8 +32,7 @@ import de.ukbonn.mwtek.utilities.generic.time.TimerTools;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.time.temporal.ChronoUnit;
-import java.util.Date;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -77,16 +76,27 @@ public class TimelineDeath extends DashboardDataItemLogic implements TimelineFun
               .filter(x -> x.getPeriod().hasEnd() && !x.isCaseClassOutpatient())
               .filter(MiiEncounter::isPatientDeceased)
               .toList();
+      // Bucket the deceased cases by the calendar day of their discharge date. The previous
+      // implementation compared every single case against every single day since the qualifying
+      // date, which is quadratic over the days and the case list.
+      Map<LocalDate, Long> deathsByDay = new HashMap<>();
+      for (MiiEncounter encounter : listPositiveDeceasedCases) {
+        LocalDate deathDay =
+            encounter.getPeriod().getEnd().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+        deathsByDay.merge(deathDay, 1L, Long::sum);
+      }
+
       // Loop through each day
       while (tempDateUnix <= currentUnixTime) {
-
-        long countDeceased = 0;
-        // needs to be filled beforehand for daysDifferenceCheck to work
-        dateResultMap.put(tempDateUnix, countDeceased);
-
-        for (MiiEncounter encounter : listPositiveDeceasedCases) {
-          checkDaysDifference(tempDateUnix, dateResultMap, encounter);
-        }
+        LocalDate checkedDay =
+            DateTools.unixTimeSecondsToDate(tempDateUnix)
+                .toInstant()
+                .atZone(ZoneId.systemDefault())
+                .toLocalDate();
+        // A case counts on the day its discharge date falls on (see the removed
+        // checkDaysDifference: dayDifference < 1 plus the same day/month/year check is exactly
+        // "same local date")
+        dateResultMap.put(tempDateUnix, deathsByDay.getOrDefault(checkedDay, 0L));
         tempDateUnix += DAY_IN_SECONDS; // add one day
       }
       valueList = divideMapValuesToLists(dateResultMap);
@@ -96,35 +106,5 @@ public class TimelineDeath extends DashboardDataItemLogic implements TimelineFun
     }
     TimerTools.stopTimerAndLog(startTimer, "finished createTimeLineDeathMap");
     return resultPair;
-  }
-
-  /**
-   * Calculation of the difference between two dates and, if the difference is less than or equal to
-   * 1, increments the value written to the map for the date checked [used by
-   * createTimelineDeathMap]
-   *
-   * @param tempDateUnix Current date [unixtime] which is checked and incremented if the reporting
-   *     date fits into the corresponding time window [date + 24 hours]
-   * @param dateResultMap Map with the result per date [unixtime]
-   * @param encounter Current {@link MiiEncounter} that is going to be checked
-   */
-  private static void checkDaysDifference(
-      long tempDateUnix, Map<Long, Long> dateResultMap, MiiEncounter encounter) {
-    Date checkDate = DateTools.unixTimeSecondsToDate(tempDateUnix);
-    Date caseDate = encounter.getPeriod().getEnd();
-    LocalDate localCheckDate = checkDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
-
-    LocalDate localCaseDate = caseDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
-
-    long dayDifference = Math.abs(ChronoUnit.DAYS.between(localCheckDate, localCaseDate));
-    // if the dayDifference is smaller than one than the value of the day can be increased by
-    // one
-    if (dayDifference < 1) {
-      // check if the dates have the same year and month
-      if (localCheckDate.getDayOfMonth() == localCaseDate.getDayOfMonth()
-          && localCheckDate.getYear() == localCaseDate.getYear()) {
-        dateResultMap.replace(tempDateUnix, dateResultMap.get(tempDateUnix) + 1);
-      }
-    }
   }
 }

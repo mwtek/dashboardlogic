@@ -329,9 +329,12 @@ public class DataItemGenerator {
         dataItemContext);
 
     // the icu information is part of the supply contact
+    // The ICU location IDs are resolved once here: recomputing them inside the predicate would
+    // re-filter every Location resource for every single supply contact.
+    Set<String> icuLocationIds = LocationFilter.getIcuLocationIds(locations);
     List<MiiEncounter> icuSupplyContactEncounters =
         supplyContactEncounters.stream()
-            .filter(x -> x.isIcuCase(LocationFilter.getIcuLocationIds(locations), false))
+            .filter(x -> x.isIcuCase(icuLocationIds, false))
             .toList();
 
     if (globalConfiguration.getCheckProceduresIcuStays())

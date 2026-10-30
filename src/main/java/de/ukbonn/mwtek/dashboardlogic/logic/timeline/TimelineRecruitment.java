@@ -34,6 +34,7 @@ import de.ukbonn.mwtek.utilities.fhir.resources.MiiQuestionnaireResponse;
 import de.ukbonn.mwtek.utilities.generic.time.DateTools;
 import de.ukbonn.mwtek.utilities.generic.time.TimerTools;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -101,21 +102,19 @@ public class TimelineRecruitment extends DashboardDataItemLogic implements Timel
       // Follow-up entries
       List<Long> followUpAuthoredDatesUnix = getFollowUpDatesOnlyLastOne(questionnaireResponses);
 
+      // Bucket both timestamp lists by the day they fall into. The previous implementation filtered
+      // both lists from scratch for every single day since the qualifying date.
+      final long firstDayUnix = tempDateUnix;
+      Map<Long, Long> consentCountByDay = countByDay(consentPermitStartDatesUnix, firstDayUnix);
+      Map<Long, Long> followUpCountByDay = countByDay(followUpAuthoredDatesUnix, firstDayUnix);
+
       // Loop through each day
       while (tempDateUnix <= currentUnixTime) {
         final long dayStart = tempDateUnix;
         final long dayEnd = tempDateUnix + DAY_IN_SECONDS;
-        long consentCount =
-            consentPermitStartDatesUnix.stream()
-                .filter(timestamp -> timestamp >= dayStart && timestamp < dayEnd)
-                .count();
-        long followUpCount =
-            followUpAuthoredDatesUnix.stream()
-                .filter(timestamp -> timestamp >= dayStart && timestamp < dayEnd)
-                .count();
 
-        dateRecruitmentConsentMap.put(dayStart, consentCount);
-        dateRecruitmentFollowUpMap.put(dayStart, followUpCount); // UNSUPPORTED ATM
+        dateRecruitmentConsentMap.put(dayStart, consentCountByDay.getOrDefault(dayStart, 0L));
+        dateRecruitmentFollowUpMap.put(dayStart, followUpCountByDay.getOrDefault(dayStart, 0L));
 
         tempDateUnix = dayEnd;
       }
@@ -135,6 +134,28 @@ public class TimelineRecruitment extends DashboardDataItemLogic implements Timel
 
     TimerTools.stopTimerAndLog(startTimer, "finished createTimelineRecruitment");
     return resultTriple;
+  }
+
+  /**
+   * Buckets the given unix timestamps by the day they fall into, counted from the first day of the
+   * timeline. Timestamps before the first day are ignored, which mirrors the day-by-day range check
+   * this method replaces.
+   *
+   * @param timestampsUnix the timestamps to bucket (epoch seconds)
+   * @param firstDayUnix unix seconds of the first day of the timeline
+   * @return a map of day start (unix seconds) to the number of timestamps falling into that day
+   */
+  static Map<Long, Long> countByDay(List<Long> timestampsUnix, long firstDayUnix) {
+    Map<Long, Long> countByDay = new HashMap<>();
+    for (long timestamp : timestampsUnix) {
+      if (timestamp < firstDayUnix) {
+        continue;
+      }
+      long dayStart =
+          firstDayUnix + ((timestamp - firstDayUnix) / DAY_IN_SECONDS) * DAY_IN_SECONDS;
+      countByDay.merge(dayStart, 1L, Long::sum);
+    }
+    return countByDay;
   }
 
   /**

@@ -39,6 +39,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.hl7.fhir.r4.model.Coding;
+import org.hl7.fhir.r4.model.Enumerations.AdministrativeGender;
 import org.hl7.fhir.r4.model.Extension;
 
 /**
@@ -98,11 +99,16 @@ public class CumulativeGender extends DashboardDataItemLogic {
   }
 
   private static boolean matchesGender(MiiPatient patient, Gender gender) {
-    if (!patient.hasGender()) {
+    if (patient == null || !patient.hasGender()) {
+      return false;
+    }
+    AdministrativeGender patientGender = patient.getGender();
+    if (patientGender == null) {
+      log.warn("Patient {} has a gender element without a value", patient.getId());
       return false;
     }
 
-    String genderCode = patient.getGender().toCode();
+    String genderCode = patientGender.toCode();
     // "Diverse" information is held in a extension so we need different behavior
     if (gender == DIVERSE) {
       if (!GENDER_OTHER_CODE.equalsIgnoreCase(genderCode)) {

@@ -46,10 +46,26 @@ public class EncounterFilter {
 
   public static List<MiiEncounter> getPositiveCurrentlyOnIcuWardEncounters(
       Collection<MiiEncounter> supplyContactEncounters, List<MiiLocation> locations) {
+    return getPositiveCurrentlyOnIcuWardEncounters(
+        supplyContactEncounters, LocationFilter.getIcuLocationIds(locations));
+  }
+
+  /**
+   * Same as {@link #getPositiveCurrentlyOnIcuWardEncounters(Collection, List)}, but takes the already
+   * resolved ICU location IDs. Callers that filter more than one collection of encounters should use
+   * this overload, otherwise the location resources are re-filtered once per encounter.
+   *
+   * @param supplyContactEncounters the supply contacts to filter
+   * @param icuLocationIds the already resolved ICU location IDs (see {@link
+   *     LocationFilter#getIcuLocationIds(List)})
+   * @return the disease-positive and currently active encounters that are located on an ICU ward
+   */
+  public static List<MiiEncounter> getPositiveCurrentlyOnIcuWardEncounters(
+      Collection<MiiEncounter> supplyContactEncounters, Set<String> icuLocationIds) {
     return supplyContactEncounters.stream()
         .filter(EncounterFilter::isDiseasePositive)
         .filter(MiiEncounter::isActive)
-        .filter(x -> x.isCurrentlyOnIcuWard(LocationFilter.getIcuLocationIds(locations)))
+        .filter(x -> x.isCurrentlyOnIcuWard(icuLocationIds))
         .toList();
   }
 

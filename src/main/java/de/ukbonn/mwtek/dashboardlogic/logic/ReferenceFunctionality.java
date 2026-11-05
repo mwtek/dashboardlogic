@@ -27,8 +27,11 @@ import de.ukbonn.mwtek.utilities.fhir.interfaces.CaseIdentifierValueProvider;
 import de.ukbonn.mwtek.utilities.fhir.resources.MiiCondition;
 import de.ukbonn.mwtek.utilities.fhir.resources.MiiEncounter;
 import de.ukbonn.mwtek.utilities.fhir.resources.MiiProcedure;
+import de.ukbonn.mwtek.utilities.generic.time.TimerTools;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -125,6 +128,12 @@ public class ReferenceFunctionality {
     // Additionally resolve the encounter hierarchy via Encounter.partOf if configured
     if (usePartOf) {
       log.info("Encounter hierarchy resolution via .partOf was activated in the config.");
+      Instant startTimer = TimerTools.startTimer();
+      // Indexing both contact levels once. Without this, every single supply contact linearly
+      // searches the (potentially six-figure) department and facility contact lists, which turns
+      // this resolution into the dominant part of the whole processing logic.
+      Map<String, MiiEncounter> departmentContactById = indexEncountersById(departmentEncounters);
+      Map<String, MiiEncounter> facilityContactById = indexEncountersById(facilityEncounters);
       supplyContactEncounters.forEach(
           supplyContact -> {
             if (supplyContact.hasPartOf()) {
@@ -132,11 +141,7 @@ public class ReferenceFunctionality {
                 String supplyContactPartOf = extractIdFromReference(supplyContact.getPartOf());
 
                 if (supplyContactPartOf != null) {
-                  MiiEncounter departmentContact =
-                      departmentEncounters.stream()
-                          .filter(x -> x.getId().equals(supplyContactPartOf))
-                          .findFirst()
-                          .orElse(null);
+                  MiiEncounter departmentContact = departmentContactById.get(supplyContactPartOf);
 
                   if (departmentContact != null) {
                     String departmentContactPartOf =
@@ -144,10 +149,7 @@ public class ReferenceFunctionality {
 
                     if (departmentContactPartOf != null) {
                       MiiEncounter facilityContact =
-                          facilityEncounters.stream()
-                              .filter(x -> x.getId().equals(departmentContactPartOf))
-                              .findFirst()
-                              .orElse(null);
+                          facilityContactById.get(departmentContactPartOf);
 
                       if (facilityContact != null) {
                         supplyContact.setFacilityContactId(facilityContact.getId());
@@ -181,12 +183,41 @@ public class ReferenceFunctionality {
               }
             }
           });
+      log.info(
+          "Encounter hierarchy resolution via .partOf took {} ms for {} supply contacts"
+              + " (indexing {} department contacts and {} facility contacts)",
+          TimerTools.stopTimer(startTimer),
+          supplyContactEncounters.size(),
+          departmentContactById.size(),
+          facilityContactById.size());
     }
     if (output.isEmpty()) {
       throw new RuntimeException(
           "No encounter with an identifier.slice 'Aufnahmenummer' was found.");
     }
     return output;
+  }
+
+  /**
+   * Indexes the given encounters by their resource ID so that lookups do not have to linearly search
+   * the whole list.
+   *
+   * <p>Encounters without an ID are skipped and the first occurrence of a duplicated ID wins, which
+   * mirrors the behaviour of the {@code stream().filter(...).findFirst()} lookups this method
+   * replaces.
+   *
+   * @param encounters the encounters to index; may be empty but not null
+   * @return a map of encounter ID to encounter
+   */
+  public static Map<String, MiiEncounter> indexEncountersById(List<MiiEncounter> encounters) {
+    Map<String, MiiEncounter> encountersById = new HashMap<>();
+    for (MiiEncounter encounter : encounters) {
+      String id = encounter.getId();
+      if (id != null) {
+        encountersById.putIfAbsent(id, encounter);
+      }
+    }
+    return encountersById;
   }
 
   /**
@@ -370,32 +401,112 @@ public class ReferenceFunctionality {
   }
 
   /**
+   * Indexes the given conditions by the case ID they reference, so that a merge does not have to
+   * linearly search the whole condition list for every merged case pair.
+   *
+   * <p>Conditions without a case ID can never match a merge and are therefore not indexed.
+   *
+   * @param conditions the conditions to index; may be empty but not null
+   * @return a map of case ID to the conditions referencing that case
+   */
+  public static Map<String, List<MiiCondition>> indexConditionsByCaseId(
+      List<MiiCondition> conditions) {
+    Map<String, List<MiiCondition>> conditionsByCaseId = new HashMap<>();
+    for (MiiCondition condition : conditions) {
+      String caseId = condition.getCaseId();
+      if (caseId != null) {
+        conditionsByCaseId.computeIfAbsent(caseId, _ -> new ArrayList<>()).add(condition);
+      }
+    }
+    return conditionsByCaseId;
+  }
+
+  /**
+   * Indexes the given procedures by the case ID they reference. Procedures without a case ID can
+   * never match a merge and are therefore not indexed.
+   *
+   * @param procedures the procedures to index; may be empty but not null
+   * @return a map of case ID to the procedures referencing that case
+   */
+  public static Map<String, List<MiiProcedure>> indexProceduresByCaseId(
+      List<MiiProcedure> procedures) {
+    Map<String, List<MiiProcedure>> proceduresByCaseId = new HashMap<>();
+    for (MiiProcedure procedure : procedures) {
+      if (procedure == null) {
+        continue;
+      }
+      String caseId = procedure.getCaseId();
+      if (caseId != null) {
+        proceduresByCaseId.computeIfAbsent(caseId, _ -> new ArrayList<>()).add(procedure);
+      }
+    }
+    return proceduresByCaseId;
+  }
+
+  /**
    * Updates the encounter references for conditions of the cases that get merged.
    *
+   * <p>This variant takes the plain condition list and builds the case ID index on the fly. Callers
+   * that merge more than one case pair should use {@link
+   * #updateConditionEncounterReferencesOnMerge(Map, String, String)} with an index built once via
+   * {@link #indexConditionsByCaseId(List)} instead.
+   *
+   * @param conditions the conditions to update
    * @param oldEncounterId the old encounter ID to be replaced, must not be null
    * @param newEncounterId the new encounter ID to replace with, must not be null
    * @throws IllegalArgumentException if either oldEncounterId or newEncounterId is null
    */
   public static void updateConditionEncounterReferencesOnMerge(
       List<MiiCondition> conditions, String oldEncounterId, String newEncounterId) {
+    updateConditionEncounterReferencesOnMerge(
+        indexConditionsByCaseId(conditions), oldEncounterId, newEncounterId);
+  }
+
+  /**
+   * Moves all conditions referencing {@code oldEncounterId} to {@code newEncounterId} using an index
+   * built once via {@link #indexConditionsByCaseId(List)}.
+   *
+   * <p>The moved conditions stay in the index under their new case ID, so that a subsequent merge of
+   * the target case takes them along.
+   *
+   * @param conditionsByCaseId the case ID index, which is updated in place
+   * @param oldEncounterId the old encounter ID to be replaced, must not be null
+   * @param newEncounterId the new encounter ID to replace with, must not be null
+   * @return the number of updated conditions
+   * @throws IllegalArgumentException if either encounter ID is null
+   */
+  public static int updateConditionEncounterReferencesOnMerge(
+      Map<String, List<MiiCondition>> conditionsByCaseId,
+      String oldEncounterId,
+      String newEncounterId) {
     if (oldEncounterId == null || newEncounterId == null) {
       throw new IllegalArgumentException("Encounter IDs must not be null");
     }
-    conditions.stream()
-        .filter(condition -> condition.getCaseId().equals(oldEncounterId))
-        .forEach(
-            condition -> {
-              condition.setCaseId(newEncounterId);
-              log.info(
-                  "Updated condition {} encounter id from {} to {}",
-                  condition.getId(),
-                  oldEncounterId,
-                  newEncounterId);
-            });
+    List<MiiCondition> movedConditions = conditionsByCaseId.remove(oldEncounterId);
+    if (movedConditions == null || movedConditions.isEmpty()) {
+      return 0;
+    }
+    for (MiiCondition condition : movedConditions) {
+      condition.setCaseId(newEncounterId);
+      log.trace(
+          "Updated condition {} encounter id from {} to {}",
+          condition.getId(),
+          oldEncounterId,
+          newEncounterId);
+    }
+    conditionsByCaseId
+        .computeIfAbsent(newEncounterId, _ -> new ArrayList<>())
+        .addAll(movedConditions);
+    return movedConditions.size();
   }
 
   /**
    * Updates the encounter references for procedures of the cases that get merged.
+   *
+   * <p>This variant takes the plain procedure list and builds the case ID index on the fly. Callers
+   * that merge more than one case pair should use {@link
+   * #updateProcedureEncounterReferences(Map, String, String)} with an index built once via {@link
+   * #indexProceduresByCaseId(List)} instead.
    *
    * @param procedures the list of procedures to update; may be empty but not null-safe if method is
    *     called with null
@@ -404,23 +515,46 @@ public class ReferenceFunctionality {
    */
   public static void updateProcedureEncounterReferences(
       List<MiiProcedure> procedures, String oldEncounterId, String newEncounterId) {
+    if (procedures == null || procedures.isEmpty()) return;
+    updateProcedureEncounterReferences(
+        indexProceduresByCaseId(procedures), oldEncounterId, newEncounterId);
+  }
+
+  /**
+   * Moves all procedures referencing {@code oldEncounterId} to {@code newEncounterId} using an index
+   * built once via {@link #indexProceduresByCaseId(List)}.
+   *
+   * @param proceduresByCaseId the case ID index, which is updated in place
+   * @param oldEncounterId the old encounter ID to be replaced, must not be null
+   * @param newEncounterId the new encounter ID to replace with, must not be null
+   * @return the number of updated procedures
+   * @throws IllegalArgumentException if either encounter ID is null
+   */
+  public static int updateProcedureEncounterReferences(
+      Map<String, List<MiiProcedure>> proceduresByCaseId,
+      String oldEncounterId,
+      String newEncounterId) {
 
     if (oldEncounterId == null || newEncounterId == null) {
       throw new IllegalArgumentException("Encounter IDs must not be null");
     }
-    if (procedures == null || procedures.isEmpty()) return;
+    if (proceduresByCaseId == null || proceduresByCaseId.isEmpty()) return 0;
 
-    procedures.stream()
-        .filter(Objects::nonNull)
-        .filter(p -> oldEncounterId.equals(p.getCaseId()))
-        .forEach(
-            p -> {
-              p.setCaseId(newEncounterId);
-              log.info(
-                  "Updated procedure {} encounter id from {} to {}",
-                  p.getId(),
-                  oldEncounterId,
-                  newEncounterId);
-            });
+    List<MiiProcedure> movedProcedures = proceduresByCaseId.remove(oldEncounterId);
+    if (movedProcedures == null || movedProcedures.isEmpty()) {
+      return 0;
+    }
+    for (MiiProcedure procedure : movedProcedures) {
+      procedure.setCaseId(newEncounterId);
+      log.trace(
+          "Updated procedure {} encounter id from {} to {}",
+          procedure.getId(),
+          oldEncounterId,
+          newEncounterId);
+    }
+    proceduresByCaseId
+        .computeIfAbsent(newEncounterId, _ -> new ArrayList<>())
+        .addAll(movedProcedures);
+    return movedProcedures.size();
   }
 }

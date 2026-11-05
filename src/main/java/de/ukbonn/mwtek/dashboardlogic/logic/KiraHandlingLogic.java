@@ -19,6 +19,9 @@
 import static de.ukbonn.mwtek.dashboardlogic.enums.KidsRadarConstants.CASE_MERGED;
 import static de.ukbonn.mwtek.dashboardlogic.enums.KidsRadarConstants.THRESHOLD_DAYS_CASE_MERGE;
 import static de.ukbonn.mwtek.dashboardlogic.enums.KidsRadarConstants.UPPER_AGE_BORDER;
+import static de.ukbonn.mwtek.dashboardlogic.logic.ReferenceFunctionality.indexConditionsByCaseId;
+import static de.ukbonn.mwtek.dashboardlogic.logic.ReferenceFunctionality.indexEncountersById;
+import static de.ukbonn.mwtek.dashboardlogic.logic.ReferenceFunctionality.indexProceduresByCaseId;
 import static de.ukbonn.mwtek.dashboardlogic.logic.ReferenceFunctionality.updateConditionEncounterReferencesOnMerge;
 import static de.ukbonn.mwtek.dashboardlogic.logic.ReferenceFunctionality.updateProcedureEncounterReferences;
 import static de.ukbonn.mwtek.dashboardlogic.tools.EncounterFilter.filterEncountersByIds;
@@ -46,7 +49,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -76,6 +78,13 @@ public class KiraHandlingLogic {
             patientsFiltered,
             inputCodeSettings);
 
+    // Indexing the resources once per merge run. Without this, every single merged case pair
+    // linearly searched the whole condition, procedure and encounter list, which made the merge the
+    // dominant part of the Kids' Radar processing logic.
+    MergeLookup lookup =
+        new MergeLookup(
+            facilityContactEncountersPreFiltered, conditionsFiltered, proceduresFiltered);
+
     // Group by patient and merge (MUST mutate registryByEncounterId entries)
     Map<String, List<Map.Entry<String, CoreCaseData>>> byPatient =
         registryByEncounterId.entrySet().stream()
@@ -85,13 +94,20 @@ public class KiraHandlingLogic {
       List<Map.Entry<String, CoreCaseData>> cases = new ArrayList<>(entry.getValue());
       if (cases.size() > 1) {
         mergeCases(
-            conditionsFiltered,
-            proceduresFiltered,
-            facilityContactEncountersPreFiltered,
+            lookup,
             cases,
             casesDeletedByDiagnosis,
             registryByEncounterId); // <-- mutate canonical instances + delete merged keys
       }
+    }
+
+    if (lookup.mergedCases > 0) {
+      log.info(
+          "Case merge finished: {} case(s) merged, {} condition and {} procedure reference(s)"
+              + " updated",
+          lookup.mergedCases,
+          lookup.updatedConditions,
+          lookup.updatedProcedures);
     }
 
     // Build merged encounter list consistent with registry keys
@@ -107,6 +123,34 @@ public class KiraHandlingLogic {
 
   public record MergeResult(
       List<MiiEncounter> mergedEncounters, Map<String, CoreCaseData> registryByEncounterId) {}
+
+  /**
+   * Lookup indexes for a single case merge run.
+   *
+   * <p>The merge moves conditions and procedures from one case to another and updates the discharge
+   * date of the merged encounter. All three resource types are therefore indexed by their
+   * respective key once, instead of being searched linearly for every merged case pair. The indexes
+   * are updated in place while merging, so a case that already absorbed another one takes the
+   * already moved resources along on the next merge.
+   */
+  public static final class MergeLookup {
+
+    private final Map<String, MiiEncounter> encounterById;
+    private final Map<String, List<MiiCondition>> conditionsByCaseId;
+    private final Map<String, List<MiiProcedure>> proceduresByCaseId;
+    private long mergedCases;
+    private long updatedConditions;
+    private long updatedProcedures;
+
+    public MergeLookup(
+        List<MiiEncounter> encounters,
+        List<MiiCondition> conditions,
+        List<MiiProcedure> procedures) {
+      this.encounterById = indexEncountersById(encounters);
+      this.conditionsByCaseId = indexConditionsByCaseId(conditions);
+      this.proceduresByCaseId = indexProceduresByCaseId(procedures);
+    }
+  }
 
   public static Map<String, CoreCaseData> mergeCoreCaseDataLists(
       Map<String, Map<String, CoreCaseData>> coreCaseDataByKjpDiagnosis,
@@ -140,17 +184,13 @@ public class KiraHandlingLogic {
   /**
    * Merges multiple cases for a single patient.
    *
-   * @param conditions Condition resources where the references may need to be updated.
-   * @param procedures Procedure resources where the references may need to be updated.
-   * @param facilityEncounters Facility encounters where the update procedure should take part.
+   * @param lookup indexes of the encounters, conditions and procedures taking part in the merge
    * @param caseDataEntries List of case data entries for a single patient.
    * @param casesDeletedByDiagnosis Set of IDs of cases that have been merged.
    * @param coreCaseDataByEncounterIdMap Map of encounter IDs to CoreCaseData.
    */
   public static void mergeCases(
-      List<MiiCondition> conditions,
-      List<MiiProcedure> procedures,
-      List<MiiEncounter> facilityEncounters,
+      MergeLookup lookup,
       List<Entry<String, CoreCaseData>> caseDataEntries,
       Set<String> casesDeletedByDiagnosis,
       Map<String, CoreCaseData> coreCaseDataByEncounterIdMap) {
@@ -188,9 +228,7 @@ public class KiraHandlingLogic {
       if (daysBetween <= THRESHOLD_DAYS_CASE_MERGE) {
         // Merge the two cases
         mergeTwoCases(
-            conditions,
-            procedures,
-            facilityEncounters,
+            lookup,
             currentCase,
             nextCase,
             encountersToBeDeleted,
@@ -219,17 +257,14 @@ public class KiraHandlingLogic {
   /**
    * Merges two specific cases.
    *
-   * @param conditions Condition resources where the reference needs to be updated.
-   * @param procedures Procedure resources where the reference needs to be updated.
+   * @param lookup indexes of the encounters, conditions and procedures taking part in the merge
    * @param currentCase The current case to be merged.
    * @param nextCase The next case to be merged.
    * @param encountersToBeDeleted Set of IDs of cases that have been merged.
    * @param coreCaseDataByEncounterIdMap Map of encounter IDs to CoreCaseData.
    */
   private static void mergeTwoCases(
-      List<MiiCondition> conditions,
-      List<MiiProcedure> procedures,
-      List<MiiEncounter> encounters,
+      MergeLookup lookup,
       CoreCaseData currentCase,
       CoreCaseData nextCase,
       Set<String> encountersToBeDeleted,
@@ -243,61 +278,63 @@ public class KiraHandlingLogic {
 
     // Mark the next case as merged by adding its ID to the deleted set
     encountersToBeDeleted.add(nextCase.getFacilityEncounterId());
-
-    // Log the discharge date update (even if it doesn't happen)
-    log.info(
-        "Discharge date updated for case id {} from {} to {}",
-        currentCase.getFacilityEncounterId(),
-        currentCase.getDischargeDate(),
-        nextCase.getDischargeDate());
+    lookup.mergedCases++;
 
     // Try to find the encounter and update it
-    updateUkbEncounter(encounters, currentCase, nextCase);
+    updateUkbEncounter(lookup.encounterById, currentCase, nextCase);
 
     // Update references and discharge date of the current case
-    updateCaseAndReferences(
-        conditions, procedures, currentCase, nextCase, coreCaseDataByEncounterIdMap);
+    updateCaseAndReferences(lookup, currentCase, nextCase, coreCaseDataByEncounterIdMap);
   }
 
   /** Updates the corresponding UkbEncounter's discharge date and adds a merged extension. */
   private static void updateUkbEncounter(
-      List<MiiEncounter> encounters, CoreCaseData currentCase, CoreCaseData nextCase) {
-    Optional<MiiEncounter> encounter =
-        encounters.stream()
-            .filter(x -> x.getId().equals(currentCase.getFacilityEncounterId()))
-            .findFirst();
+      Map<String, MiiEncounter> encountersById,
+      CoreCaseData currentCase,
+      CoreCaseData nextCase) {
+    MiiEncounter encounter = encountersById.get(currentCase.getFacilityEncounterId());
 
-    encounter.ifPresentOrElse(
-        enc -> {
-          Date currentEncounterEnd = enc.getPeriod().getEnd();
+    if (encounter == null) {
+      log.warn(
+          "Encounter with id {} not found in facilityContactEncounters",
+          currentCase.getFacilityEncounterId());
+      return;
+    }
 
-          // Only update if the next case's discharge date is later
-          if (shouldUpdateDate(currentEncounterEnd, nextCase.getDischargeDate())) {
-            enc.getPeriod().setEnd(nextCase.getDischargeDate());
-          }
+    Date currentEncounterEnd = encounter.getPeriod().getEnd();
 
-          // Add the extension indicating this case was merged
-          enc.addExtension(CASE_MERGED);
-        },
-        () ->
-            log.warn(
-                "Encounter with id {} not found in facilityContactEncounters",
-                currentCase.getFacilityEncounterId()));
+    // Only update if the next case's discharge date is later
+    if (shouldUpdateDate(currentEncounterEnd, nextCase.getDischargeDate())) {
+      encounter.getPeriod().setEnd(nextCase.getDischargeDate());
+      log.debug(
+          "Discharge date updated for case id {} from {} to {}",
+          currentCase.getFacilityEncounterId(),
+          currentEncounterEnd,
+          nextCase.getDischargeDate());
+    }
+
+    // Add the extension indicating this case was merged
+    encounter.addExtension(CASE_MERGED);
   }
 
   /** Updates the encounter references and possibly the discharge date for the merged case. */
   private static void updateCaseAndReferences(
-      List<MiiCondition> conditions,
-      List<MiiProcedure> procedures,
+      MergeLookup lookup,
       CoreCaseData currentCase,
       CoreCaseData nextCase,
       Map<String, CoreCaseData> coreCaseDataByEncounterIdMap) {
 
     // Update encounter references
-    updateConditionEncounterReferencesOnMerge(
-        conditions, nextCase.getFacilityEncounterId(), currentCase.getFacilityEncounterId());
-    updateProcedureEncounterReferences(
-        procedures, nextCase.getFacilityEncounterId(), currentCase.getFacilityEncounterId());
+    lookup.updatedConditions +=
+        updateConditionEncounterReferencesOnMerge(
+            lookup.conditionsByCaseId,
+            nextCase.getFacilityEncounterId(),
+            currentCase.getFacilityEncounterId());
+    lookup.updatedProcedures +=
+        updateProcedureEncounterReferences(
+            lookup.proceduresByCaseId,
+            nextCase.getFacilityEncounterId(),
+            currentCase.getFacilityEncounterId());
 
     // Update the discharge date if necessary
     if (shouldUpdateDate(currentCase.getDischargeDate(), nextCase.getDischargeDate())) {
@@ -448,15 +485,28 @@ public class KiraHandlingLogic {
    */
   public static Map<MiiEncounter, MiiPatient> mapEncountersToPatients(
       Set<MiiEncounter> encounters, List<MiiPatient> patients) {
-    return encounters.parallelStream()
-        .collect(
-            Collectors.toMap(
-                encounter -> encounter,
-                encounter ->
-                    patients.stream()
-                        .filter(patient -> patient.getId().equals(encounter.getPatientId()))
-                        .findFirst()
-                        .orElse(null)));
+    // Indexing the patients once. The previous implementation searched the whole patient list for
+    // every single encounter, which is quadratic over the two resource collections.
+    Map<String, MiiPatient> patientById = new HashMap<>();
+    for (MiiPatient patient : patients) {
+      String id = patient.getId();
+      if (id != null) {
+        patientById.putIfAbsent(id, patient);
+      }
+    }
+
+    Map<MiiEncounter, MiiPatient> encountersToPatients = new HashMap<>();
+    for (MiiEncounter encounter : encounters) {
+      MiiPatient patient = patientById.get(encounter.getPatientId());
+      if (patient == null) {
+        log.warn(
+            "No patient found for encounter {} (patient id {})",
+            encounter.getId(),
+            encounter.getPatientId());
+      }
+      encountersToPatients.put(encounter, patient);
+    }
+    return encountersToPatients;
   }
 
   /**

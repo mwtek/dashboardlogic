@@ -74,7 +74,6 @@ public class TimelineTests extends DashboardDataItemLogic implements TimelineFun
               observations, inputCodeSettings, dataItemContext);
     }
 
-    long endUnixTime = DateTools.getCurrentUnixTime();
 
     // Initialization of the map with the date entries to keep the order ascending
     List<Long> labEffectiveDates =
@@ -84,22 +83,12 @@ public class TimelineTests extends DashboardDataItemLogic implements TimelineFun
             .map(x -> DateTools.dateToUnixTime(x.getValue()))
             .toList();
 
+    // Each lab date falls into exactly one day of the timeline, so the day is computed directly
+    // instead of walking day by day until a match is found.
+    final long firstDayUnix = getKickOffDateInSeconds(dataItemContext);
     labEffectiveDates.parallelStream()
         .forEach(
-            effective -> {
-              // Reset of the starting date
-              long tempDate = getKickOffDateInSeconds(dataItemContext);
-
-              // If a value was found once in a time window, can be cancelled
-              Boolean labValueFound = false;
-
-              while (tempDate <= endUnixTime && !labValueFound) {
-                labValueFound = addLabTestToTimeline(effective, tempDate, valueDateMap);
-
-                // check the next day
-                tempDate += NumDashboardConstants.DAY_IN_SECONDS; // add one day
-              }
-            });
+            effective -> addLabTestToTimeline(effective, firstDayUnix, valueDateMap));
 
     // order them by key ascending (just needed if we want to parallelize it; the first tries
     // were not really promising tho because of too many write/read ops probably block each other)
@@ -124,7 +113,6 @@ public class TimelineTests extends DashboardDataItemLogic implements TimelineFun
     Instant startTimer = TimerTools.startTimer();
     Map<Long, Long> valueDateMap = getDateMapWithoutValues(dataItemContext);
     List<Long> valueList;
-    long currentUnixTime = DateTools.getCurrentUnixTime();
     if (diseasePositiveObservations == null) {
       diseasePositiveObservations =
           ObservationFilter.getObservationsByContext(
@@ -164,16 +152,11 @@ public class TimelineTests extends DashboardDataItemLogic implements TimelineFun
             .toList());
 
     try {
+      // Same direct day computation as in createTimelineTestsMap. Note that this item intentionally
+      // starts at the covid qualifying date, which is kept as-is.
+      final long firstDayUnix = Covid.QUALIFYING_DATE_SECONDS;
       labEffectiveDatesOfPositives.parallelStream()
-          .forEach(
-              labEffective -> {
-                Boolean obsFound = false;
-                long checkingDateUnix = Covid.QUALIFYING_DATE_SECONDS;
-                while (checkingDateUnix <= currentUnixTime && !obsFound) {
-                  obsFound = addLabTestToTimeline(labEffective, checkingDateUnix, valueDateMap);
-                  checkingDateUnix += NumDashboardConstants.DAY_IN_SECONDS; // add one day
-                }
-              });
+          .forEach(labEffective -> addLabTestToTimeline(labEffective, firstDayUnix, valueDateMap));
     } catch (Exception ex) {
       log.error("Error while running createTimelineTestPositiveMap", ex);
     }
@@ -195,27 +178,27 @@ public class TimelineTests extends DashboardDataItemLogic implements TimelineFun
   }
 
   /**
-   * Check whether a laboratory result belongs to the supplied date {@literal [Interval: day <->
-   * day+24h]} and later incrementing if so.
+   * Increments the timeline entry of the day the given laboratory result falls into [interval: day
+   * &lt;-&gt; day+24h].
    *
-   * @param labFundDate Date of the laboratory result
-   * @param tempDateUnix Current day [unix time] which is checked and incremented if the reporting
-   *     date fits into the corresponding time window [day + 24 hours]
+   * <p>The day is computed arithmetically instead of searching it day by day. Results before the
+   * first day of the timeline, or in a day that is not part of the timeline (e.g. a future date),
+   * are not counted - which is exactly what the day-by-day search this method replaces did.
+   *
+   * @param labFundDate Date of the laboratory result [unix time]
+   * @param firstDayUnix Unix time of the first day of the timeline [unix time]
    * @param resultMap Map that maps a frequency value to a date (unix time)
-   * @return Status information on whether the time of the laboratory test was within the reference
-   *     range and the resultMap was incremented at this point.
    */
-  private static Boolean addLabTestToTimeline(
-      Long labFundDate, long tempDateUnix, Map<Long, Long> resultMap) {
-    long increasedUnix = tempDateUnix + NumDashboardConstants.DAY_IN_SECONDS - 1;
-    boolean obsFound = false;
-
-    // if the labResult day is after the checked date and if the difference
-    if (tempDateUnix <= labFundDate && increasedUnix >= labFundDate) {
-      obsFound = true;
-      resultMap.compute(tempDateUnix, (k, v) -> v != null ? v + 1 : null);
+  static void addLabTestToTimeline(
+      Long labFundDate, long firstDayUnix, Map<Long, Long> resultMap) {
+    if (labFundDate == null || labFundDate < firstDayUnix) {
+      return;
     }
-
-    return obsFound;
+    long dayStart =
+        firstDayUnix
+            + ((labFundDate - firstDayUnix) / NumDashboardConstants.DAY_IN_SECONDS)
+                * NumDashboardConstants.DAY_IN_SECONDS;
+    // compute() leaves the map untouched if the day is not part of the timeline
+    resultMap.compute(dayStart, (k, v) -> v != null ? v + 1 : null);
   }
 }
